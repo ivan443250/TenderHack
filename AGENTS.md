@@ -1,205 +1,115 @@
 # AGENTS.md
 
-Этот файл — **карта**, а не энциклопедия. Подробные продуктовые и технические решения живут в `docs/` и являются source of truth.
+`AGENTS.md` — короткая карта репозитория для coding agents. Глубокий контекст живёт в `docs/`; не дублируй его здесь.
 
-## 1. Перед любой нетривиальной задачей
+## 1. Старт любой нетривиальной задачи
 
-1. Прочитай этот файл.
+1. Проверь текущую ветку, `git status` и diff. Не затирай чужую работу.
 2. Прочитай `docs/index.md`.
-3. Открой только релевантные документы из `docs/`.
-4. Проверь текущий `git status`/diff и не затирай чужие изменения.
-5. Сформулируй acceptance criteria задачи до написания кода.
-6. Если задача сложная или затрагивает несколько независимых областей — создай/обнови execution plan по правилам `docs/agent-workflow.md`.
+3. Открой только документы, релевантные задаче.
+4. Проверь `docs/open-decisions.md`: не превращай нерешённую политику в скрытый факт.
+5. Сформулируй acceptance criteria до кода.
+6. Если меняется внешний/межмодульный интерфейс — сначала открой `docs/contracts/README.md` и соответствующий контракт.
+7. Для работы дольше одной сессии или на нескольких блоках — используй execution plan по `docs/agent-workflow.md`.
 
-## 2. Неизменные продуктовые инварианты
+Подробный manager/subagent/review loop: `docs/agent-workflow.md`.
 
-- Это локальная система поддержки Портала поставщиков, а не универсальный helpdesk.
-- Runtime продукта — **один управляемый orchestrator/state machine**, не swarm автономных product agents.
-- Coding subagents разрешены и поощряются для ускорения разработки; это не меняет runtime-архитектуру продукта.
-- Внешние AI API в штатном интеллектуальном контуре запрещены.
-- Нормативный корпус ответов и исторический аналитический корпус разделены.
-- Историческое поле `Решение` не является автоматически разрешенным ответом новому пользователю.
-- Найденный похожий текст не равен доказанному ответу.
-- `ANSWER` не означает `RESOLVED`.
-- Подготовленная передача не означает принятую передачу.
-- Не выдумывай Portal state, SLA, контакты, line mappings или данные интеграций, которых нет.
-- Не выводи внутренний chain-of-thought пользователю, в лог или UI.
-- При нехватке подтверждений предпочитай `CLARIFY`/`HANDOFF_OFFER`, а не правдоподобную галлюцинацию.
+## 2. Приоритет источников
 
-Подробности: `docs/product-spec.md`.
+1. Официальные требования организаторов и подтверждённые экспертные уточнения.
+2. Явные текущие решения команды/пользователя, если они не противоречат п.1.
+3. `docs/hackathon-requirements.md`.
+4. `docs/product-spec.md`.
+5. `docs/architecture.md`, `docs/stack.md`, ADR и frozen contracts.
+6. Код, комментарии и старые drafts.
 
-## 3. Архитектурная граница
+Если источники конфликтуют — не выбирай молча. Зафиксируй конфликт в `docs/open-decisions.md` или обнови source of truth тем же change.
 
-Целевой MVP — два backend runtime с одной PostgreSQL (`docs/adr/0001-dotnet-support-core-python-knowledge-service.md`):
+## 3. Неподвижные архитектурные инварианты
 
-- **`api` / `api-worker` — .NET support core** (C#, clean architecture без церемониальных слоёв): cases, turns, orchestrator/state machine, финальный `Decision`, deterministic moderation, routing, handoff + outbox, feedback, HTTP/SSE для браузера, authz. Единственная публичная граница.
-- **`knowledge` / `knowledge-worker` — Python knowledge & inference service**: ingestion, `kb_*`, retrieval, answerability assessment, draft/verify, LLM-проверка неоднозначности модерации, quality analytics, evals. Только внутренняя сеть.
-- React frontend ходит только в `api`.
+- Browser ходит только в `.NET api`; `knowledge` наружу не публикуется.
+- Один product orchestrator/state machine находится в `.NET`.
+- `.NET` владеет `Decision`, case/turn state, moderation policy, routing, handoff, feedback и idempotency.
+- Python `knowledge` владеет ingestion, retrieval, evidence/answerability, draft/verify, model adapters и quality analytics.
+- `knowledge` возвращает факты/скоры/evidence; он **никогда** не возвращает `Decision`, `should_handoff`, `HandoffStatus` или decision-family `reason_codes`.
+- Направление runtime-зависимости: `api → knowledge`. Обратных HTTP-вызовов нет.
+- Одна PostgreSQL допустима, но `api_rw` и `knowledge_rw` не читают/не мигрируют таблицы друг друга; общих views/ролей нет.
+- Normative answer corpus и historical analytics corpus разделены. Историческое `Решение` не является ответом пользователю.
+- `ANSWER != RESOLVED`; prepared handoff != accepted handoff.
+- Infrastructure failure != «в базе нет ответа».
+- Внешние LLM/search API не используются в штатном интеллектуальном контуре.
+- Не выводить chain-of-thought в UI/logs/docs.
 
-Правила границы, которые нельзя нарушать без нового ADR:
+Изменение границы runtime, нового сервиса/queue/DB/state dimension требует ADR.
 
-- оркестратор один и он в .NET; Python возвращает факты/скоры/оценки evidence, никогда `Decision`, `HandoffStatus`, `should_handoff`;
-- контракт `api → knowledge` — `v0`, OpenAPI из FastAPI, C#-клиент генерируется, не пишется руками; новые поля optional;
-- зависимость только `api → knowledge`, и по HTTP, и по данным: общих таблиц/view/ролей нет; факты для аналитики `api-worker` пушит в `knowledge` (`/v0/quality/*`), `api` не читает `kb_*`/`quality_*`;
-- недоступность `knowledge` — отдельная категория ошибки, не «в базе нет информации».
+## 4. Контракты прежде реализации
 
-Старый .NET scaffold из коммита `1b57aa1` не восстанавливать — его модель не соответствует state model. Не вводить дополнительные сервисы без измеренной причины.
+Реестр: `docs/contracts/README.md`.
 
-Ключевые зависимости и rejected alternatives: `docs/stack.md`.
+| Граница | Source of truth |
+|---|---|
+| `.NET api ↔ Python knowledge` | `docs/contracts/knowledge-v0.md` + `knowledge-v0.openapi.yaml` |
+| Browser ↔ `.NET api` | `docs/contracts/web-api-v0.md` |
+| `.NET Application ↔ support adapter` | `docs/contracts/support-adapter-v0.md` |
+| State/data ownership | `docs/architecture.md` |
 
-Модули, состояния и data boundaries: `docs/architecture.md`.
+Правила:
 
-## 4. Обязательный рабочий цикл агента
+- breaking change контракта нельзя маскировать refactor'ом;
+- additive поле должно быть optional, пока обе стороны не мигрировали;
+- generated DTO не протаскиваются в Domain/Application;
+- boundary input валидируется до бизнес-логики;
+- контракт и обе стороны синхронизируются одним change/PR, когда это возможно;
+- frontend не изобретает state, которого нет в API contract.
 
-Для любой существенной задачи используй цикл:
+## 5. Рабочие блоки
+
+Карта параллельной разработки: `docs/workstreams.md`.
+
+| Блок | Владелец/runtime | Читать сначала |
+|---|---|---|
+| Support Core / state / orchestration | `.NET api` | `architecture.md`, `product-spec.md`, `contracts/` |
+| Knowledge / retrieval / generation | Python `knowledge` | `product-spec.md`, `knowledge-v0.*`, `quality.md` |
+| Ingestion / KB | `knowledge-worker` | `product-spec.md §6–9`, `architecture.md §8–9` |
+| Web / chat timeline | React | `web-api-v0.md`, `product-spec.md`, `architecture.md §13–14` |
+| Handoff integration | `.NET api-worker` | `support-adapter-v0.md`, `product-spec.md §17` |
+| Quality / issue analytics | Python `knowledge-worker` | `quality.md`, `knowledge-v0.*` |
+| Deployment / observability | cross-cutting | `stack.md`, `architecture.md §16–18` |
+
+Не редактируй чужой блок «заодно», если это не требуется контрактом задачи.
+
+## 6. Обязательный цикл для существенного change
 
 ```text
-DISCOVER
-→ PLAN
-→ DELEGATE independent work if useful
-→ IMPLEMENT
-→ SELF-REVIEW
-→ SKEPTIC REVIEW
-→ FIX
-→ VERIFY
-→ DOC SYNC
-→ FINAL STATUS
+DISCOVER → DEFINE ACCEPTANCE → PLAN → IMPLEMENT
+→ SELF-REVIEW → SKEPTIC REVIEW → FIX → VERIFY → DOC SYNC
 ```
 
-### DISCOVER
+Root agent остаётся интегратором. Subagents можно использовать для независимых workstreams/review, но не для параллельного редактирования одного shared contract.
 
-- Проследи реальный flow до файлов, которые будут изменены.
-- Не строй решение на названии функции/комментарии, если можно проверить код или данные.
-- Явно разделяй факт, принятое проектное решение и гипотезу.
+Перед завершением проверь минимум:
 
-### PLAN
+- product invariant/state transitions;
+- contract compatibility;
+- idempotency/retry/failure path;
+- provenance и corpus separation;
+- secrets/PII/logging;
+- docs/code drift;
+- отсутствие decision-логики в `knowledge`;
+- отсутствие cross-runtime DB reads.
 
-План должен содержать:
+## 7. Verification и Definition of Done
 
-- цель;
-- затрагиваемые модули;
-- acceptance criteria;
-- риски/неизвестные;
-- проверки после изменения.
+Полные gates: `docs/quality.md`.
 
-Не пиши большой план для однострочной обратимой правки.
+Не заявляй о passing tests/benchmarks, если они не запускались. Пока scaffold отсутствует, не выдумывай команды. После появления manifest/config реальная команда проверки должна быть добавлена в `docs/quality.md` в том же change.
 
-### DELEGATE
+Для bugfix — regression case до/вместе с fix, если это разумно. Для boundary changes — contract test обязателен.
 
-Если harness предоставляет subagents/collaboration tools, делегируй независимые ветки, когда это экономит время или повышает качество.
+## 8. Git и данные
 
-Root-agent всегда остается manager и отвечает за финальную интеграцию.
-
-Хорошие задачи для subagents:
-
-- repo/data reconnaissance;
-- поиск несоответствия спецификации;
-- независимое исследование библиотеки/контракта;
-- реализация непересекающихся модулей;
-- review тестов;
-- security/data-leak review;
-- skeptic review готового diff.
-
-Не делегировать двум агентам одновременное редактирование одних и тех же файлов. По умолчанию depth delegation = 1; рекурсивная делегация только при явной пользе.
-
-### IMPLEMENT
-
-- Минимальный change set, который полностью закрывает acceptance criteria.
-- Сначала корректность и наблюдаемое поведение, затем abstraction/polish.
-- Не добавляй dependency, service, agent, queue, ANN-index или cache «на будущее» без реальной необходимости.
-- Парси/валидируй данные на boundary; не опирайся на guessed shapes.
-- Ошибки должны приводить к честному состоянию, а не к ложному success.
-
-### SELF-REVIEW
-
-Перед внешним review root-agent обязан сам перечитать diff как reviewer:
-
-1. Соответствует ли изменение задаче и `docs/product-spec.md`?
-2. Не добавлено ли скрытое новое требование/поведение?
-3. Не нарушены ли состояния и idempotency?
-4. Не появилась ли возможность галлюцинации/подмены provenance?
-5. Не смешаны ли normative knowledge и historical analytics?
-6. Не появились ли secrets/PII/raw private data в логах/fixtures?
-7. Обработаны ли failure/timeout/empty/unknown paths?
-8. Документация все еще описывает реальный код?
-9. Не появилась ли decision-логика в `knowledge` или прямое чтение чужих таблиц (правила `§3`)?
-
-### SKEPTIC REVIEW
-
-Для нетривиального изменения после self-review запусти независимого reviewer-subagent, если инструмент доступен.
-
-Skeptic получает: исходную задачу, acceptance criteria, релевантные docs и diff. Его инструкция: **предположить, что решение ошибочно, и найти конкретные способы его сломать**.
-
-Он проверяет минимум:
-
-- spec drift;
-- неподтвержденные предположения;
-- неправильные boundary/state transitions;
-- data leakage / prompt injection / unsafe rendering;
-- утечка `Decision`/handoff-логики в `knowledge` или обход контракта `v0`;
-- race/idempotency/retry проблемы;
-- ложные success states;
-- недостающие edge cases;
-- тесты, которые лишь повторяют реализацию;
-- переусложнение и скрытую инфраструктурную стоимость.
-
-Ответ skeptic: список findings с severity `critical/high/medium/low`, доказательством и предлагаемой проверкой. Не проси skeptic переписывать всю реализацию.
-
-Root-agent обязан исправить findings либо явно зафиксировать, почему finding неприменим. Затем повторить targeted checks. Максимум два обычных review-цикла; продолжать дальше только если остаются critical/high проблемы.
-
-### VERIFY
-
-Проверки должны быть соразмерны изменению.
-
-- Сначала самые узкие тесты/линты, которые доказывают измененный контракт.
-- После их успеха расширяй проверки только если затронут shared boundary, migration, state machine, retrieval, security или есть нерешенные риски.
-- Не создавай бессмысленные тесты, зеркально повторяющие implementation.
-- Для bugfix сначала добавь воспроизводящий regression case, если это разумно.
-- Не заявляй, что тесты прошли, если они не запускались.
-
-Команды становятся обязательными только после появления соответствующих manifest/config files. Актуальные команды должны быть записаны здесь или в `docs/quality.md` сразу после scaffold.
-
-### DOC SYNC
-
-Если изменился architecture boundary, state, API contract, chosen dependency, evaluation policy или product behavior — обнови соответствующий файл `docs/` в том же change.
-
-Не оставляй `TODO` в source-of-truth документации без owner/условия удаления.
-
-## 5. Правила git
-
-- Работай в текущей ветке, если пользователь явно не попросил другую.
-- Не переписывай чужую историю, не force-push без прямого запроса.
-- Не делай amend существующих commits.
-- Перед завершением проверь diff/status.
-- Если пользователь просит один commit — все связанные изменения должны попасть в один атомарный commit.
-- Не коммить raw hackathon data, model weights, secrets или generated caches.
-
-## 6. Качество кода
-
-- Предпочитай явные typed contracts и маленькое число хорошо очерченных модулей.
-- Не создавай abstraction только ради «clean architecture».
-- I/O boundaries должны быть валидируемыми и тестируемыми.
-- Логи — structured и без chain-of-thought/секретов.
-- User-facing error отличается от `knowledge not found`; infrastructure failure нельзя выдавать за отсутствие ответа в БЗ.
-- Все state-changing operations проектировать с idempotency/retry semantics.
-
-## 7. Порядок чтения docs по типу задачи
-
-| Задача | Читать |
-|---|---|
-| Любая продуктовая логика | `docs/product-spec.md` |
-| Backend/state/API (.NET `api`) | `docs/architecture.md`, `docs/product-spec.md` |
-| Knowledge service / contract `v0` | `docs/architecture.md §10`, `docs/adr/0001-*.md` |
-| Dependency/runtime/model | `docs/stack.md`, `docs/references.md` |
-| Смена границы api/knowledge | `docs/adr/` — новый ADR обязателен |
-| Retrieval/RAG/evals | `docs/product-spec.md`, `docs/quality.md`, `docs/stack.md` |
-| Frontend/UX | `docs/product-spec.md`, `docs/architecture.md` |
-| Agentic dev workflow/review | `docs/agent-workflow.md` |
-| Планирование хакатона | `docs/execution-plan.md` |
-| Tests/benchmark/DoD | `docs/quality.md` |
-
-## 8. Источники OpenAI guidance
-
-Repository workflow намеренно следует актуальному OpenAI agent-first подходу: короткий `AGENTS.md` как map, versioned repository docs как system of record, планы как first-class artifacts, manager-style delegation, self-review + независимые agent reviews и соразмерное testing/verification.
-
-Ссылки и точный контекст: `docs/references.md`.
+- Не force-push/amend без прямого запроса.
+- Не коммить raw organizer data, model weights, secrets, generated caches.
+- Не восстанавливать retired scaffold из `1b57aa1`.
+- Перед финалом перечитать полный diff и текущий status.
+- Если docs описывают target, а код ещё не существует, называй это **documented target**, не `implemented`.

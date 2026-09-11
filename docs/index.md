@@ -8,55 +8,66 @@
 |---|---|---|
 | [`hackathon-requirements.md`](hackathon-requirements.md) | Формальные функции, ограничения, scoring/defense layer без старой архитектуры | Scope/приоритеты/спор о требованиях |
 | [`product-spec.md`](product-spec.md) | Что строим, P0/P1/non-goals, decision/state semantics, knowledge/routing/quality rules | Любое изменение поведения |
-| [`architecture.md`](architecture.md) | Модули, boundaries, state, persistence, worker, handoff | Backend/API/data/frontend contracts |
+| [`architecture.md`](architecture.md) | Модули, boundaries, state, persistence, worker, handoff | Backend/API/data/frontend boundaries |
 | [`stack.md`](stack.md) | Зафиксированный стек, версии, модели, rejected alternatives | Новые dependencies/runtime/infrastructure |
-| [`adr/`](adr/) | Architecture decision records: контекст, решение, цена, условия пересмотра. ADR-0001 — граница .NET `api` / Python `knowledge` | Любая работа на границе runtime, контракт `v0`, владение таблицами |
-| [`contracts/knowledge-v0.md`](contracts/knowledge-v0.md) + [`contracts/knowledge-v0.openapi.yaml`](contracts/knowledge-v0.openapi.yaml) | Замороженный контракт `api ↔ knowledge`: эндпоинты, схемы, заголовки, таксономия ошибок, идемпотентность | Реализация/изменение любого `/v0/...` эндпоинта с любой стороны границы |
-| [`agent-workflow.md`](agent-workflow.md) | Как coding agents планируют, делегируют, проверяют и ревьюят | Любая существенная агентная работа |
+| [`adr/`](adr/) | Architecture decision records; ADR-0001 — граница .NET `api` / Python `knowledge` | Смена ownership/runtime/service/queue/DB/state dimension |
+| [`contracts/`](contracts/) | Нормативные интерфейсы между независимо разрабатываемыми блоками | Любая работа на shared boundary |
+| [`open-decisions.md`](open-decisions.md) | Нерешённые policy/contract gaps, которые нельзя выбирать молча | Перед реализацией затронутой неоднозначной области |
+| [`workstreams.md`](workstreams.md) | Владение блоками, allowed scope и правила параллельной разработки | Деление работы между людьми/agents |
+| [`agent-workflow.md`](agent-workflow.md) | Manager/subagent workflow, self-check и skeptic review | Любая существенная agentic работа |
 | [`quality.md`](quality.md) | Evals, tests, regression, Definition of Done | Перед завершением implementation task |
 | [`execution-plan.md`](execution-plan.md) | Порядок 40-часовой реализации и gates | Планирование/scope decisions |
 | [`references.md`](references.md) | Первичные источники и OpenAI guidance | Спор об архитектуре/agent workflow/tech facts |
 
+## Контракты
+
+Начинать с [`contracts/README.md`](contracts/README.md).
+
+Текущие shared boundaries:
+
+- [`contracts/knowledge-v0.md`](contracts/knowledge-v0.md) + [`contracts/knowledge-v0.openapi.yaml`](contracts/knowledge-v0.openapi.yaml) — frozen `.NET api ↔ Python knowledge`;
+- [`contracts/web-api-v0.md`](contracts/web-api-v0.md) — browser ↔ `.NET api`, server-driven chat timeline/SSE/handoff/feedback semantics;
+- [`contracts/support-adapter-v0.md`](contracts/support-adapter-v0.md) — `.NET Application ↔ external/demo support adapter`.
+
 ## Приоритет источников
 
 1. Явные требования организаторов/уточнения экспертов.
-2. Реальные предоставленные данные и инструкции.
-3. `hackathon-requirements.md` — сохраненная командная фиксация стабильного формального слоя.
-4. `product-spec.md` — принятая командная политика для неоднозначных мест.
-5. `architecture.md` и `stack.md` — принятая инженерная реализация политики.
-6. Остальные документы/комментарии/код.
+2. Явные текущие решения команды/пользователя, если они не противоречат п.1.
+3. Реальные предоставленные данные и инструкции.
+4. `hackathon-requirements.md` — сохраненная фиксация формального слоя.
+5. `product-spec.md` — принятая продуктовая политика для неоднозначных мест.
+6. `architecture.md`, `stack.md`, ADR и frozen contracts — инженерная реализация политики.
+7. Остальные документы/комментарии/код.
 
-Если новое официальное требование противоречит docs, **не защищать старый документ**: обновить решение, записать причину и синхронно изменить зависимые документы/код.
+Если новое официальное требование противоречит docs, не защищать старый документ: обновить решение, причину и зависимые документы/код. Если конфликт ещё не разрешён — записать его в `open-decisions.md` и не выбирать вариант скрыто.
 
 ## Что является фактом, решением и гипотезой
-
-Во всех документах придерживаться терминов:
 
 - **Факт** — подтвержден данными, официальным требованием, исходным документом или наблюдаемым runtime behavior.
 - **Решение** — выбранная командой политика/архитектура.
 - **Цель** — критерий будущей проверки, не уже достигнутый результат.
 - **Гипотеза** — объяснение, которое еще нужно доказать.
 
-Не превращать цель, план или model confidence в факт.
+Не превращать target architecture, план или model confidence в факт реализации.
 
-## Документационная дисциплина для agents
-
-OpenAI agent-first guidance используется буквально: root `AGENTS.md` — карта, а не гигантский мануал; глубокий контекст живет здесь и открывается по необходимости.
+## Документационная дисциплина
 
 Если задача меняет:
 
-- формальное понимание scope/constraints → обновить `hackathon-requirements.md`;
-- продуктовую семантику → обновить `product-spec.md`;
-- модуль/boundary/state → `architecture.md`;
-- контракт `api ↔ knowledge` или владение таблицами → `architecture.md §8, §10` и синхронная правка обоих сервисов;
-- перенос модуля через границу runtime, новый сервис/queue/DB → новый `adr/NNNN-*.md`;
-- библиотеку/model/runtime → `stack.md`;
-- тестовый gate/метрику → `quality.md`;
-- порядок исполнения/critical path → `execution-plan.md`.
+- формальный scope/constraints → `hackathon-requirements.md`;
+- product behavior/state policy → `product-spec.md`;
+- module ownership/data/state boundary → `architecture.md`;
+- shared transport/interface → соответствующий файл `contracts/` + обе стороны + contract tests;
+- runtime ownership/new service/queue/DB/state dimension → новый ADR;
+- dependency/model/runtime → `stack.md`;
+- test gate/metric → `quality.md`;
+- critical path → `execution-plan.md`;
+- параллельное владение блоками → `workstreams.md`;
+- нерешённый конфликт → `open-decisions.md`.
 
 ## Execution plans для крупных задач
 
-После появления активной разработки сложные изменения должны иметь короткий versioned plan. Рекомендуемая структура:
+После появления активной разработки сложные изменения должны иметь короткий versioned plan:
 
 ```text
 docs/plans/
@@ -64,12 +75,6 @@ docs/plans/
   completed/
 ```
 
-Не создавать планы ради каждой мелкой правки. План нужен, если работа:
+План нужен, если работа затрагивает несколько модулей, меняет contract/state/data model, делится между несколькими agents, содержит benchmark/существенные unknowns или занимает больше одной coding-сессии.
 
-- затрагивает несколько модулей;
-- требует миграции/смены контракта;
-- идет параллельно несколькими agents;
-- содержит существенные неизвестные;
-- длится больше одной нормальной coding-сессии.
-
-Plan содержит: цель, acceptance criteria, affected boundaries, риски, последовательность, delegated work, progress, decisions, verification и rollback/fallback.
+Plan содержит: goal, non-goals, acceptance criteria, relevant docs/contracts, risks, workstreams, implementation steps, verification, decisions/progress/open issues.
