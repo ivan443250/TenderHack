@@ -114,5 +114,6 @@ Root agent остаётся интегратором. Subagents можно ис�
 - Не force-push/amend без прямого запроса.
 - Не коммить raw organizer data, model weights, secrets, generated caches.
 - Не восстанавливать retired scaffold из `1b57aa1`.
+- Папка документации — `docs/` в нижнем регистре. Windows/macOS не различают регистр, git и GitHub — различают: новый файл, созданный в папке `Docs`, уедет в репозиторий как `Docs/...` и создаст вторую папку. Перед `git add` проверять `git ls-files | grep '^Docs/'` — должно быть пусто; если нет — `git mv -f Docs/<path> docs/<path>`.
 - Перед финалом перечитать полный diff и текущий status.
 - Если docs описывают target, а код ещё не существует, называй это **documented target**, не `implemented`.
