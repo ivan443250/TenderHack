@@ -1,0 +1,488 @@
+<title>TenderHack Architecture Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f5f2ea;
+    --paper-raised:#fbf9f3;
+    --ink:#1c1f22;
+    --ink-muted:#6b6355;
+    --line:#cdc4ac;
+    --line-strong:#a89d80;
+    --accent-a:#c8531f;      /* .NET / api_rw */
+    --accent-a-soft:#f0d9c8;
+    --accent-b:#2b6e68;      /* Python relational / knowledge_rw */
+    --accent-b-soft:#d7e8e2;
+    --accent-idx:#3f5f8a;    /* vector & lexical index, same role, own abstraction */
+    --accent-idx-soft:#dbe3f0;
+    --contract:#8a6d1f;      /* frozen v0 contract */
+    --contract-soft:#ecdfb8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#15181b; --paper-raised:#1c2024; --ink:#eef0ee; --ink-muted:#a49c8a;
+      --line:#3a3d38; --line-strong:#55584f;
+      --accent-a:#ff8a52; --accent-a-soft:#432614;
+      --accent-b:#57c2b4; --accent-b-soft:#16302c;
+      --accent-idx:#89a6d9; --accent-idx-soft:#1c2b42;
+      --contract:#e0bb5a; --contract-soft:#3a2f14;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#15181b; --paper-raised:#1c2024; --ink:#eef0ee; --ink-muted:#a49c8a;
+    --line:#3a3d38; --line-strong:#55584f;
+    --accent-a:#ff8a52; --accent-a-soft:#432614;
+    --accent-b:#57c2b4; --accent-b-soft:#16302c;
+    --accent-idx:#89a6d9; --accent-idx-soft:#1c2b42;
+    --contract:#e0bb5a; --contract-soft:#3a2f14;
+  }
+
+  *{box-sizing:border-box;}
+  body{ background:var(--paper); color:var(--ink); font-family:'IBM Plex Sans', system-ui, sans-serif; -webkit-font-smoothing:antialiased; }
+  .wrap{ max-width:1080px; margin:0 auto; padding:56px 24px 80px; display:flex; flex-direction:column; gap:36px; }
+  header{ display:flex; flex-direction:column; gap:14px; border-bottom:1px solid var(--line); padding-bottom:32px; }
+  .eyebrow{ font-family:'IBM Plex Mono', monospace; font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--contract); margin:0; }
+  h1{ font-family:'Oswald', sans-serif; font-weight:700; font-size:clamp(30px,4.2vw,44px); text-transform:uppercase; margin:0; text-wrap:balance; color:var(--ink); }
+  .dek{ font-size:16.5px; line-height:1.55; max-width:66ch; color:var(--ink); margin:0; }
+  .dek code{ font-family:'IBM Plex Mono', monospace; font-size:.92em; background:var(--accent-a-soft); color:var(--accent-a); padding:1px 5px; border-radius:3px; }
+
+  .callout{
+    display:flex; gap:12px; align-items:flex-start;
+    background:var(--accent-idx-soft); border:1px solid var(--accent-idx);
+    border-radius:10px; padding:14px 18px; font-size:13.5px; line-height:1.55; color:var(--ink);
+  }
+  .callout b{ color:var(--accent-idx); }
+  .callout .mark{ font-family:'Oswald',sans-serif; font-weight:700; font-size:15px; color:var(--accent-idx); flex:none; }
+
+  figure.diagram-figure{ margin:0; display:flex; flex-direction:column; gap:14px; }
+  .diagram-figure svg{ width:100%; height:auto; display:block; }
+  figcaption{ font-size:13.5px; color:var(--ink-muted); line-height:1.5; max-width:74ch; }
+  figcaption b{ color:var(--ink); font-weight:600; }
+
+  .node-title{ font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:12.5px; letter-spacing:.04em; }
+  .node-sub{ font-family:'IBM Plex Sans',sans-serif; font-size:10.5px; }
+  .node-mono{ font-family:'IBM Plex Mono',monospace; font-size:9.5px; }
+  .diagram-label{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; }
+  .diagram-eyebrow{ font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.12em; }
+
+  .legend{ display:flex; flex-wrap:wrap; gap:18px 26px; padding:16px 20px; background:var(--paper-raised); border:1px solid var(--line); border-radius:10px; }
+  .legend-item{ display:flex; align-items:center; gap:9px; font-size:12.5px; color:var(--ink); }
+  .legend-swatch{ width:26px; height:0; border-top-width:3px; border-top-style:solid; flex:none; }
+  .legend-swatch.dashed{ border-top-style:dashed; }
+
+  section h2{ font-family:'Oswald', sans-serif; font-weight:600; font-size:20px; letter-spacing:.02em; text-transform:uppercase; margin:0 0 16px; color:var(--ink); }
+
+  .table-scroll{ overflow-x:auto; border:1px solid var(--line); border-radius:10px; }
+  table{ width:100%; border-collapse:collapse; min-width:820px; background:var(--paper-raised); }
+  thead th{ text-align:left; font-family:'IBM Plex Mono', monospace; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-muted); padding:12px 16px; border-bottom:1px solid var(--line-strong); white-space:nowrap; }
+  tbody td{ padding:12px 16px; font-size:13.5px; border-bottom:1px solid var(--line); vertical-align:top; }
+  tbody tr:last-child td{ border-bottom:none; }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+  .abs-name{ font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:13px; }
+  .tag{ display:inline-block; font-family:'IBM Plex Mono', monospace; font-size:10px; letter-spacing:.05em; text-transform:uppercase; padding:2px 8px; border-radius:999px; white-space:nowrap; }
+  .tag.a{ background:var(--accent-a-soft); color:var(--accent-a); }
+  .tag.b{ background:var(--accent-b-soft); color:var(--accent-b); }
+  .tag.idx{ background:var(--accent-idx-soft); color:var(--accent-idx); }
+  .tag.outside{ background:transparent; color:var(--ink-muted); border:1px dashed var(--line-strong); }
+
+  .invariants ol{ margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:14px; counter-reset:inv; }
+  .invariants li{ display:grid; grid-template-columns:34px 1fr; gap:14px; align-items:start; padding:14px 16px; background:var(--paper-raised); border:1px solid var(--line); border-left:3px solid var(--contract); border-radius:8px; font-size:14px; line-height:1.5; }
+  .invariants li::before{ counter-increment:inv; content: counter(inv, decimal-leading-zero); font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:15px; color:var(--contract); }
+  .invariants b{ color:var(--ink); }
+
+  footer{ font-size:12px; color:var(--ink-muted); border-top:1px solid var(--line); padding-top:20px; }
+
+  .cheatsheet{ display:flex; flex-direction:column; gap:28px; }
+  .entity-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px; }
+  .entity-card{ background:var(--paper-raised); border:1px solid var(--line); border-left:3px solid var(--card-accent, var(--line-strong)); border-radius:8px; padding:14px 16px; display:flex; flex-direction:column; gap:6px; }
+  .entity-card .name{ font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13.5px; color:var(--ink); }
+  .entity-card .role{ font-size:11px; color:var(--ink-muted); text-transform:uppercase; letter-spacing:.04em; }
+  .entity-card .desc{ font-size:13px; line-height:1.5; color:var(--ink); }
+
+  .arrow-scroll{ overflow-x:auto; border:1px solid var(--line); border-radius:10px; }
+  table.arrows{ width:100%; border-collapse:collapse; min-width:900px; background:var(--paper-raised); }
+  table.arrows thead th{ text-align:left; font-family:'IBM Plex Mono', monospace; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-muted); padding:12px 14px; border-bottom:1px solid var(--line-strong); white-space:nowrap; }
+  table.arrows tbody td{ padding:12px 14px; font-size:13px; line-height:1.5; border-bottom:1px solid var(--line); vertical-align:top; }
+  table.arrows tbody tr:last-child td{ border-bottom:none; }
+  table.arrows .flow{ white-space:nowrap; font-size:13px; }
+  table.arrows .flow b{ font-family:'IBM Plex Mono',monospace; font-weight:600; }
+  table.arrows .api{ font-family:'IBM Plex Mono',monospace; font-size:12px; white-space:nowrap; }
+  .dot{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:7px; vertical-align:middle; }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">docs/architecture.md · abstraction view</p>
+    <h1>Architecture map</h1>
+    <p class="dek">The same system, one level up from Docker: who owns which <em>decision</em>, and — deliberately drawn as three separate stores — which of them owns the <code>State</code>, the plain relational <code>Knowledge</code> metadata, and the <code>Vector &amp; Lexical Index</code>.</p>
+  </header>
+
+  <div class="callout">
+    <span class="mark">≠</span>
+    <span><b>Not what the rule actually says:</b> the project never isolates Python to "only the vector DB." The rule is <b>no cross-runtime table access</b> — <code style="font-family:'IBM Plex Mono',monospace">knowledge</code> never touches <code style="font-family:'IBM Plex Mono',monospace">api</code>'s tables and vice versa. <code style="font-family:'IBM Plex Mono',monospace">knowledge</code> still owns a completely ordinary relational store (<b>Knowledge Store</b>) in addition to the vector/lexical index — both live under its own <code style="font-family:'IBM Plex Mono',monospace">knowledge_rw</code> role, both inside the same physical PostgreSQL 16. Drawn below as separate abstractions because that's the useful mental model, not because they're separate servers.</span>
+  </div>
+
+  <figure class="diagram-figure">
+    <svg viewBox="0 0 1040 800" role="img" aria-label="Architecture diagram: Browser reaches Web and the Support Core (api, api-worker); the Support Core calls Knowledge and Inference (knowledge, knowledge-worker) over the frozen v0 contract, one-way only, and writes to the State Store; Knowledge and Inference write to two separate abstractions, the Knowledge Store and the Vector and Lexical Index, and call the Inference runtime; all three stores are schemas inside one physical PostgreSQL 16 instance; the Support Core submits handoffs to an external Portal support system (demo adapter in P0) and receives status facts back by polling or an optional signed webhook; the browser also receives an owner-level notification stream.">
+      <defs>
+        <marker id="m-ink" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink)"/></marker>
+        <marker id="m-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent-a)"/></marker>
+        <marker id="m-b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent-b)"/></marker>
+        <marker id="m-idx" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent-idx)"/></marker>
+        <marker id="m-c" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--contract)"/></marker>
+        <marker id="m-muted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink-muted)"/></marker>
+      </defs>
+
+      <!-- Browser -->
+      <g>
+        <rect x="380" y="20" width="280" height="46" rx="8" fill="var(--paper-raised)" stroke="var(--ink)" stroke-width="1.5"/>
+        <text x="520" y="41" text-anchor="middle" class="node-title" fill="var(--ink)">BROWSER</text>
+        <text x="520" y="57" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">the only client TenderHack ships</text>
+      </g>
+
+      <!-- Web -->
+      <g>
+        <rect x="60" y="100" width="280" height="68" rx="7" fill="var(--paper-raised)" stroke="var(--ink)" stroke-width="1.5"/>
+        <text x="200" y="128" text-anchor="middle" class="node-title" fill="var(--ink)">WEB</text>
+        <text x="200" y="144" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">React SPA</text>
+        <text x="200" y="157" text-anchor="middle" class="node-mono" fill="var(--ink-muted)">renders server state only</text>
+      </g>
+
+      <!-- Support Core -->
+      <g>
+        <rect x="380" y="100" width="280" height="104" rx="7" fill="var(--paper-raised)" stroke="var(--accent-a)" stroke-width="2"/>
+        <text x="520" y="118" text-anchor="middle" class="node-title" fill="var(--accent-a)" letter-spacing="0.06em">SUPPORT CORE · .NET 10</text>
+        <line x1="392" y1="128" x2="648" y2="128" stroke="var(--line)"/>
+        <text x="520" y="146" text-anchor="middle" class="node-mono" fill="var(--ink)" font-weight="600">api</text>
+        <text x="520" y="159" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">HTTP/SSE · Decision · completion · notifications</text>
+        <line x1="392" y1="167" x2="648" y2="167" stroke="var(--line)" stroke-dasharray="2 3"/>
+        <text x="520" y="182" text-anchor="middle" class="node-mono" fill="var(--ink)" font-weight="600">api-worker</text>
+        <text x="520" y="195" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">outbox · handoff submit + status poll · quality push</text>
+      </g>
+
+      <!-- Knowledge & Inference -->
+      <g>
+        <rect x="700" y="100" width="280" height="104" rx="7" fill="var(--paper-raised)" stroke="var(--accent-b)" stroke-width="2"/>
+        <text x="840" y="118" text-anchor="middle" class="node-title" fill="var(--accent-b)" letter-spacing="0.06em">KNOWLEDGE &amp; INFERENCE · Python</text>
+        <line x1="712" y1="128" x2="968" y2="128" stroke="var(--line)"/>
+        <text x="840" y="146" text-anchor="middle" class="node-mono" fill="var(--ink)" font-weight="600">knowledge</text>
+        <text x="840" y="159" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">retrieval · answerability · draft/verify</text>
+        <line x1="712" y1="167" x2="968" y2="167" stroke="var(--line)" stroke-dasharray="2 3"/>
+        <text x="840" y="182" text-anchor="middle" class="node-mono" fill="var(--ink)" font-weight="600">knowledge-worker</text>
+        <text x="840" y="195" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">ingestion · embeddings · quality audit</text>
+      </g>
+
+      <!-- arrows: browser -> web / support core -->
+      <path d="M440,66 L200,100" fill="none" stroke="var(--ink)" stroke-width="1.6" marker-end="url(#m-ink)"/>
+      <text x="330" y="86" text-anchor="middle" class="diagram-label" fill="var(--ink-muted)">static assets</text>
+      <line x1="560" y1="66" x2="560" y2="98" stroke="var(--ink)" stroke-width="1.6" marker-end="url(#m-ink)"/>
+      <text x="606" y="80" class="diagram-label" fill="var(--ink-muted)">HTTP + SSE: case events, notifications</text>
+      <text x="606" y="92" class="diagram-label" fill="var(--ink-muted)" font-size="9">(via optional reverse-proxy)</text>
+
+      <!-- arrows: support core -> knowledge&inference -->
+      <line x1="660" y1="146" x2="698" y2="146" stroke="var(--contract)" stroke-width="2" marker-end="url(#m-c)"/>
+      <text x="679" y="140" text-anchor="middle" class="diagram-label" fill="var(--contract)" font-size="9">contract v0</text>
+      <line x1="660" y1="181" x2="698" y2="181" stroke="var(--contract)" stroke-width="2" marker-end="url(#m-c)"/>
+      <text x="679" y="197" text-anchor="middle" class="diagram-label" fill="var(--contract)" font-size="9">quality push</text>
+      <text x="810" y="90" text-anchor="middle" class="diagram-label" fill="var(--contract)" font-size="9" font-style="italic">one-way — knowledge never calls back</text>
+
+      <!-- Inference runtime -->
+      <g>
+        <rect x="700" y="244" width="280" height="64" rx="7" fill="var(--paper-raised)" stroke="var(--accent-b)" stroke-width="2"/>
+        <text x="840" y="269" text-anchor="middle" class="node-title" fill="var(--ink)">INFERENCE RUNTIME</text>
+        <text x="840" y="284" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">vLLM — embed / rerank / generate</text>
+        <text x="840" y="297" text-anchor="middle" class="node-mono" fill="var(--ink-muted)">used only by knowledge*</text>
+      </g>
+      <line x1="840" y1="204" x2="840" y2="242" stroke="var(--accent-b)" stroke-width="1.8" marker-end="url(#m-b)"/>
+
+      <!-- Persistence group -->
+      <rect x="60" y="360" width="920" height="200" rx="14" fill="none" stroke="var(--line-strong)" stroke-width="1.5" stroke-dasharray="6 5"/>
+      <text x="84" y="386" class="diagram-eyebrow" fill="var(--ink-muted)" letter-spacing="0.1em">POSTGRESQL 16 · ONE PHYSICAL INSTANCE</text>
+
+      <!-- State Store -->
+      <g>
+        <rect x="90" y="404" width="270" height="130" rx="7" fill="var(--paper-raised)" stroke="var(--accent-a)" stroke-width="2"/>
+        <text x="225" y="430" text-anchor="middle" class="node-title" fill="var(--ink)">STATE STORE</text>
+        <text x="225" y="450" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">cases · turns · case_events · handoffs</text>
+        <text x="225" y="464" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">status_updates · outbox · feedback · notifications</text>
+        <line x1="150" y1="478" x2="300" y2="478" stroke="var(--line)"/>
+        <text x="225" y="498" text-anchor="middle" class="node-mono" fill="var(--accent-a)" font-weight="600">role: api_rw</text>
+        <text x="225" y="514" text-anchor="middle" class="node-mono" fill="var(--ink-muted)" font-size="8.5">owner: Support Core, exclusively</text>
+      </g>
+
+      <!-- Knowledge Store -->
+      <g>
+        <rect x="390" y="404" width="270" height="130" rx="7" fill="var(--paper-raised)" stroke="var(--accent-b)" stroke-width="2"/>
+        <text x="525" y="430" text-anchor="middle" class="node-title" fill="var(--ink)">KNOWLEDGE STORE</text>
+        <text x="525" y="450" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">kb_documents · kb_snapshots</text>
+        <text x="525" y="464" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">quality_cases · issue_groups</text>
+        <line x1="450" y1="478" x2="600" y2="478" stroke="var(--line)"/>
+        <text x="525" y="498" text-anchor="middle" class="node-mono" fill="var(--accent-b)" font-weight="600">role: knowledge_rw</text>
+        <text x="525" y="514" text-anchor="middle" class="node-mono" fill="var(--ink-muted)" font-size="8.5">plain relational — not vectors</text>
+      </g>
+
+      <!-- Vector & Lexical Index -->
+      <g>
+        <rect x="690" y="404" width="270" height="130" rx="7" fill="var(--paper-raised)" stroke="var(--accent-idx)" stroke-width="2"/>
+        <text x="825" y="430" text-anchor="middle" class="node-title" fill="var(--ink)">VECTOR &amp; LEXICAL INDEX</text>
+        <text x="825" y="450" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">pgvector on kb_fragments</text>
+        <text x="825" y="464" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">pg_trgm · FTS (tsvector/tsquery)</text>
+        <line x1="750" y1="478" x2="900" y2="478" stroke="var(--line)"/>
+        <text x="825" y="498" text-anchor="middle" class="node-mono" fill="var(--accent-idx)" font-weight="600">role: knowledge_rw</text>
+        <text x="825" y="514" text-anchor="middle" class="node-mono" fill="var(--ink-muted)" font-size="8.5">a distinct abstraction, same role</text>
+      </g>
+
+      <text x="520" y="552" text-anchor="middle" class="diagram-label" fill="var(--ink-muted)" font-size="9.5" font-style="italic">no cross-schema SELECT between api_rw and knowledge_rw, in either direction</text>
+
+      <!-- arrow: support core -> state store -->
+      <path d="M460,204 L280,404" fill="none" stroke="var(--accent-a)" stroke-width="1.8" marker-end="url(#m-a)"/>
+      <rect x="330" y="270" width="70" height="18" rx="4" fill="var(--accent-a-soft)"/>
+      <text x="365" y="283" text-anchor="middle" class="diagram-label" fill="var(--accent-a)" font-size="9">SQL · api_rw</text>
+
+      <!-- arrow: knowledge&inference -> knowledge store (routed left of inference runtime, in the B/C gutter) -->
+      <path d="M700,190 L680,190 L680,440 L662,440" fill="none" stroke="var(--accent-b)" stroke-width="1.8" marker-end="url(#m-b)"/>
+      <rect x="612" y="330" width="90" height="18" rx="4" fill="var(--accent-b-soft)"/>
+      <text x="657" y="343" text-anchor="middle" class="diagram-label" fill="var(--accent-b)" font-size="9">SQL · knowledge_rw</text>
+
+      <!-- arrow: knowledge&inference -> vector index (routed right corridor) -->
+      <path d="M980,180 L1012,180 L1012,440 L962,440" fill="none" stroke="var(--accent-idx)" stroke-width="1.8" marker-end="url(#m-idx)"/>
+      <rect x="945" y="330" width="80" height="30" rx="4" fill="var(--accent-idx-soft)"/>
+      <text x="985" y="343" text-anchor="middle" class="diagram-label" fill="var(--accent-idx)" font-size="9">SQL · knowledge_rw</text>
+      <text x="985" y="355" text-anchor="middle" class="diagram-label" fill="var(--accent-idx)" font-size="9">pgvector/pg_trgm</text>
+
+      <!-- External demo adapter -->
+      <g>
+        <rect x="380" y="700" width="280" height="64" rx="7" fill="none" stroke="var(--ink-muted)" stroke-width="1.5" stroke-dasharray="5 5"/>
+        <text x="520" y="722" text-anchor="middle" class="node-title" fill="var(--ink-muted)">PORTAL SUPPORT SYSTEM</text>
+        <text x="520" y="737" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">demo adapter with staged status script · outside Compose</text>
+        <text x="520" y="751" text-anchor="middle" class="node-mono" fill="var(--ink-muted)">real adapter later, same contract</text>
+      </g>
+      <!-- outbound: submit -->
+      <path d="M380,178 L16,178 L16,722 L378,722" fill="none" stroke="var(--ink-muted)" stroke-width="1.6" stroke-dasharray="5 5" marker-end="url(#m-muted)"/>
+      <!-- inbound: status facts (poll from api-worker; optional signed webhook into api) -->
+      <path d="M378,742 L34,742 L34,194 L378,194" fill="none" stroke="var(--ink-muted)" stroke-width="1.6" stroke-dasharray="5 5" marker-end="url(#m-muted)"/>
+      <rect x="4" y="420" width="120" height="44" rx="4" fill="var(--paper)"/>
+      <text x="64" y="433" text-anchor="middle" class="diagram-label" fill="var(--ink-muted)" font-size="9">↓ SubmitAsync</text>
+      <text x="64" y="446" text-anchor="middle" class="diagram-label" fill="var(--ink-muted)" font-size="9">↑ GetStatusAsync (poll)</text>
+      <text x="64" y="459" text-anchor="middle" class="diagram-label" fill="var(--ink-muted)" font-size="9">↑ webhook (optional)</text>
+
+    </svg>
+    <figcaption>Three stores, drawn as three abstractions on purpose — <b>State Store</b> (owned only by the Support Core), <b>Knowledge Store</b> (plain relational metadata) and the <b>Vector &amp; Lexical Index</b> (pgvector + pg_trgm + FTS) — the last two both owned by <b>knowledge</b>/<b>knowledge-worker</b> under the same <code>knowledge_rw</code> role, both physically inside the one dashed PostgreSQL 16 boundary. The amber arrow is the only path from the .NET side to the Python side, and it never runs back. The support adapter is now a round trip: <b>submit</b> goes out, <b>status facts</b> come back by polling (or a signed webhook for a real system).</figcaption>
+  </figure>
+
+  <div class="legend">
+    <div class="legend-item"><span class="legend-swatch" style="border-color:var(--contract)"></span>contract v0 (frozen, one-way)</div>
+    <div class="legend-item"><span class="legend-swatch" style="border-color:var(--accent-a)"></span>.NET-owned (api_rw)</div>
+    <div class="legend-item"><span class="legend-swatch" style="border-color:var(--accent-b)"></span>Python-owned, relational (knowledge_rw)</div>
+    <div class="legend-item"><span class="legend-swatch" style="border-color:var(--accent-idx)"></span>Python-owned, vector/lexical (knowledge_rw)</div>
+    <div class="legend-item"><span class="legend-swatch dashed" style="border-color:var(--ink-muted)"></span>support adapter round trip (demo in P0; webhook optional)</div>
+  </div>
+
+  <section class="manifest">
+    <h2>Abstraction → reality</h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Abstraction</th><th>Backed by (real names)</th><th>Owner</th><th>Physically lives in</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="abs-name">Support Core</td>
+            <td class="mono">api, api-worker (.NET 10)</td>
+            <td><span class="tag a">api_rw</span></td>
+            <td>Compose — api public, api-worker internal</td>
+          </tr>
+          <tr>
+            <td class="abs-name">Knowledge &amp; Inference</td>
+            <td class="mono">knowledge, knowledge-worker (Python 3.12)</td>
+            <td><span class="tag b">knowledge_rw</span></td>
+            <td>Compose, internal network only</td>
+          </tr>
+          <tr>
+            <td class="abs-name">Inference runtime</td>
+            <td class="mono">inference (vLLM, llama.cpp fallback)</td>
+            <td>—</td>
+            <td>Compose, internal · called only by knowledge*</td>
+          </tr>
+          <tr>
+            <td class="abs-name">State Store</td>
+            <td class="mono">cases, turns, case_events, handoffs, outbox, feedback, api_jobs, idempotency_keys</td>
+            <td><span class="tag a">api_rw</span></td>
+            <td>PostgreSQL 16 — single instance</td>
+          </tr>
+          <tr>
+            <td class="abs-name">Knowledge Store</td>
+            <td class="mono">kb_documents, kb_document_versions, kb_snapshots, kb_condition_cards, kb_ingestion_runs, quality_cases, quality_evaluations, issue_groups, knowledge_jobs</td>
+            <td><span class="tag b">knowledge_rw</span></td>
+            <td>same PostgreSQL 16 instance</td>
+          </tr>
+          <tr>
+            <td class="abs-name">Vector &amp; Lexical Index</td>
+            <td class="mono">pgvector (on kb_fragments), pg_trgm, FTS (to_tsvector/tsquery)</td>
+            <td><span class="tag idx">knowledge_rw</span></td>
+            <td>same PostgreSQL 16 instance</td>
+          </tr>
+          <tr>
+            <td class="abs-name">Contract</td>
+            <td class="mono">v0 OpenAPI → NSwag-generated C# client</td>
+            <td>—</td>
+            <td>HTTP between api/api-worker and knowledge</td>
+          </tr>
+          <tr>
+            <td class="abs-name">External adapter</td>
+            <td class="mono">Portal support system</td>
+            <td>—</td>
+            <td><span class="tag outside">outside Compose</span> · demo/simulated</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="invariants">
+    <h2>What this actually enforces</h2>
+    <ol>
+      <li><span><b>No cross-runtime table access</b> — not "no relational access for Python." <code style="font-family:'IBM Plex Mono',monospace">knowledge</code> freely owns its own relational tables (Knowledge Store); it just never sees <code style="font-family:'IBM Plex Mono',monospace">api</code>'s State Store, and <code style="font-family:'IBM Plex Mono',monospace">api</code> never sees either of Python's stores.</span></li>
+      <li><span><b>One direction only.</b> <code style="font-family:'IBM Plex Mono',monospace">api → knowledge</code>, always, over contract <code style="font-family:'IBM Plex Mono',monospace">v0</code>. <code style="font-family:'IBM Plex Mono',monospace">knowledge</code> never calls back and never reads <code style="font-family:'IBM Plex Mono',monospace">api</code>'s tables.</span></li>
+      <li><span><b>Vector and relational are one role, two shapes.</b> Both Python stores share <code style="font-family:'IBM Plex Mono',monospace">knowledge_rw</code> — the split into two boxes is for legibility, not a second database service.</span></li>
+      <li><span><b>Stage, specialist and outcome are adapter facts only.</b> They enter through <code style="font-family:'IBM Plex Mono',monospace">IngestHandoffStatus</code> (poll or signed webhook) and nowhere else; a <code style="font-family:'IBM Plex Mono',monospace">null</code> stays <code style="font-family:'IBM Plex Mono',monospace">null</code>, the UI never shows a placeholder specialist. <code style="font-family:'IBM Plex Mono',monospace">RESOLVED</code> is set only by the user's <code style="font-family:'IBM Plex Mono',monospace">complete</code> or by a terminal adapter fact.</span></li>
+      <li><span><b>Notifications are api-owned facts, delivered locally.</b> Persisted inbox + owner-level SSE + browser Web Notifications API. No Web Push, email or SMS in P0 — they need external services and would break the offline demo (ADR-0002).</span></li>
+    </ol>
+  </section>
+
+  <section class="cheatsheet">
+    <h2>Шпаргалка: кто есть кто и кто кому звонит</h2>
+    <p class="dek" style="max-width:80ch">Без формальностей — просто «что это» и «чем реально общаются» для каждой стрелки на схеме выше.</p>
+
+    <div class="entity-grid">
+      <div class="entity-card" style="--card-accent:var(--ink)">
+        <span class="name">Browser</span>
+        <span class="role">клиент</span>
+        <span class="desc">Обычный браузер пользователя. Ничего не знает про <span class="mono">knowledge</span> — только про <span class="mono">web</span> и <span class="mono">api</span>.</span>
+      </div>
+      <div class="entity-card" style="--card-accent:var(--ink)">
+        <span class="name">web</span>
+        <span class="role">frontend</span>
+        <span class="desc">React SPA. Отдаёт статику браузеру и сама же ходит в <span class="mono">api</span> из JS (fetch/EventSource) — на схеме это одна стрелка «HTTP/SSE», не через <span class="mono">web</span>-контейнер.</span>
+      </div>
+      <div class="entity-card" style="--card-accent:var(--accent-a)">
+        <span class="name">api</span>
+        <span class="role">.NET · support core</span>
+        <span class="desc">Единственная точка входа для браузера. Держит состояние кейса, считает <span class="mono">Decision</span> (вкл. <span class="mono">MODERATION_WARNING</span>), завершает обращение, пишет уведомления, дергает <span class="mono">knowledge</span> по контракту v0. Принимает опциональный подписанный webhook от поддержки.</span>
+      </div>
+      <div class="entity-card" style="--card-accent:var(--accent-a)">
+        <span class="name">api-worker</span>
+        <span class="role">.NET · фоновый процесс</span>
+        <span class="desc">Тот же код что и <span class="mono">api</span>, но без HTTP-входа. Разгребает outbox: отправляет handoff, <b>опрашивает статус</b> принятых передач (<span class="mono">handoff-status-sync</span>), пушит turns / feedback / completions в <span class="mono">knowledge</span>.</span>
+      </div>
+      <div class="entity-card" style="--card-accent:var(--accent-b)">
+        <span class="name">knowledge</span>
+        <span class="role">Python · FastAPI</span>
+        <span class="desc">Отвечает на синхронные вызовы <span class="mono">api</span> по v0: понять запрос, найти фрагменты, оценить достаточность, сгенерировать черновик, проверить его. Никогда не решает, никогда не зовёт <span class="mono">api</span> в ответ.</span>
+      </div>
+      <div class="entity-card" style="--card-accent:var(--accent-b)">
+        <span class="name">knowledge-worker</span>
+        <span class="role">Python · фоновый процесс</span>
+        <span class="desc">Тот же код, без HTTP. Парсит документы, считает embeddings, гоняет quality audit по уже накопленным данным.</span>
+      </div>
+      <div class="entity-card" style="--card-accent:var(--accent-b)">
+        <span class="name">inference (vLLM)</span>
+        <span class="role">модельный runtime</span>
+        <span class="desc">Просто сервер с моделями (embedder/reranker/generator). Вызывается только из Python-кода, у <span class="mono">api</span> к нему нет доступа вообще.</span>
+      </div>
+      <div class="entity-card" style="--card-accent:var(--accent-a)">
+        <span class="name">State Store</span>
+        <span class="role">таблицы Postgres</span>
+        <span class="desc">Обычные таблицы: <span class="mono">cases, turns, handoffs, handoff_status_updates, outbox, feedback, notifications</span>. Читает/пишет только <span class="mono">.NET</span>-код через EF Core.</span>
+      </div>
+      <div class="entity-card" style="--card-accent:var(--accent-b)">
+        <span class="name">Knowledge Store</span>
+        <span class="role">таблицы Postgres</span>
+        <span class="desc">Тоже обычные таблицы (<span class="mono">kb_documents, quality_cases</span> и т.п.), просто принадлежат Python-стороне. Обычный SQL, никакой магии.</span>
+      </div>
+      <div class="entity-card" style="--card-accent:var(--accent-idx)">
+        <span class="name">Vector &amp; Lexical Index</span>
+        <span class="role">расширения Postgres</span>
+        <span class="desc"><span class="mono">pgvector</span> (похожесть по смыслу) + <span class="mono">pg_trgm</span>/FTS (похожесть по буквам). Физически те же таблицы Postgres, просто отдельный тип запроса.</span>
+      </div>
+      <div class="entity-card" style="--card-accent:var(--ink-muted)">
+        <span class="name">Portal support system</span>
+        <span class="role">внешняя система (демо)</span>
+        <span class="desc">На хакатоне это demo-адаптер: принимает заявку и по запросу отдаёт <b>сценарий статусов</b> («в очереди → назначен Демо-специалист → в работе → решено»), каждый шаг помечен <span class="mono">SIMULATED</span>. Настоящей интеграции нет; реальный адаптер встанет на тот же контракт.</span>
+      </div>
+    </div>
+
+    <div class="arrow-scroll">
+      <table class="arrows">
+        <thead>
+          <tr><th>Стрелка</th><th>Через что реально общаются</th><th>Что происходит по-простому</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="flow"><span class="dot" style="background:var(--ink)"></span><b>Browser → web</b></td>
+            <td class="api">HTTP GET (обычная раздача файлов)</td>
+            <td>Браузер скачивает HTML/JS/CSS собранного React-приложения.</td>
+          </tr>
+          <tr>
+            <td class="flow"><span class="dot" style="background:var(--ink)"></span><b>Browser → api</b></td>
+            <td class="api">HTTP (REST) + два SSE-потока:<br><span style="color:var(--ink-muted);font-size:11px">/cases/{id}/events/stream · /notifications/stream</span></td>
+            <td>Обычные запросы (сообщение, «Обратиться к оператору», «Завершить обращение», feedback) плюс живой поток событий чата (стадии, ответ, предупреждение модерации, статус передачи) и отдельный owner-level поток уведомлений — он работает, даже если открыт другой чат; при скрытой вкладке браузер показывает системное уведомление (Web Notifications API, без внешних push-серверов). Доступ по анонимной owner-cookie.</td>
+          </tr>
+          <tr>
+            <td class="flow"><span class="dot" style="background:var(--contract)"></span><b>api → knowledge</b></td>
+            <td class="api">HTTP POST, contract <span class="mono">v0</span><br><span style="color:var(--ink-muted);font-size:11px">/v0/understand, /v0/retrieve, /v0/answerability, /v0/draft, /v0/verify, /v0/moderation/context</span></td>
+            <td>Синхронные вызовы внутри одного хода диалога. Каждый — отдельный HTTP-запрос с заголовками <span class="mono">X-Trace-Id/X-Case-Id/X-Turn-Id</span>. Ответ — факты и оценки, не решение.</td>
+          </tr>
+          <tr>
+            <td class="flow"><span class="dot" style="background:var(--contract)"></span><b>api-worker → knowledge</b></td>
+            <td class="api">HTTP POST <span class="mono">/v0/quality/turns</span>, <span class="mono">/v0/quality/feedback</span>, <span class="mono">/v0/quality/completions</span></td>
+            <td>Асинхронный «пуш» фактов: ход, feedback (четыре сигнала: специалист, качество информации, «решено?», комментарий) и завершение обращения с исходом — через outbox, at-least-once, идемпотентно по <span class="mono">turn_id+revision</span> / <span class="mono">feedback_id</span> / <span class="mono">case_id</span>.</td>
+          </tr>
+          <tr>
+            <td class="flow"><span class="dot" style="background:var(--accent-b)"></span><b>knowledge / knowledge-worker → inference</b></td>
+            <td class="api">HTTP (OpenAI-совместимый API vLLM) через узкие адаптеры <span class="mono">Embedder / Reranker / Generator / Verifier</span></td>
+            <td>«Посчитай embedding», «оцени релевантность пары», «сгенерируй structured draft», «проверь claim по evidence». Никакого произвольного tool-use, только эти 4 операции.</td>
+          </tr>
+          <tr>
+            <td class="flow"><span class="dot" style="background:var(--accent-a)"></span><b>api → State Store</b></td>
+            <td class="api">SQL через EF Core / Npgsql, роль <span class="mono">api_rw</span></td>
+            <td>Обычные <span class="mono">INSERT/UPDATE/SELECT</span> в свои таблицы на каждый HTTP-запрос: сохранить сообщение, записать стадию хода, обновить состояние.</td>
+          </tr>
+          <tr>
+            <td class="flow"><span class="dot" style="background:var(--accent-a)"></span><b>api-worker → State Store</b></td>
+            <td class="api">SQL через EF Core, роль <span class="mono">api_rw</span></td>
+            <td><span class="mono">SELECT ... FOR UPDATE SKIP LOCKED</span> по таблицам <span class="mono">outbox</span>/<span class="mono">api_jobs</span> — забрать очередную задачу, пометить как отправленную/проваленную.</td>
+          </tr>
+          <tr>
+            <td class="flow"><span class="dot" style="background:var(--accent-b)"></span><b>knowledge / knowledge-worker → Knowledge Store</b></td>
+            <td class="api">SQL через SQLAlchemy2/asyncpg, роль <span class="mono">knowledge_rw</span></td>
+            <td>Обычный SQL по своим таблицам: сохранить распарсенный документ, записать сохранённый quality-кейс, обновить issue-group.</td>
+          </tr>
+          <tr>
+            <td class="flow"><span class="dot" style="background:var(--accent-idx)"></span><b>knowledge → Vector &amp; Lexical Index</b></td>
+            <td class="api">SQL: оператор <span class="mono">&lt;=&gt;</span> (pgvector cosine), <span class="mono">%</span>/<span class="mono">similarity()</span> (pg_trgm), <span class="mono">to_tsquery</span> (FTS)</td>
+            <td>Тот же SQL-коннект что и выше, просто другой тип запроса — «найди похожие по смыслу/по буквам фрагменты», результаты которых потом соединяются (RRF) и передаются в reranker.</td>
+          </tr>
+          <tr>
+            <td class="flow"><span class="dot" style="background:var(--ink-muted)"></span><b>api-worker → Portal support system</b></td>
+            <td class="api">интерфейс <span class="mono">IHandoffAdapter.SubmitAsync(...)</span> (демо-реализация — эмулирует ответ по конфигу: success/timeout/failure)</td>
+            <td>«Отправить заявку человеку». На хакатоне настоящего HTTP наружу нет — адаптер выбирается конфигом, а не запросом, и явно помечен как demo/simulated в UI.</td>
+          </tr>
+          <tr>
+            <td class="flow"><span class="dot" style="background:var(--ink-muted)"></span><b>Portal support system → api-worker</b></td>
+            <td class="api">интерфейс <span class="mono">IHandoffAdapter.GetStatusAsync(...)</span>, job <span class="mono">handoff-status-sync</span> (poll с backoff 15 с → 5 мин)</td>
+            <td>«Что там с моей заявкой?» — worker сам опрашивает адаптер по принятым передачам и получает <span class="mono">HandoffStatusSnapshot</span>: этап, специалист, терминальный исход. Идемпотентно по <span class="mono">handoff_id + external_revision</span>. Терминальный статус завершает обращение (<span class="mono">CLOSED_SUPPORT</span>) и порождает уведомление. Demo-адаптер отдаёт заранее заданный сценарий.</td>
+          </tr>
+          <tr>
+            <td class="flow"><span class="dot" style="background:var(--ink-muted)"></span><b>Portal support system → api</b> (опционально)</td>
+            <td class="api">HTTP POST <span class="mono">/api/v0/integrations/support/status</span>, HMAC-подпись + timestamp; выключен, пока нет реального адаптера</td>
+            <td>Тот же <span class="mono">HandoffStatusSnapshot</span>, но push'ем от реальной системы. Попадает в тот же use-case <span class="mono">IngestHandoffStatus</span>, что и polling, — Domain не различает канал. Demo этот путь не использует.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>Source: <span class="mono">docs/architecture.md §5, §8–9, §15</span>, <span class="mono">docs/adr/0001-*.md §3</span>, <span class="mono">docs/adr/0002-*.md</span>, <span class="mono">docs/contracts/support-adapter-v0.md §6</span>, <span class="mono">docs/stack.md §6, §16</span>. This view intentionally omits ports/images/network zones — see the Compose-level diagram for those.</footer>
+</div>
