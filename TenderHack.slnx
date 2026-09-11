@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TenderHack.Application/TenderHack.Application.csproj" />
+    <Project Path="src/TenderHack.Domain/TenderHack.Domain.csproj" />
+    <Project Path="src/TenderHack.Infrastructure/TenderHack.Infrastructure.csproj" />
+    <Project Path="src/TenderHack.Web/TenderHack.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TenderHack.UnitTests/TenderHack.UnitTests.csproj" />
+  </Folder>
+</Solution>

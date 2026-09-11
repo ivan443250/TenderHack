@@ -1,0 +1,17 @@
+## .NET
+bin/
+obj/
+*.user
+
+## IDE
+.vs/
+.vscode/
+*.suo
+
+## Frontend (once web/ exists)
+node_modules/
+dist/
+
+## Env / secrets
+.env
+Docs/HackDocs/.obsidian/
