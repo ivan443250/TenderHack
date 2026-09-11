@@ -4,7 +4,9 @@
 
 ## Статус
 
-`master` намеренно очищен от раннего .NET-шаблона. Предыдущий scaffold фиксировал архитектуру до финального ревью требований и конфликтовал с принятой спецификацией. Текущая база — **docs-first, agent-first**: сначала зафиксированы формальные ограничения, продуктовые инварианты, архитектура, стек, quality gates и правила работы coding agents; реализация должна строиться поверх них.
+`master` намеренно очищен от раннего .NET-шаблона (`1b57aa1`): его доменная модель фиксировала архитектуру до финального ревью требований. Текущая база — **docs-first, agent-first**: сначала зафиксированы формальные ограничения, продуктовые инварианты, архитектура, стек, quality gates и правила работы coding agents; реализация должна строиться поверх них.
+
+Backend разделён на .NET support core и Python knowledge-сервис по [`docs/adr/0001-dotnet-support-core-python-knowledge-service.md`](docs/adr/0001-dotnet-support-core-python-knowledge-service.md). Новый `apps/api` пишется по текущему `architecture.md`, а не восстанавливается из старого scaffold.
 
 ## Что строим
 
@@ -18,15 +20,17 @@
 ## Принятый стек
 
 - **Web:** React + TypeScript + Vite, Node.js 24 LTS, pnpm.
-- **API / orchestration:** Python 3.12, FastAPI, Pydantic v2.
-- **Persistence:** PostgreSQL 16, SQLAlchemy 2, Alembic, asyncpg.
+- **Support core (`api`, `api-worker`):** C# / .NET 10 LTS, ASP.NET Core Minimal API, EF Core + Npgsql. Владеет cases, state machine, `Decision`, moderation rules, routing, handoff/outbox, feedback, HTTP/SSE.
+- **Knowledge & inference (`knowledge`, `knowledge-worker`):** Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, Alembic, asyncpg. Владеет ingestion, retrieval, моделями, answerability/verify, quality analytics.
+- **Контракт между ними:** внутренний HTTP `v0`, OpenAPI → сгенерированный C#-клиент; Python возвращает факты/скоры, решения принимает .NET.
+- **Persistence:** PostgreSQL 16, одна БД, строгое владение таблицами по runtime.
 - **Search:** PostgreSQL FTS + `pg_trgm` + `pgvector`; сначала exact vector search.
 - **Parsing:** `pdfplumber` baseline; Docling/OCR адресно после измерения качества.
 - **Embeddings:** `Qwen3-Embedding-0.6B`, до 1024 dimensions.
 - **Reranker:** `BAAI/bge-reranker-v2-m3`.
 - **Generation:** `Qwen3-4B-Instruct-2507`, local-only.
 - **Inference:** vLLM после hardware smoke-test; один fallback на llama.cpp при несовместимости/нехватке VRAM.
-- **Deployment:** Docker Compose; один modular monolith + отдельный worker process того же Python-проекта.
+- **Deployment:** Docker Compose; `web`, `api`, `api-worker`, `knowledge`, `knowledge-worker`, `postgres`, `inference`.
 
 Подробности и обоснования: [`docs/stack.md`](docs/stack.md) и [`docs/architecture.md`](docs/architecture.md).
 
@@ -39,6 +43,7 @@
 - [`docs/product-spec.md`](docs/product-spec.md) — продуктовые границы и логика решений;
 - [`docs/architecture.md`](docs/architecture.md) — модули, состояния, data boundaries;
 - [`docs/stack.md`](docs/stack.md) — выбранный стек и rejected alternatives;
+- [`docs/adr/`](docs/adr/) — architecture decision records; ADR-0001 — граница .NET `api` / Python `knowledge`;
 - [`docs/agent-workflow.md`](docs/agent-workflow.md) — обязательный цикл coding agents, subagents и skeptic review;
 - [`docs/quality.md`](docs/quality.md) — тестирование, evals и Definition of Done;
 - [`docs/execution-plan.md`](docs/execution-plan.md) — порядок реализации и gates;
@@ -59,12 +64,12 @@
 
 ```text
 apps/
-  api/          FastAPI modular monolith
+  api/          .NET solution: Domain / Application / Infrastructure / Api / Worker + tests
+  knowledge/    Python FastAPI knowledge & inference service + worker entrypoint
   web/          React/Vite UI
-worker/         background jobs using the same domain/application code
 evals/          retrieval, decision, moderation, quality and E2E suites
 scripts/        ingestion/dev/reproducibility helpers
-docs/           repository knowledge system of record
+docs/           repository knowledge system of record (+ docs/adr/)
 ```
 
 Не создавать эти каталоги пустыми ради вида. Первый implementation change должен создать только реально используемый scaffold и одновременно обновить команды в `AGENTS.md`/docs.

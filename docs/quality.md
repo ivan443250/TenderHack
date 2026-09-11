@@ -131,7 +131,16 @@ Mandatory regression examples around state:
 - timeout does not convert `PENDING` to accepted;
 - moderation close preserves already accepted handoff;
 - infrastructure failure is `TECHNICAL_ERROR`, not «knowledge missing»;
+- `knowledge` timeout / 5xx / schema-invalid body on any stage → `TECHNICAL_ERROR` with `KnowledgeFailure` category, persisted stage events preserved;
+- `knowledge` down + human request → handoff package still built from persisted fields;
 - UI restore reads state from API after reload.
+
+Where these tests run (ADR-0001 §3, rule 8):
+
+- state/idempotency invariants — `TenderHack.Domain.Tests` / `Application.Tests` (no DB, no HTTP);
+- `evals/decisions` — HTTP against `api` with `knowledge` in stub/fixture mode returning recorded `retrieve`/`answerability`/`verify` payloads; decision logic is never re-implemented in Python for test convenience;
+- `evals/retrieval`, `evals/quality` — Python, directly against `knowledge`;
+- E2E (§11) — full Compose.
 
 ## 9. Quality evaluator
 
@@ -290,11 +299,20 @@ The repository currently contains documentation only after the scaffold reset. *
 The first scaffold change must add and document actual commands here, expected roughly as:
 
 ```bash
-# Python
+# .NET support core (apps/api)
+dotnet restore
+dotnet format --verify-no-changes
+dotnet build -warnaserror
+dotnet test
+
+# Python knowledge service (apps/knowledge)
 uv sync --frozen
 uv run ruff check .
 uv run <type-checker> ...
 uv run pytest ...
+
+# Contract v0
+<documented command to export knowledge OpenAPI and regenerate the C# client; CI fails if generated client is stale>
 
 # Web
 pnpm install --frozen-lockfile

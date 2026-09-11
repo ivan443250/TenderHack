@@ -142,9 +142,19 @@ https://nodejs.org/en/about/previous-releases
 
 The baseline frontend runtime in September 2026 is Node.js 24 LTS. Pin exact image/runtime in implementation manifests.
 
+### .NET
+
+https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core
+
+Target baseline for `apps/api`: .NET 10 LTS (support through November 2028). Pin SDK version in `global.json` and the exact `sdk`/`aspnet` image tags in the Dockerfile when scaffold is created.
+
+EF Core + Npgsql: https://www.npgsql.org/efcore/ — used only for `api`-owned tables; no pgvector mapping in .NET.
+
+NSwag: https://github.com/RicoSuter/NSwag — generates the `knowledge` client from FastAPI OpenAPI; generated code stays in `TenderHack.Infrastructure`.
+
 ### Python
 
-Target baseline: Python 3.12. Pin the exact patch/minor constraints in `pyproject.toml`/container when scaffold is created.
+Target baseline for `apps/knowledge`: Python 3.12. Pin the exact patch/minor constraints in `pyproject.toml`/container when scaffold is created.
 
 ## 7. Product/hackathon sources
 

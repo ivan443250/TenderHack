@@ -12,8 +12,8 @@
 
 | Role | Primary ownership | Must not decide alone |
 |---|---|---|
-| Backend / integration | states, API, persistence, jobs, handoff | content of domain instructions / truth policy |
-| ML / data | ingestion, retrieval, model serving, evals | whether its own model is “good enough” without independent evaluation |
+| Backend / integration (.NET `api`) | states, orchestrator, `Decision`, persistence of case tables, jobs, handoff, contract `v0` consumer | content of domain instructions / truth policy; changing `v0` without ML/data |
+| ML / data (Python `knowledge`) | ingestion, retrieval, model serving, answerability/verify, quality analytics, evals, contract `v0` provider | whether its own model is “good enough” without independent evaluation; any decision-like output |
 | Frontend / design | chat, source view, states, read-only analytics | server lifecycle semantics / fake local status |
 | Product / QA / domain | knowledge cards, rubric, gold cases, BPMN, demo | implementation architecture without engineering review |
 
@@ -23,19 +23,24 @@ If team size differs, preserve ownership separation conceptually. Cut P1 before 
 
 Parallel work:
 
-### Backend
+### Backend (.NET `api`)
 
 - lock initial API/state vocabulary;
-- create minimal database/app skeleton only after contracts are understood;
-- define case/turn/handoff IDs and idempotency behavior.
+- **agree and freeze contract `v0` with ML/data within the first hour** (`architecture.md §10`): endpoint list, field names, `X-Trace-Id` headers, failure categories;
+- generate the C# client from the stub OpenAPI; wire `IKnowledgeService` against it;
+- create minimal EF Core skeleton for `api`-owned tables only after contracts are understood;
+- define case/turn/handoff IDs and idempotency behavior;
+- first `Domain` invariant tests (state transitions) before any HTTP endpoint.
 
-### ML/data
+### ML/data (Python `knowledge`)
 
+- stand up `knowledge` FastAPI with **stub responses** for every `v0` endpoint (plausible JSON, fixed fragment IDs) so `api` and `web` can integrate before models exist;
 - inventory all source files/data;
 - run hardware smoke test;
 - load candidate local generator/embedding/reranker;
 - record GPU/CPU/RAM/runtime/model revisions;
-- inspect critical PDF/table extraction.
+- inspect critical PDF/table extraction;
+- Alembic baseline for `kb_*` tables + extensions.
 
 ### Frontend
 
@@ -54,6 +59,8 @@ Must be true:
 - local inference boots; no external AI API required;
 - exact hardware limits known;
 - team agrees on API/state terms;
+- contract `v0` is frozen and served by `knowledge` stubs; `api` calls it end-to-end with trace headers;
+- table ownership per `architecture.md §8` is reflected in both migration baselines; `knowledge` test suite runs against a database without `api` tables;
 - data/knowledge inventory exists;
 - no stale architecture assumption blocks implementation.
 
@@ -67,10 +74,10 @@ Build:
 
 - document registry + extraction baseline;
 - initial semantic fragments with source/page anchors;
-- PostgreSQL schema/migrations;
-- lexical + exact + dense baseline;
+- PostgreSQL schema/migrations (EF Core for `api`, Alembic for `knowledge`);
+- lexical + exact + dense baseline behind real `/v0/retrieve`, replacing the stub;
 - basic case/message persistence;
-- simple orchestrator path;
+- simple `TurnOrchestrator` path in .NET calling `understand → retrieve → answerability → draft → verify`;
 - source drawer/open source action;
 - first condition cards for the highest-risk/high-frequency cases;
 - first regression/gold suite.
@@ -105,9 +112,11 @@ Build in parallel:
 - full decision enum;
 - conversation/resolution/turn/handoff states;
 - superseded turn logic;
-- handoff outbox + controlled demo adapter;
+- handoff outbox + controlled demo adapter (`api-worker`);
 - idempotency semantics;
-- failure categories.
+- failure categories, including per-stage `KnowledgeFailure` mapping;
+- outbox push of quality-turn / feedback payloads to `knowledge` (`/v0/quality/turns`, `/v0/quality/feedback`) — needed by the 16–24 h phase;
+- boundary check at gate: no `Decision`/handoff logic in `knowledge`, no cross-runtime table access (ADR-0001 §6 trigger).
 
 ### Moderation/routing
 

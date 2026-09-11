@@ -10,6 +10,7 @@
 | [`product-spec.md`](product-spec.md) | Что строим, P0/P1/non-goals, decision/state semantics, knowledge/routing/quality rules | Любое изменение поведения |
 | [`architecture.md`](architecture.md) | Модули, boundaries, state, persistence, worker, handoff | Backend/API/data/frontend contracts |
 | [`stack.md`](stack.md) | Зафиксированный стек, версии, модели, rejected alternatives | Новые dependencies/runtime/infrastructure |
+| [`adr/`](adr/) | Architecture decision records: контекст, решение, цена, условия пересмотра. ADR-0001 — граница .NET `api` / Python `knowledge` | Любая работа на границе runtime, контракт `v0`, владение таблицами |
 | [`agent-workflow.md`](agent-workflow.md) | Как coding agents планируют, делегируют, проверяют и ревьюят | Любая существенная агентная работа |
 | [`quality.md`](quality.md) | Evals, tests, regression, Definition of Done | Перед завершением implementation task |
 | [`execution-plan.md`](execution-plan.md) | Порядок 40-часовой реализации и gates | Планирование/scope decisions |
@@ -46,6 +47,8 @@ OpenAI agent-first guidance используется буквально: root `A
 - формальное понимание scope/constraints → обновить `hackathon-requirements.md`;
 - продуктовую семантику → обновить `product-spec.md`;
 - модуль/boundary/state → `architecture.md`;
+- контракт `api ↔ knowledge` или владение таблицами → `architecture.md §8, §10` и синхронная правка обоих сервисов;
+- перенос модуля через границу runtime, новый сервис/queue/DB → новый `adr/NNNN-*.md`;
 - библиотеку/model/runtime → `stack.md`;
 - тестовый gate/метрику → `quality.md`;
 - порядок исполнения/critical path → `execution-plan.md`.

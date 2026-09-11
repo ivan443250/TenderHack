@@ -30,9 +30,20 @@
 
 ## 3. Архитектурная граница
 
-Целевой MVP — Python modular monolith + отдельный worker того же проекта, React frontend, PostgreSQL как транзакционный и retrieval-контур.
+Целевой MVP — два backend runtime с одной PostgreSQL (`docs/adr/0001-dotnet-support-core-python-knowledge-service.md`):
 
-Не возвращать прежний .NET scaffold и не вводить дополнительные сервисы без измеренной причины.
+- **`api` / `api-worker` — .NET support core** (C#, clean architecture без церемониальных слоёв): cases, turns, orchestrator/state machine, финальный `Decision`, deterministic moderation, routing, handoff + outbox, feedback, HTTP/SSE для браузера, authz. Единственная публичная граница.
+- **`knowledge` / `knowledge-worker` — Python knowledge & inference service**: ingestion, `kb_*`, retrieval, answerability assessment, draft/verify, LLM-проверка неоднозначности модерации, quality analytics, evals. Только внутренняя сеть.
+- React frontend ходит только в `api`.
+
+Правила границы, которые нельзя нарушать без нового ADR:
+
+- оркестратор один и он в .NET; Python возвращает факты/скоры/оценки evidence, никогда `Decision`, `HandoffStatus`, `should_handoff`;
+- контракт `api → knowledge` — `v0`, OpenAPI из FastAPI, C#-клиент генерируется, не пишется руками; новые поля optional;
+- зависимость только `api → knowledge`, и по HTTP, и по данным: общих таблиц/view/ролей нет; факты для аналитики `api-worker` пушит в `knowledge` (`/v0/quality/*`), `api` не читает `kb_*`/`quality_*`;
+- недоступность `knowledge` — отдельная категория ошибки, не «в базе нет информации».
+
+Старый .NET scaffold из коммита `1b57aa1` не восстанавливать — его модель не соответствует state model. Не вводить дополнительные сервисы без измеренной причины.
 
 Ключевые зависимости и rejected alternatives: `docs/stack.md`.
 
@@ -111,6 +122,7 @@ Root-agent всегда остается manager и отвечает за фин
 6. Не появились ли secrets/PII/raw private data в логах/fixtures?
 7. Обработаны ли failure/timeout/empty/unknown paths?
 8. Документация все еще описывает реальный код?
+9. Не появилась ли decision-логика в `knowledge` или прямое чтение чужих таблиц (правила `§3`)?
 
 ### SKEPTIC REVIEW
 
@@ -124,6 +136,7 @@ Skeptic получает: исходную задачу, acceptance criteria, р
 - неподтвержденные предположения;
 - неправильные boundary/state transitions;
 - data leakage / prompt injection / unsafe rendering;
+- утечка `Decision`/handoff-логики в `knowledge` или обход контракта `v0`;
 - race/idempotency/retry проблемы;
 - ложные success states;
 - недостающие edge cases;
@@ -175,8 +188,10 @@ Root-agent обязан исправить findings либо явно зафик
 | Задача | Читать |
 |---|---|
 | Любая продуктовая логика | `docs/product-spec.md` |
-| Backend/state/API | `docs/architecture.md`, `docs/product-spec.md` |
+| Backend/state/API (.NET `api`) | `docs/architecture.md`, `docs/product-spec.md` |
+| Knowledge service / contract `v0` | `docs/architecture.md §10`, `docs/adr/0001-*.md` |
 | Dependency/runtime/model | `docs/stack.md`, `docs/references.md` |
+| Смена границы api/knowledge | `docs/adr/` — новый ADR обязателен |
 | Retrieval/RAG/evals | `docs/product-spec.md`, `docs/quality.md`, `docs/stack.md` |
 | Frontend/UX | `docs/product-spec.md`, `docs/architecture.md` |
 | Agentic dev workflow/review | `docs/agent-workflow.md` |
