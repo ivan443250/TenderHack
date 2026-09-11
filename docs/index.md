@@ -11,6 +11,7 @@
 | [`architecture.md`](architecture.md) | Модули, boundaries, state, persistence, worker, handoff | Backend/API/data/frontend contracts |
 | [`stack.md`](stack.md) | Зафиксированный стек, версии, модели, rejected alternatives | Новые dependencies/runtime/infrastructure |
 | [`adr/`](adr/) | Architecture decision records: контекст, решение, цена, условия пересмотра. ADR-0001 — граница .NET `api` / Python `knowledge` | Любая работа на границе runtime, контракт `v0`, владение таблицами |
+| [`contracts/knowledge-v0.md`](contracts/knowledge-v0.md) + [`contracts/knowledge-v0.openapi.yaml`](contracts/knowledge-v0.openapi.yaml) | Замороженный контракт `api ↔ knowledge`: эндпоинты, схемы, заголовки, таксономия ошибок, идемпотентность | Реализация/изменение любого `/v0/...` эндпоинта с любой стороны границы |
 | [`agent-workflow.md`](agent-workflow.md) | Как coding agents планируют, делегируют, проверяют и ревьюят | Любая существенная агентная работа |
 | [`quality.md`](quality.md) | Evals, tests, regression, Definition of Done | Перед завершением implementation task |
 | [`execution-plan.md`](execution-plan.md) | Порядок 40-часовой реализации и gates | Планирование/scope decisions |

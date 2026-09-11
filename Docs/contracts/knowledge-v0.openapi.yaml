@@ -1,0 +1,992 @@
+openapi: 3.0.3
+info:
+  title: TenderHack knowledge service — contract v0
+  version: "0.1.0"
+  description: >
+    Frozen contract between the .NET support core (`api`/`api-worker`) and the Python
+    knowledge & inference service (`knowledge`/`knowledge-worker`). See
+    docs/contracts/knowledge-v0.md for normative rules (headers, error taxonomy,
+    idempotency, versioning). This file is the source of truth for NSwag client
+    generation until `knowledge` emits its own OpenAPI from FastAPI; at that point the
+    two must stay in lockstep or the change is a contract-breaking change (see §6 of
+    the companion markdown).
+
+servers:
+  - url: http://knowledge:8000
+
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Liveness/readiness probe.
+      responses:
+        "200":
+          description: Service is up.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /v0/understand:
+    post:
+      operationId: understand
+      summary: Normalize raw user text and extract entities/exact codes.
+      parameters:
+        - $ref: "#/components/parameters/XTraceId"
+        - $ref: "#/components/parameters/XCaseId"
+        - $ref: "#/components/parameters/XTurnId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnderstandRequest"
+      responses:
+        "200":
+          description: Understanding result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnderstandResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/ModelUnavailable"
+
+  /v0/moderation/context:
+    post:
+      operationId: moderationContext
+      summary: LLM ambiguity check for a deterministic rule match. Never returns a moderation outcome.
+      parameters:
+        - $ref: "#/components/parameters/XTraceId"
+        - $ref: "#/components/parameters/XCaseId"
+        - $ref: "#/components/parameters/XTurnId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationContextRequest"
+      responses:
+        "200":
+          description: Ambiguity assessment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationContextResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/ModelUnavailable"
+
+  /v0/retrieve:
+    post:
+      operationId: retrieve
+      summary: Hybrid retrieval (exact + FTS + dense + RRF + rerank) against one corpus.
+      parameters:
+        - $ref: "#/components/parameters/XTraceId"
+        - $ref: "#/components/parameters/XCaseId"
+        - $ref: "#/components/parameters/XTurnId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RetrieveRequest"
+      responses:
+        "200":
+          description: Ranked candidate fragments.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetrieveResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/UnknownSnapshot"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/ModelUnavailable"
+
+  /v0/answerability:
+    post:
+      operationId: answerability
+      summary: Assess whether retrieved evidence is sufficient to answer, without producing a decision.
+      parameters:
+        - $ref: "#/components/parameters/XTraceId"
+        - $ref: "#/components/parameters/XCaseId"
+        - $ref: "#/components/parameters/XTurnId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnswerabilityRequest"
+      responses:
+        "200":
+          description: Evidence sufficiency assessment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnswerabilityResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/UnknownSnapshot"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/ModelUnavailable"
+
+  /v0/draft:
+    post:
+      operationId: draft
+      summary: Generate a structured draft answer with claims tied to evidence fragments.
+      parameters:
+        - $ref: "#/components/parameters/XTraceId"
+        - $ref: "#/components/parameters/XCaseId"
+        - $ref: "#/components/parameters/XTurnId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DraftRequest"
+      responses:
+        "200":
+          description: Draft with claims.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DraftResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/UnknownSnapshot"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/ModelError"
+        "503":
+          $ref: "#/components/responses/ModelUnavailable"
+
+  /v0/verify:
+    post:
+      operationId: verify
+      summary: Verify each claim of a draft against its cited evidence fragments.
+      parameters:
+        - $ref: "#/components/parameters/XTraceId"
+        - $ref: "#/components/parameters/XCaseId"
+        - $ref: "#/components/parameters/XTurnId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyRequest"
+      responses:
+        "200":
+          description: Per-claim verification result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifyResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/UnknownSnapshot"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/ModelUnavailable"
+
+  /v0/sources/{fragment_id}:
+    get:
+      operationId: getSource
+      summary: Resolve a fragment to its original document/page/anchor text for the source drawer.
+      parameters:
+        - $ref: "#/components/parameters/XTraceId"
+        - name: fragment_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Source fragment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceResponse"
+        "404":
+          $ref: "#/components/responses/UnknownFragment"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v0/snapshots/current:
+    get:
+      operationId: getCurrentSnapshot
+      summary: Current active knowledge base snapshot.
+      parameters:
+        - $ref: "#/components/parameters/XTraceId"
+      responses:
+        "200":
+          description: Current snapshot metadata.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SnapshotResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v0/quality/turns:
+    post:
+      operationId: pushQualityTurn
+      summary: >
+        Push the full fact set of one completed turn (sent by api-worker via outbox,
+        at-least-once, idempotent by turn_id+revision).
+      parameters:
+        - $ref: "#/components/parameters/XTraceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QualityTurnPush"
+      responses:
+        "202":
+          description: Stored (not yet evaluated).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v0/quality/feedback:
+    post:
+      operationId: pushQualityFeedback
+      summary: >
+        Push one feedback event (sent by api-worker via outbox, at-least-once,
+        idempotent by feedback_id).
+      parameters:
+        - $ref: "#/components/parameters/XTraceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QualityFeedbackPush"
+      responses:
+        "202":
+          description: Stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v0/quality/evaluations:
+    get:
+      operationId: getQualityEvaluations
+      summary: Read-only quality evaluations for a case (proxied by api with server-side authz).
+      parameters:
+        - $ref: "#/components/parameters/XTraceId"
+        - name: case_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Evaluations for the case.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QualityEvaluationsResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v0/quality/issue-groups:
+    get:
+      operationId: getIssueGroups
+      summary: Read-only repeated-problem groups (proxied by api with server-side authz).
+      parameters:
+        - $ref: "#/components/parameters/XTraceId"
+      responses:
+        "200":
+          description: Issue groups.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IssueGroupsResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  parameters:
+    XTraceId:
+      name: X-Trace-Id
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+    XCaseId:
+      name: X-Case-Id
+      in: header
+      required: true
+      schema:
+        type: string
+    XTurnId:
+      name: X-Turn-Id
+      in: header
+      required: true
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: Missing required trace header.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ValidationError:
+      description: Request body failed schema validation.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    UnknownSnapshot:
+      description: snapshot_id does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    UnknownFragment:
+      description: fragment_id does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ModelUnavailable:
+      description: Inference runtime unreachable — maps to KnowledgeFailure.UNAVAILABLE.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ModelError:
+      description: Inference runtime responded but generation/verification failed — maps to KnowledgeFailure.MODEL_ERROR.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalError:
+      description: Unhandled error — maps to KnowledgeFailure.UNAVAILABLE.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum:
+            - VALIDATION_ERROR
+            - MISSING_TRACE_HEADER
+            - UNKNOWN_SNAPSHOT
+            - UNKNOWN_FRAGMENT
+            - MODEL_UNAVAILABLE
+            - MODEL_ERROR
+            - INTERNAL_ERROR
+        message:
+          type: string
+        detail:
+          type: object
+          additionalProperties: true
+          nullable: true
+
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        model_versions:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
+
+    AcceptedResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [stored]
+
+    EntityProvenance:
+      type: string
+      enum: [user_explicit, trusted_portal_context, inferred, unknown]
+
+    Entity:
+      type: object
+      required: [type, value, provenance]
+      properties:
+        type:
+          type: string
+          description: >
+            Context slot name, e.g. role, process, edo_provider, document_type, status,
+            user_action, error_code, duration, already_tried.
+        value:
+          type: string
+        provenance:
+          $ref: "#/components/schemas/EntityProvenance"
+
+    LanguageFlags:
+      type: object
+      required: [detected_language, typo_corrected]
+      properties:
+        detected_language:
+          type: string
+        typo_corrected:
+          type: boolean
+
+    UnderstandRequest:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+        prior_turn_summary:
+          type: string
+          nullable: true
+
+    UnderstandResponse:
+      type: object
+      required: [normalized_text, entities, exact_codes, language_flags]
+      properties:
+        normalized_text:
+          type: string
+        entities:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entity"
+        exact_codes:
+          type: array
+          items:
+            type: string
+        language_flags:
+          $ref: "#/components/schemas/LanguageFlags"
+
+    ModerationAmbiguity:
+      type: string
+      enum: [OFFENSIVE, NOT_OFFENSIVE, UNCERTAIN]
+
+    RuleMatch:
+      type: object
+      required: [rule_id, version, matched_term, matched_span]
+      properties:
+        rule_id:
+          type: string
+        version:
+          type: string
+        matched_term:
+          type: string
+        matched_span:
+          type: object
+          required: [start, end]
+          properties:
+            start:
+              type: integer
+            end:
+              type: integer
+
+    ModerationContextRequest:
+      type: object
+      required: [text, rule_match]
+      properties:
+        text:
+          type: string
+        rule_match:
+          $ref: "#/components/schemas/RuleMatch"
+
+    ModerationContextResponse:
+      type: object
+      required: [ambiguity, model_version]
+      properties:
+        ambiguity:
+          $ref: "#/components/schemas/ModerationAmbiguity"
+        model_version:
+          type: string
+
+    Corpus:
+      type: string
+      enum: [NORMATIVE, HISTORICAL]
+
+    RetrieveRequest:
+      type: object
+      required: [query, entities, exact_codes, corpus]
+      properties:
+        query:
+          type: string
+        entities:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entity"
+        exact_codes:
+          type: array
+          items:
+            type: string
+        corpus:
+          $ref: "#/components/schemas/Corpus"
+        snapshot_id:
+          type: string
+          nullable: true
+
+    CandidateScores:
+      type: object
+      properties:
+        exact:
+          type: number
+          nullable: true
+        fts:
+          type: number
+          nullable: true
+        dense:
+          type: number
+          nullable: true
+        rerank:
+          type: number
+          nullable: true
+
+    Candidate:
+      type: object
+      required: [fragment_id, document_id, scores, applicability_flags]
+      properties:
+        fragment_id:
+          type: string
+        document_id:
+          type: string
+        page:
+          type: integer
+          nullable: true
+        anchor:
+          type: string
+          nullable: true
+        scores:
+          $ref: "#/components/schemas/CandidateScores"
+        applicability_flags:
+          type: array
+          items:
+            type: string
+
+    RetrieveResponse:
+      type: object
+      required: [snapshot_id, retrieval_config_version, candidates]
+      properties:
+        snapshot_id:
+          type: string
+        retrieval_config_version:
+          type: string
+        candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/Candidate"
+
+    AnswerabilityRequest:
+      type: object
+      required: [query, snapshot_id, candidate_fragment_ids]
+      properties:
+        query:
+          type: string
+        snapshot_id:
+          type: string
+        candidate_fragment_ids:
+          type: array
+          items:
+            type: string
+
+    EvidenceSufficiency:
+      type: string
+      enum: [SUFFICIENT, CONDITION_DEPENDENT, INSUFFICIENT]
+
+    AnswerabilityResponse:
+      type: object
+      required: [evidence_sufficiency, evidence_fragment_ids, missing_conditions, risk_flags]
+      properties:
+        evidence_sufficiency:
+          $ref: "#/components/schemas/EvidenceSufficiency"
+        evidence_fragment_ids:
+          type: array
+          items:
+            type: string
+        missing_conditions:
+          type: array
+          items:
+            type: string
+        risk_flags:
+          type: array
+          items:
+            type: string
+
+    DraftConstraints:
+      type: object
+      properties:
+        max_output_tokens:
+          type: integer
+          default: 800
+        tone:
+          type: string
+          nullable: true
+
+    DraftRequest:
+      type: object
+      required: [query, snapshot_id, evidence_fragment_ids, constraints]
+      properties:
+        query:
+          type: string
+        snapshot_id:
+          type: string
+        evidence_fragment_ids:
+          type: array
+          items:
+            type: string
+        constraints:
+          $ref: "#/components/schemas/DraftConstraints"
+
+    Claim:
+      type: object
+      required: [claim_id, text, fragment_ids]
+      properties:
+        claim_id:
+          type: string
+        text:
+          type: string
+        fragment_ids:
+          type: array
+          items:
+            type: string
+
+    TokenUsage:
+      type: object
+      required: [input, output]
+      properties:
+        input:
+          type: integer
+        output:
+          type: integer
+
+    DraftResponse:
+      type: object
+      required: [draft_markdown, claims, model_version, token_usage]
+      properties:
+        draft_markdown:
+          type: string
+        claims:
+          type: array
+          items:
+            $ref: "#/components/schemas/Claim"
+        model_version:
+          type: string
+        token_usage:
+          $ref: "#/components/schemas/TokenUsage"
+
+    VerifyRequest:
+      type: object
+      required: [claims, snapshot_id]
+      properties:
+        claims:
+          type: array
+          items:
+            $ref: "#/components/schemas/Claim"
+        snapshot_id:
+          type: string
+
+    VerifyResult:
+      type: object
+      required: [claim_id, supported, evidence_fragment_ids]
+      properties:
+        claim_id:
+          type: string
+        supported:
+          type: boolean
+        evidence_fragment_ids:
+          type: array
+          items:
+            type: string
+
+    VerifyResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/VerifyResult"
+
+    SourceResponse:
+      type: object
+      required: [document_id, title, version, text, snapshot_id]
+      properties:
+        document_id:
+          type: string
+        title:
+          type: string
+        version:
+          type: string
+        page:
+          type: integer
+          nullable: true
+        anchor:
+          type: string
+          nullable: true
+        text:
+          type: string
+        snapshot_id:
+          type: string
+
+    SnapshotResponse:
+      type: object
+      required: [snapshot_id, created_at, document_count, fragment_count]
+      properties:
+        snapshot_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        document_count:
+          type: integer
+        fragment_count:
+          type: integer
+
+    StageTimings:
+      type: object
+      properties:
+        understand_ms:
+          type: integer
+          nullable: true
+        retrieve_ms:
+          type: integer
+          nullable: true
+        draft_ms:
+          type: integer
+          nullable: true
+        verify_ms:
+          type: integer
+          nullable: true
+
+    QualityTurnPush:
+      type: object
+      required: [case_id, turn_id, revision, occurred_at, question_text, decision, reason_codes, stage_timings]
+      description: >
+        decision, reason_codes, handoff_status, recommended_line, service_need are opaque
+        string labels produced by api; knowledge never interprets or reproduces their policy.
+      properties:
+        case_id:
+          type: string
+        turn_id:
+          type: string
+        revision:
+          type: integer
+        occurred_at:
+          type: string
+          format: date-time
+        question_text:
+          type: string
+        prior_turns_summary:
+          type: string
+          nullable: true
+        decision:
+          type: string
+        reason_codes:
+          type: array
+          items:
+            type: string
+        answer_markdown:
+          type: string
+          nullable: true
+        evidence_fragment_ids:
+          type: array
+          items:
+            type: string
+          nullable: true
+        snapshot_id:
+          type: string
+          nullable: true
+        handoff_status:
+          type: string
+          nullable: true
+        recommended_line:
+          type: string
+          nullable: true
+        service_need:
+          type: string
+          nullable: true
+        stage_timings:
+          $ref: "#/components/schemas/StageTimings"
+        error_category:
+          type: string
+          nullable: true
+
+    QualityFeedbackPush:
+      type: object
+      required: [feedback_id, case_id, turn_id, occurred_at]
+      properties:
+        feedback_id:
+          type: string
+        case_id:
+          type: string
+        turn_id:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        helpful:
+          type: boolean
+          nullable: true
+        solved:
+          type: boolean
+          nullable: true
+        comment_text:
+          type: string
+          nullable: true
+
+    DimensionValue:
+      type: string
+      enum: ["0", "1", "2", UNKNOWN, NOT_APPLICABLE]
+
+    DimensionScore:
+      type: object
+      required: [value]
+      properties:
+        value:
+          $ref: "#/components/schemas/DimensionValue"
+        evidence:
+          type: string
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+        limitation:
+          type: string
+          nullable: true
+        improvement_suggestion:
+          type: string
+          nullable: true
+
+    Evaluation:
+      type: object
+      required: [turn_id, factual_support, completeness, clarity, next_step, critical_error, evaluated_at]
+      properties:
+        turn_id:
+          type: string
+        factual_support:
+          $ref: "#/components/schemas/DimensionScore"
+        completeness:
+          $ref: "#/components/schemas/DimensionScore"
+        clarity:
+          $ref: "#/components/schemas/DimensionScore"
+        next_step:
+          $ref: "#/components/schemas/DimensionScore"
+        critical_error:
+          type: boolean
+        critical_error_reason:
+          type: string
+          nullable: true
+        evaluated_at:
+          type: string
+          format: date-time
+
+    QualityEvaluationsResponse:
+      type: object
+      required: [case_id, evaluations]
+      properties:
+        case_id:
+          type: string
+        evaluations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Evaluation"
+
+    HypothesisType:
+      type: string
+      enum: [KNOWLEDGE_GAP, PROCESS_ISSUE, PORTAL_ISSUE, OTHER]
+
+    Hypothesis:
+      type: object
+      required: [type, text]
+      properties:
+        type:
+          $ref: "#/components/schemas/HypothesisType"
+        text:
+          type: string
+        confidence:
+          type: string
+          enum: [LOW, MEDIUM, HIGH]
+          nullable: true
+
+    IssueGroup:
+      type: object
+      required: [group_id, label, n, representative_case_ids, limitations, hypotheses]
+      properties:
+        group_id:
+          type: string
+        label:
+          type: string
+        n:
+          type: integer
+        representative_case_ids:
+          type: array
+          items:
+            type: string
+        negative_signal_count:
+          type: integer
+          nullable: true
+        unresolved_count:
+          type: integer
+          nullable: true
+        limitations:
+          type: array
+          items:
+            type: string
+        hypotheses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Hypothesis"
+
+    IssueGroupsResponse:
+      type: object
+      required: [groups]
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/IssueGroup"

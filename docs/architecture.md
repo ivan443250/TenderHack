@@ -319,6 +319,8 @@ No HNSW until exact retrieval latency is measured and shown to be a bottleneck o
 
 This is the only interface between runtimes. It is frozen as `v0` in the first implementation hour (`execution-plan.md §3`); `knowledge` serves stubs with plausible JSON until real models are wired. OpenAPI is emitted by FastAPI; the C# client is generated (NSwag) into `TenderHack.Infrastructure` and never leaks into `Application`.
 
+The normative, exact version of this contract lives in [`docs/contracts/knowledge-v0.md`](contracts/knowledge-v0.md) (rules, headers, error taxonomy, idempotency, versioning) and [`docs/contracts/knowledge-v0.openapi.yaml`](contracts/knowledge-v0.openapi.yaml) (machine-readable OpenAPI 3.0, used for NSwag generation until `knowledge` emits its own OpenAPI from FastAPI — the two must then stay in lockstep). The shapes below stay illustrative; the two files above are authoritative on conflict.
+
 Design rules:
 
 - **facts, scores and evidence assessments in; no decisions out** — responses never contain `decision`, `should_handoff`, `handoff_status` or decision-family reason codes;
