@@ -1,0 +1,546 @@
+<title>TenderHack Compose Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f5f2ea;
+    --paper-raised:#fbf9f3;
+    --ink:#1c1f22;
+    --ink-muted:#6b6355;
+    --line:#cdc4ac;
+    --line-strong:#a89d80;
+    --accent-a:#c8531f;
+    --accent-a-soft:#f0d9c8;
+    --accent-b:#2b6e68;
+    --accent-b-soft:#d7e8e2;
+    --contract:#8a6d1f;
+    --contract-soft:#ecdfb8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#15181b;
+      --paper-raised:#1c2024;
+      --ink:#eef0ee;
+      --ink-muted:#a49c8a;
+      --line:#3a3d38;
+      --line-strong:#55584f;
+      --accent-a:#ff8a52;
+      --accent-a-soft:#432614;
+      --accent-b:#57c2b4;
+      --accent-b-soft:#16302c;
+      --contract:#e0bb5a;
+      --contract-soft:#3a2f14;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#15181b;
+    --paper-raised:#1c2024;
+    --ink:#eef0ee;
+    --ink-muted:#a49c8a;
+    --line:#3a3d38;
+    --line-strong:#55584f;
+    --accent-a:#ff8a52;
+    --accent-a-soft:#432614;
+    --accent-b:#57c2b4;
+    --accent-b-soft:#16302c;
+    --contract:#e0bb5a;
+    --contract-soft:#3a2f14;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', system-ui, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{
+    max-width:1080px;
+    margin:0 auto;
+    padding:56px 24px 80px;
+    display:flex;
+    flex-direction:column;
+    gap:40px;
+  }
+  header{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    border-bottom:1px solid var(--line);
+    padding-bottom:32px;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--contract);
+    margin:0;
+  }
+  h1{
+    font-family:'Oswald', sans-serif;
+    font-weight:700;
+    font-size:clamp(32px,4.4vw,46px);
+    letter-spacing:.005em;
+    text-transform:uppercase;
+    margin:0;
+    text-wrap:balance;
+    color:var(--ink);
+  }
+  .dek{
+    font-size:16.5px;
+    line-height:1.55;
+    max-width:62ch;
+    color:var(--ink);
+    margin:0;
+  }
+  .dek code{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:.92em;
+    background:var(--accent-a-soft);
+    color:var(--accent-a);
+    padding:1px 5px;
+    border-radius:3px;
+  }
+  .meta-row{
+    list-style:none;
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin:6px 0 0;
+    padding:0;
+  }
+  .meta-row li{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--ink-muted);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:4px 12px;
+  }
+
+  figure.diagram-figure{
+    margin:0;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+  .diagram-figure svg{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  figcaption{
+    font-size:13.5px;
+    color:var(--ink-muted);
+    line-height:1.5;
+    max-width:70ch;
+  }
+  figcaption b{ color:var(--ink); font-weight:600; }
+
+  .node-title{ font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px; letter-spacing:.045em; }
+  .node-sub{ font-family:'IBM Plex Sans',sans-serif; font-size:10.5px; }
+  .node-mono{ font-family:'IBM Plex Mono',monospace; font-size:9.5px; }
+  .diagram-label{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; }
+  .diagram-eyebrow{ font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.12em; }
+
+  .legend{
+    display:flex;
+    flex-wrap:wrap;
+    gap:20px 28px;
+    padding:16px 20px;
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:10px;
+  }
+  .legend-item{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    font-size:12.5px;
+    color:var(--ink);
+  }
+  .legend-swatch{
+    width:26px;
+    height:0;
+    border-top-width:3px;
+    border-top-style:solid;
+    flex:none;
+  }
+  .legend-swatch.dashed{ border-top-style:dashed; }
+
+  section h2{
+    font-family:'Oswald', sans-serif;
+    font-weight:600;
+    font-size:20px;
+    letter-spacing:.02em;
+    text-transform:uppercase;
+    margin:0 0 16px;
+    color:var(--ink);
+  }
+
+  .table-scroll{ overflow-x:auto; border:1px solid var(--line); border-radius:10px; }
+  table{
+    width:100%;
+    border-collapse:collapse;
+    min-width:760px;
+    background:var(--paper-raised);
+  }
+  thead th{
+    text-align:left;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--ink-muted);
+    padding:12px 16px;
+    border-bottom:1px solid var(--line-strong);
+    white-space:nowrap;
+  }
+  tbody td{
+    padding:12px 16px;
+    font-size:13.5px;
+    border-bottom:1px solid var(--line);
+    vertical-align:top;
+  }
+  tbody tr:last-child td{ border-bottom:none; }
+  td.mono, th.mono{ font-family:'IBM Plex Mono', monospace; font-size:12px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .container-name{ font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:13px; }
+  .tag{
+    display:inline-block;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10px;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    padding:2px 8px;
+    border-radius:999px;
+    white-space:nowrap;
+  }
+  .tag.public{ background:var(--accent-a-soft); color:var(--accent-a); }
+  .tag.internal{ background:var(--accent-b-soft); color:var(--accent-b); }
+  .tag.outside{ background:transparent; color:var(--ink-muted); border:1px dashed var(--line-strong); }
+
+  .invariants ol{
+    margin:0;
+    padding:0;
+    list-style:none;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    counter-reset:inv;
+  }
+  .invariants li{
+    display:grid;
+    grid-template-columns:34px 1fr;
+    gap:14px;
+    align-items:start;
+    padding:14px 16px;
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-left:3px solid var(--contract);
+    border-radius:8px;
+    font-size:14px;
+    line-height:1.5;
+  }
+  .invariants li::before{
+    counter-increment:inv;
+    content: counter(inv, decimal-leading-zero);
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:600;
+    font-size:15px;
+    color:var(--contract);
+  }
+  .invariants b{ color:var(--ink); }
+
+  footer{
+    font-size:12px;
+    color:var(--ink-muted);
+    border-top:1px solid var(--line);
+    padding-top:20px;
+  }
+  footer a{ color:var(--ink-muted); }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">docs/contracts · infrastructure</p>
+    <h1>Container topology</h1>
+    <p class="dek">How <code>api</code>, <code>knowledge</code> and their workers share one PostgreSQL and one Docker Compose network — and why the arrows between them only run one way.</p>
+    <ul class="meta-row">
+      <li>Docker Compose</li>
+      <li>Single Linux host</li>
+      <li>No external AI APIs</li>
+      <li>1 Postgres, 2 roles</li>
+    </ul>
+  </header>
+
+  <figure class="diagram-figure">
+    <svg viewBox="0 0 1140 910" role="img" aria-label="Diagram of the TenderHack Docker Compose containers: a browser reaches web and api through an optional reverse proxy; api and api-worker (the .NET support core) call knowledge over the frozen v0 contract and write to PostgreSQL under the api_rw role; knowledge and knowledge-worker (the Python knowledge service) call the local inference runtime and write to PostgreSQL under the knowledge_rw role; knowledge never calls back into api; api-worker optionally reaches an external, demo-only support adapter outside the Compose network.">
+      <defs>
+        <marker id="arrow-ink" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--ink)"/>
+        </marker>
+        <marker id="arrow-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--accent-a)"/>
+        </marker>
+        <marker id="arrow-b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--accent-b)"/>
+        </marker>
+        <marker id="arrow-c" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--contract)"/>
+        </marker>
+        <marker id="arrow-muted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-muted)"/>
+        </marker>
+      </defs>
+
+      <!-- ===== boundary: compose network ===== -->
+      <rect x="40" y="164" width="1060" height="636" rx="14" fill="none" stroke="var(--line-strong)" stroke-width="1.5"/>
+      <text x="64" y="192" class="diagram-eyebrow" fill="var(--ink-muted)" letter-spacing="0.12em">DOCKER COMPOSE NETWORK · tenderhack_default</text>
+
+      <!-- internal-only sub-boundary -->
+      <rect x="396" y="286" width="664" height="476" rx="12" fill="none" stroke="var(--accent-b)" stroke-width="1.5" stroke-dasharray="5 5" opacity="0.75"/>
+      <text x="420" y="306" class="diagram-label" fill="var(--accent-b)" letter-spacing="0.1em">INTERNAL ONLY — NO HOST PORT</text>
+
+      <!-- ===== client tier ===== -->
+      <g>
+        <rect x="420" y="20" width="260" height="50" rx="8" fill="var(--paper-raised)" stroke="var(--ink)" stroke-width="1.5"/>
+        <text x="550" y="42" text-anchor="middle" class="node-title" fill="var(--ink)">BROWSER</text>
+        <text x="550" y="59" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">the only client TenderHack ships</text>
+      </g>
+
+      <g>
+        <rect x="420" y="96" width="260" height="42" rx="8" fill="none" stroke="var(--ink-muted)" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <text x="550" y="115" text-anchor="middle" class="node-title" fill="var(--ink)">REVERSE-PROXY</text>
+        <text x="550" y="130" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">optional · nginx/Caddy · :80/:443</text>
+      </g>
+
+      <!-- arrows: browser -> proxy -->
+      <line x1="550" y1="70" x2="550" y2="94" stroke="var(--ink)" stroke-width="1.6" marker-end="url(#arrow-ink)"/>
+
+      <!-- ===== host-exposed row: web + api ===== -->
+      <g>
+        <rect x="90" y="196" width="260" height="68" rx="7" fill="var(--paper-raised)" stroke="var(--ink)" stroke-width="1.5"/>
+        <line x1="98" y1="207" x2="342" y2="207" stroke="var(--line)"/>
+        <line x1="98" y1="212" x2="342" y2="212" stroke="var(--line)"/>
+        <text x="220" y="231" text-anchor="middle" class="node-title" fill="var(--ink)">WEB</text>
+        <text x="220" y="246" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">React SPA (Vite build)</text>
+        <text x="220" y="258" text-anchor="middle" class="node-mono" fill="var(--ink-muted)">nginx:alpine · :5173→80</text>
+      </g>
+
+      <g>
+        <rect x="420" y="196" width="260" height="68" rx="7" fill="var(--paper-raised)" stroke="var(--accent-a)" stroke-width="2"/>
+        <line x1="428" y1="207" x2="672" y2="207" stroke="var(--line)"/>
+        <line x1="428" y1="212" x2="672" y2="212" stroke="var(--line)"/>
+        <text x="550" y="231" text-anchor="middle" class="node-title" fill="var(--ink)">API</text>
+        <text x="550" y="246" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">.NET 10 · ASP.NET Core Minimal API</text>
+        <text x="550" y="258" text-anchor="middle" class="node-mono" fill="var(--ink-muted)">aspnet:10.0 · :8080</text>
+      </g>
+
+      <!-- arrows: proxy -> web / api -->
+      <path d="M480,138 L220,196" fill="none" stroke="var(--ink)" stroke-width="1.6" marker-end="url(#arrow-ink)"/>
+      <text x="336" y="172" text-anchor="middle" class="diagram-label" fill="var(--ink-muted)">static assets</text>
+
+      <line x1="550" y1="138" x2="550" y2="194" stroke="var(--ink)" stroke-width="1.6" marker-end="url(#arrow-ink)"/>
+      <text x="596" y="170" class="diagram-label" fill="var(--ink-muted)">HTTP / SSE</text>
+
+      <!-- ===== support core row: api-worker + knowledge ===== -->
+      <g>
+        <rect x="420" y="310" width="260" height="68" rx="7" fill="var(--paper-raised)" stroke="var(--accent-a)" stroke-width="2"/>
+        <line x1="428" y1="321" x2="672" y2="321" stroke="var(--line)"/>
+        <line x1="428" y1="326" x2="672" y2="326" stroke="var(--line)"/>
+        <text x="550" y="345" text-anchor="middle" class="node-title" fill="var(--ink)">API-WORKER</text>
+        <text x="550" y="360" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">.NET 10 · BackgroundService</text>
+        <text x="550" y="372" text-anchor="middle" class="node-mono" fill="var(--ink-muted)">aspnet:10.0 · no host port</text>
+      </g>
+
+      <g>
+        <rect x="750" y="310" width="260" height="68" rx="7" fill="var(--paper-raised)" stroke="var(--accent-b)" stroke-width="2"/>
+        <line x1="758" y1="321" x2="1002" y2="321" stroke="var(--line)"/>
+        <line x1="758" y1="326" x2="1002" y2="326" stroke="var(--line)"/>
+        <text x="880" y="345" text-anchor="middle" class="node-title" fill="var(--ink)">KNOWLEDGE</text>
+        <text x="880" y="360" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">Python 3.12 · FastAPI</text>
+        <text x="880" y="372" text-anchor="middle" class="node-mono" fill="var(--ink-muted)">uv image · :8000, internal</text>
+      </g>
+
+      <!-- arrow: api -> knowledge (contract v0) -->
+      <path d="M680,248 L750,320" fill="none" stroke="var(--contract)" stroke-width="2" marker-end="url(#arrow-c)"/>
+      <rect x="672" y="270" width="120" height="30" rx="4" fill="var(--contract-soft)"/>
+      <text x="732" y="283" text-anchor="middle" class="diagram-label" fill="var(--contract)" font-weight="600">contract v0</text>
+      <text x="732" y="296" text-anchor="middle" class="diagram-label" fill="var(--contract)" font-size="9">one-way, never back</text>
+
+      <!-- arrow: api-worker -> knowledge (quality push) -->
+      <line x1="680" y1="344" x2="748" y2="344" stroke="var(--contract)" stroke-width="2" marker-end="url(#arrow-c)"/>
+      <text x="714" y="336" text-anchor="middle" class="diagram-label" fill="var(--contract)" font-size="9">quality push</text>
+
+      <!-- ===== knowledge-worker row ===== -->
+      <g>
+        <rect x="750" y="418" width="260" height="68" rx="7" fill="var(--paper-raised)" stroke="var(--accent-b)" stroke-width="2"/>
+        <line x1="758" y1="429" x2="1002" y2="429" stroke="var(--line)"/>
+        <line x1="758" y1="434" x2="1002" y2="434" stroke="var(--line)"/>
+        <text x="880" y="453" text-anchor="middle" class="node-title" fill="var(--ink)">KNOWLEDGE-WORKER</text>
+        <text x="880" y="468" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">Python 3.12 · worker entrypoint</text>
+        <text x="880" y="480" text-anchor="middle" class="node-mono" fill="var(--ink-muted)">uv image · no host port</text>
+      </g>
+
+      <!-- ===== shared postgres ===== -->
+      <g>
+        <rect x="590" y="530" width="260" height="80" rx="7" fill="var(--paper-raised)" stroke="var(--line-strong)" stroke-width="1.5"/>
+        <line x1="598" y1="541" x2="842" y2="541" stroke="var(--line)"/>
+        <line x1="598" y1="546" x2="842" y2="546" stroke="var(--line)"/>
+        <text x="720" y="564" text-anchor="middle" class="node-title" fill="var(--ink)">POSTGRESQL 16</text>
+        <line x1="720" y1="572" x2="720" y2="600" stroke="var(--line-strong)" stroke-dasharray="3 3"/>
+        <text x="655" y="590" text-anchor="middle" class="node-mono" fill="var(--accent-a)">api_rw</text>
+        <text x="785" y="590" text-anchor="middle" class="node-mono" fill="var(--accent-b)">knowledge_rw</text>
+        <text x="720" y="602" text-anchor="middle" class="node-mono" fill="var(--ink-muted)" font-size="8.5">postgres:16 · :5432</text>
+      </g>
+      <text x="720" y="624" text-anchor="middle" class="diagram-label" fill="var(--ink-muted)" font-size="9.5" font-style="italic">no cross-schema SELECT · no shared views</text>
+      <rect x="617" y="632" width="206" height="20" rx="10" fill="var(--accent-b-soft)"/>
+      <text x="720" y="646" text-anchor="middle" class="diagram-label" fill="var(--accent-b)" font-size="9.5">+ pgvector, pg_trgm, FTS — this IS the vector DB</text>
+
+      <!-- ===== inference ===== -->
+      <g>
+        <rect x="750" y="670" width="260" height="68" rx="7" fill="var(--paper-raised)" stroke="var(--accent-b)" stroke-width="2"/>
+        <line x1="758" y1="681" x2="1002" y2="681" stroke="var(--line)"/>
+        <line x1="758" y1="686" x2="1002" y2="686" stroke="var(--line)"/>
+        <text x="880" y="705" text-anchor="middle" class="node-title" fill="var(--ink)">INFERENCE</text>
+        <text x="880" y="720" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">vLLM (embed · rerank · generate)</text>
+        <text x="880" y="732" text-anchor="middle" class="node-mono" fill="var(--ink-muted)">no host port · GPU</text>
+      </g>
+
+      <!-- arrows: api -> postgres, api-worker -> postgres (gutter trunks) -->
+      <path d="M680,230 L705,230 L705,530" fill="none" stroke="var(--accent-a)" stroke-width="1.8" marker-end="url(#arrow-a)"/>
+      <path d="M680,344 L727,344 L727,530" fill="none" stroke="var(--accent-a)" stroke-width="1.8" marker-end="url(#arrow-a)"/>
+      <text x="662" y="440" text-anchor="end" class="diagram-label" fill="var(--accent-a)" font-size="9.5" transform="rotate(-90 662 440)">SQL · api_rw</text>
+
+      <!-- arrows: knowledge -> postgres, knowledge-worker -> postgres -->
+      <path d="M750,362 L742,362 L742,530" fill="none" stroke="var(--accent-b)" stroke-width="1.8" marker-end="url(#arrow-b)"/>
+      <path d="M750,452 L690,452 L690,530" fill="none" stroke="var(--accent-b)" stroke-width="1.8" marker-end="url(#arrow-b)"/>
+      <text x="965" y="440" text-anchor="start" class="diagram-label" fill="var(--accent-b)" font-size="9.5" transform="rotate(-90 965 440)">SQL · knowledge_rw</text>
+
+      <!-- arrows: knowledge -> inference (right corridor around knowledge-worker) -->
+      <path d="M1010,340 L1042,340 L1042,704 L1010,704" fill="none" stroke="var(--accent-b)" stroke-width="1.8" marker-end="url(#arrow-b)"/>
+      <!-- knowledge-worker -> inference (straight) -->
+      <line x1="880" y1="486" x2="880" y2="668" stroke="var(--accent-b)" stroke-width="1.8" marker-end="url(#arrow-b)"/>
+      <rect x="945" y="500" width="150" height="30" rx="4" fill="var(--accent-b-soft)"/>
+      <text x="1020" y="513" text-anchor="middle" class="diagram-label" fill="var(--accent-b)">embed · rerank</text>
+      <text x="1020" y="525" text-anchor="middle" class="diagram-label" fill="var(--accent-b)">generate (vLLM)</text>
+
+      <!-- ===== external demo adapter ===== -->
+      <g>
+        <rect x="420" y="822" width="260" height="56" rx="7" fill="none" stroke="var(--ink-muted)" stroke-width="1.5" stroke-dasharray="5 5"/>
+        <text x="550" y="844" text-anchor="middle" class="node-title" fill="var(--ink-muted)">PORTAL SUPPORT SYSTEM</text>
+        <text x="550" y="859" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">demo / simulated adapter · outside Compose</text>
+      </g>
+      <line x1="550" y1="378" x2="550" y2="820" stroke="var(--ink-muted)" stroke-width="1.6" stroke-dasharray="5 5" marker-end="url(#arrow-muted)"/>
+      <rect x="500" y="560" width="100" height="20" rx="4" fill="var(--paper)"/>
+      <text x="550" y="574" text-anchor="middle" class="diagram-label" fill="var(--ink-muted)" font-size="9.5">demo adapter</text>
+
+    </svg>
+    <figcaption>Every container in the Compose network, which ones the browser can actually reach, and the two roles (<b>api_rw</b> / <b>knowledge_rw</b>) that split one PostgreSQL instance down the middle. Amber marks the frozen <b>v0</b> contract — the only path from the .NET side to the Python side, and it never runs the other way.</figcaption>
+  </figure>
+
+  <div class="legend">
+    <div class="legend-item"><span class="legend-swatch" style="border-color:var(--contract)"></span>contract v0 (frozen, one-way)</div>
+    <div class="legend-item"><span class="legend-swatch" style="border-color:var(--accent-a)"></span>.NET-owned data path (api_rw)</div>
+    <div class="legend-item"><span class="legend-swatch" style="border-color:var(--accent-b)"></span>Python-owned data path (knowledge_rw / models)</div>
+    <div class="legend-item"><span class="legend-swatch" style="border-color:var(--ink)"></span>browser-facing</div>
+    <div class="legend-item"><span class="legend-swatch dashed" style="border-color:var(--ink-muted)"></span>optional / demo-only</div>
+  </div>
+
+  <section class="manifest">
+    <h2>Compose manifest</h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Container</th>
+            <th>Image basis</th>
+            <th>Network</th>
+            <th class="mono">Port</th>
+            <th>Owns / does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="container-name">web</td>
+            <td>node:24 build → nginx:alpine</td>
+            <td><span class="tag public">public</span></td>
+            <td class="mono">5173→80</td>
+            <td>React SPA. Talks only to <span class="mono" style="font-family:'IBM Plex Mono',monospace">api</span>.</td>
+          </tr>
+          <tr>
+            <td class="container-name">api</td>
+            <td>mcr.microsoft.com/dotnet/aspnet:10.0</td>
+            <td><span class="tag public">public</span></td>
+            <td class="mono">8080</td>
+            <td>Cases, turns, <code style="font-family:'IBM Plex Mono',monospace">Decision</code>, moderation, routing, handoff, HTTP/SSE.</td>
+          </tr>
+          <tr>
+            <td class="container-name">api-worker</td>
+            <td>mcr.microsoft.com/dotnet/aspnet:10.0</td>
+            <td><span class="tag internal">internal</span></td>
+            <td class="mono">—</td>
+            <td>Outbox delivery, handoff retries, quality/feedback push, stale-turn cleanup.</td>
+          </tr>
+          <tr>
+            <td class="container-name">knowledge</td>
+            <td>uv-based Python 3.12 image</td>
+            <td><span class="tag internal">internal</span></td>
+            <td class="mono">8000</td>
+            <td>Retrieval, answerability, draft/verify, moderation-context check. No decisions.</td>
+          </tr>
+          <tr>
+            <td class="container-name">knowledge-worker</td>
+            <td>uv-based Python 3.12 image</td>
+            <td><span class="tag internal">internal</span></td>
+            <td class="mono">—</td>
+            <td>Ingestion, embeddings, quality audit, issue-group recomputation.</td>
+          </tr>
+          <tr>
+            <td class="container-name">postgres</td>
+            <td>postgres:16</td>
+            <td><span class="tag internal">internal</span></td>
+            <td class="mono">5432</td>
+            <td>One database, two roles: <span class="mono" style="font-family:'IBM Plex Mono',monospace">api_rw</span>, <span class="mono" style="font-family:'IBM Plex Mono',monospace">knowledge_rw</span>. No cross-schema reads. <span class="mono" style="font-family:'IBM Plex Mono',monospace">pgvector</span> + <span class="mono" style="font-family:'IBM Plex Mono',monospace">pg_trgm</span> extensions <b>are</b> the vector DB — no separate service.</td>
+          </tr>
+          <tr>
+            <td class="container-name">inference</td>
+            <td>vLLM (llama.cpp fallback)</td>
+            <td><span class="tag internal">internal</span></td>
+            <td class="mono">—</td>
+            <td>Embed / rerank / generate. Reachable only from <span class="mono" style="font-family:'IBM Plex Mono',monospace">knowledge*</span>.</td>
+          </tr>
+          <tr>
+            <td class="container-name">reverse-proxy</td>
+            <td>nginx or Caddy</td>
+            <td><span class="tag public">public</span></td>
+            <td class="mono">80 / 443</td>
+            <td>Optional. Routes <span class="mono" style="font-family:'IBM Plex Mono',monospace">/</span> → web, <span class="mono" style="font-family:'IBM Plex Mono',monospace">/api*</span> → api.</td>
+          </tr>
+          <tr>
+            <td class="container-name">portal support system</td>
+            <td>not a container</td>
+            <td><span class="tag outside">outside compose</span></td>
+            <td class="mono">—</td>
+            <td>Demo/simulated handoff target reached only by <span class="mono" style="font-family:'IBM Plex Mono',monospace">api-worker</span>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="invariants">
+    <h2>What the arrows enforce</h2>
+    <ol>
+      <li><span><b>One direction only.</b> <span class="mono" style="font-family:'IBM Plex Mono',monospace">api → knowledge</span>, always. <span class="mono" style="font-family:'IBM Plex Mono',monospace">knowledge</span> never calls <span class="mono" style="font-family:'IBM Plex Mono',monospace">api</span> and never reads its tables — it only receives pushed payloads at <span class="mono" style="font-family:'IBM Plex Mono',monospace">/v0/quality/*</span>.</span></li>
+      <li><span><b>The browser has one door.</b> It reaches <span class="mono" style="font-family:'IBM Plex Mono',monospace">web</span> and <span class="mono" style="font-family:'IBM Plex Mono',monospace">api</span> only — never <span class="mono" style="font-family:'IBM Plex Mono',monospace">knowledge</span> directly, in dev or in production.</span></li>
+      <li><span><b>One database, two locked roles.</b> <span class="mono" style="font-family:'IBM Plex Mono',monospace">api_rw</span> and <span class="mono" style="font-family:'IBM Plex Mono',monospace">knowledge_rw</span> each see only their own tables — no shared views, no cross-schema <span class="mono" style="font-family:'IBM Plex Mono',monospace">SELECT</span> in either direction.</span></li>
+    </ol>
+  </section>
+
+  <footer>Source: <span class="mono" style="font-family:'IBM Plex Mono',monospace">docs/architecture.md §2–3, §14</span> and <span class="mono" style="font-family:'IBM Plex Mono',monospace">docs/stack.md §14</span>. Update this diagram in the same change as the Compose file if a container, port or network boundary changes.</footer>
+</div>
