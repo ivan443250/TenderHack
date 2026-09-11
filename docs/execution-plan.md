@@ -109,11 +109,13 @@ Build in parallel:
 
 ### Backend
 
-- full decision enum;
-- conversation/resolution/turn/handoff states;
+- full decision enum incl. `MODERATION_WARNING`;
+- conversation (incl. `CLOSED_SUPPORT`) / resolution / turn / handoff states, `moderation_warning_count`;
+- owner session cookie and owner scoping on every case endpoint;
 - superseded turn logic;
-- handoff outbox + controlled demo adapter (`api-worker`);
-- idempotency semantics;
+- handoff outbox + controlled demo adapter (`api-worker`), `SubmitAsync` modes;
+- `IHandoffAdapter.GetStatusAsync` + `handoff-status-sync` job + `IngestHandoffStatus` (ADR-0002); demo `staged` script;
+- idempotency semantics, incl. `(handoff_id, external_revision)`;
 - failure categories, including per-stage `KnowledgeFailure` mapping;
 - outbox push of quality-turn / feedback payloads to `knowledge` (`/v0/quality/turns`, `/v0/quality/feedback`) — needed by the 16–24 h phase;
 - boundary check at gate: no `Decision`/handoff logic in `knowledge`, no cross-runtime table access (ADR-0001 §6 trigger).
@@ -121,6 +123,7 @@ Build in parallel:
 ### Moderation/routing
 
 - profanity normalizer + rules/version;
+- warning-first threshold policy (`Moderation:CloseAfterWarnings`), warning text as server event;
 - contextual ambiguity path only where justified;
 - service need + line/channel policy + reason codes.
 
@@ -128,33 +131,39 @@ Build in parallel:
 
 - semantic stages;
 - clarification;
+- «подтверждённого ответа нет» + «Обратиться к оператору поддержки»;
 - handoff review/confirm;
-- pending/accepted/simulated/failed;
-- moderation close;
+- status widget: pending/accepted/simulated/failed + stage/specialist rows from server facts only;
+- moderation warning and close;
 - technical error.
 
 ### Gate G2
 
 Critical branches work without manual DB editing:
 
-- `ANSWER` with source;
+- `ANSWER` with source button that opens the fragment;
 - `CLARIFY` when one condition changes the branch;
-- `HANDOFF_OFFER` on insufficient/factual-state cases;
+- `HANDOFF_OFFER` on insufficient/factual-state cases, with the operator button;
 - `ANSWER_AND_HANDOFF` when instruction itself requires support;
-- moderation close;
-- handoff success and failure;
+- moderation warning, then close on repeat;
+- handoff success and failure; `staged` demo shows stage/specialist changing live via `HANDOFF_STATUS`;
 - `ANSWER` does not resolve the case.
 
 ## 6. 16–24 h — Quality contour and read-only analytics
 
 Build:
 
-- feedback helpful vs solved as separate signals;
+- completion: `POST .../complete`, adapter terminal → `CLOSED_SUPPORT`, `CASE_COMPLETED` / `FEEDBACK_REQUESTED` events;
+- archive: `GET /api/v0/cases?status=`, read-only case view;
+- notifications: `notifications` table, `GET /api/v0/notifications`, owner SSE stream, ack; web toast/badge + Web Notifications API when hidden;
+- feedback widget with four signals (`specialist_rating`, `information_quality_rating`, `solved`, `comment_text`), once per case;
+- outbox push `/v0/quality/feedback` (extended fields) and `/v0/quality/completions`;
 - source-type/data-sufficiency model;
 - quality rubric (`0/1/2/UNKNOWN/NA`);
 - quality evaluator with evidence/limitations;
 - historical topic/group baseline;
 - repeated-problem cards with representative examples and explicit hypotheses;
+- specialist-feedback slices by issue group / line / `specialist_ref` with `n` and limitations — no ranking;
 - protected read-only analytics UI;
 - simulated human reply only if needed to demonstrate the methodology, clearly labelled.
 
@@ -165,7 +174,9 @@ Demo can show:
 1. one answer/record with a useful quality audit;
 2. one case where insufficient data yields `UNKNOWN`, not fake zero;
 3. one repeated-problem group with real `n` and examples;
-4. negative feedback is not automatically converted into employee blame.
+4. negative feedback is not automatically converted into employee blame;
+5. a case completed by the `staged` demo support while the user is elsewhere → notification arrives, case lands in «Архив», feedback widget opens with the specialist row labelled demo;
+6. a case completed by the user («Завершить обращение») → same completion/feedback path, `CLOSED_USER`.
 
 ## 7. 24–32 h — Evaluation, regression and hardening
 
@@ -247,7 +258,8 @@ If behind schedule:
 - source provenance;
 - answer/clarify/handoff distinction;
 - honest technical error vs no-answer distinction;
-- explicit handoff status and real/demo separation;
+- explicit handoff status and real/demo separation, incl. status ingestion from the adapter (no fabricated stage/specialist);
+- explicit completion + in-app notification + feedback widget (the 7-point chat UX is the scored functionality);
 - minimum quality methodology;
 - critical domain regressions;
 - reproducible local run;

@@ -35,7 +35,10 @@
 - Направление runtime-зависимости: `api → knowledge`. Обратных HTTP-вызовов нет.
 - Одна PostgreSQL допустима, но `api_rw` и `knowledge_rw` не читают/не мигрируют таблицы друг друга; общих views/ролей нет.
 - Normative answer corpus и historical analytics corpus разделены. Историческое `Решение` не является ответом пользователю.
-- `ANSWER != RESOLVED`; prepared handoff != accepted handoff.
+- `ANSWER != RESOLVED`; prepared handoff != accepted handoff. `RESOLVED` ставят только явный `complete` пользователя или терминальный факт адаптера.
+- Этап/специалист/терминальный статус передачи — только факты адаптера (poll или подписанный webhook, ADR-0002); `null` остаётся `null`, UI не показывает заглушек.
+- Уведомления — api-owned факты (inbox + owner SSE + Web Notifications API); внешних push/email в P0 нет.
+- Модерация warning-first: порог — серверная конфигурация, не UI.
 - Infrastructure failure != «в базе нет ответа».
 - Внешние LLM/search API не используются в штатном интеллектуальном контуре.
 - Не выводить chain-of-thought в UI/logs/docs.

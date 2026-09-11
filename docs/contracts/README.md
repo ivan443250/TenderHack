@@ -56,10 +56,14 @@ Where applicable:
 ### web-api-v0
 
 - API OpenAPI/snapshots include all fields used by UI;
-- SSE event replay/reconnect by event id;
+- SSE event replay/reconnect by event id (case stream and owner notification stream);
 - same idempotency key + same payload returns same logical result;
-- reload from snapshot reproduces timeline state;
-- source/handoff/feedback actions are authz checked server-side.
+- reload from snapshot reproduces timeline state, incl. completed/archived cases;
+- `complete` → `CASE_COMPLETED` + `FEEDBACK_REQUESTED` + notification row; second `complete` → `409`;
+- feedback once per case; four signals stored independently;
+- notifications catch-up by `notification_id`, ack idempotent;
+- owner cookie mismatch → no access; `case_id` alone grants nothing;
+- source/handoff/feedback/notification actions are authz checked server-side.
 
 ### support-adapter-v0
 
@@ -67,4 +71,14 @@ Where applicable:
 - accepted only after positive adapter acknowledgement;
 - unknown specialist/stage stays null, never fabricated;
 - simulated mode is explicit in persisted state/UI;
-- timeout/failure is retryable without losing prepared package.
+- timeout/failure is retryable without losing prepared package;
+- status snapshot idempotent by `(handoff_id, external_revision)`; poll and webhook converge;
+- terminal status completes the case exactly once (`CLOSED_SUPPORT`);
+- `staged` demo script deterministic per `handoff_id`;
+- webhook rejects unsigned / stale / mismatched requests and is absent when disabled.
+
+### knowledge-v0 (quality pushes)
+
+- `QualityFeedbackPush` with the four signals + `specialist_ref` deserializes; `helpful` ignored by new consumers;
+- `QualityCompletionPush` idempotent by `case_id`;
+- analytics fixtures can be built from turns + feedback + completions alone (no API DB).

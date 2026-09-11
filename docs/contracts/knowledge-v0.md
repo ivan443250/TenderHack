@@ -76,8 +76,9 @@
 - `POST /v0/quality/turns` идемпотентен по `(turn_id, revision)`: повторная доставка того же `turn_id`+`revision`
   (retry после потери ack, at-least-once outbox) — upsert без ошибки, ответ `202` в обоих случаях.
 - `POST /v0/quality/feedback` идемпотентен по `feedback_id`: повторная доставка — upsert, `202`.
+- `POST /v0/quality/completions` идемпотентен по `case_id`: повторная доставка — upsert, `202` (кейс завершается ровно один раз, поэтому ключ — сам `case_id`). `api-worker` отправляет его повторно с обновлённым `resolution_status`, если терминальный факт адаптера пришёл уже после `CLOSED_USER` и перевёл `UNKNOWN → RESOLVED/UNRESOLVED`; `knowledge` берёт последнюю версию.
 - `202` означает **«сохранено»**, не «оценено»: оценка запускается асинхронно `knowledge-worker`.
-- `knowledge` никогда не отвечает `409` на эти два эндпоинта — по правилам push-модели (`architecture.md §10`)
+- `knowledge` никогда не отвечает `409` на эти три эндпоинта — по правилам push-модели (`architecture.md §10`)
   `api-worker` всегда отправляет полный, детерминированный по коммиту payload; конфликт содержимого при том же
   ключе означает баг в `api-worker`, а не легитимный конкурентный сценарий, и должен быть обнаружен тестами
   (`quality.md §8`), а не HTTP-статусом.
@@ -98,7 +99,8 @@
 | `GET /v0/sources/{fragment_id}` | открытие источника (вне хода, из UI) | нет |
 | `GET /v0/snapshots/current` | текущий snapshot базы знаний | нет |
 | `POST /v0/quality/turns` | push факта о ходе (`api-worker`) | нет (`turn_id` в теле) |
-| `POST /v0/quality/feedback` | push фидбэка (`api-worker`) | нет (`turn_id` в теле) |
+| `POST /v0/quality/feedback` | push фидбэка: `specialist_rating`, `information_quality_rating`, `solved`, `comment_text` (`api-worker`) | нет (`turn_id` в теле) |
+| `POST /v0/quality/completions` | push факта завершения обращения: `completion_reason`, `resolution_status`, `specialist_ref?` (`api-worker`; additive, 2026-09-12) | нет (`case_id` в теле) |
 | `GET /v0/quality/evaluations?case_id=` | read-only аналитика (proxy `api`) | нет |
 | `GET /v0/quality/issue-groups` | read-only аналитика (proxy `api`) | нет |
 
@@ -106,9 +108,14 @@
 
 - `Decision`, `HandoffStatus`, `should_handoff`, `reason_codes` семейства решений — **запрещённые ключи** в любом
   ответе `knowledge`. Их наличие в теле ответа — `INVALID_RESPONSE` независимо от статус-кода.
-- `decision`, `reason_codes`, `handoff_status`, `recommended_line`, `service_need` в теле `POST /v0/quality/turns`
-  — это **opaque строки**, присланные `api`; `knowledge` не парсит и не воспроизводит их семантику
-  (`architecture.md §5.7`).
+- `decision`, `reason_codes`, `handoff_status`, `recommended_line`, `service_need` в теле `POST /v0/quality/turns`,
+  а также `completion_reason`, `resolution_status` в `POST /v0/quality/completions` — это **opaque строки**,
+  присланные `api`; `knowledge` не парсит и не воспроизводит их семантику (`architecture.md §5.7`).
+- `specialist_ref` (в feedback и completions) — opaque идентификатор специалиста от адаптера. `knowledge` может
+  группировать по нему (`n`, распределение `specialist_rating`, limitations), но **не публикует** персональный
+  рейтинг/ранжирование (`product-spec.md §18.2`). `null` означает «человек не участвовал или адаптер не сообщил».
+- `helpful` в `QualityFeedbackPush` — deprecated, дублирует `information_quality_rating`; новые consumers
+  читают только два явных рейтинга.
 - `corpus` в `POST /v0/retrieve` обязателен и по умолчанию не подразумевается — вызывающая сторона (`Application`)
   всегда передаёт `NORMATIVE` явно для user-facing ответа; `HISTORICAL` используется только для аналитики/evals,
   никогда для генерации ответа пользователю (`product-spec.md §6.2`).

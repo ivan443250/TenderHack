@@ -28,7 +28,7 @@
 
 ## 3. A — Support Core (`apps/api`)
 
-**Owns:** `Case`, `Turn`, revisions, all state enums, `TurnOrchestrator`, moderation/routing policy, idempotency, handoff aggregate/outbox, feedback, HTTP/SSE/authz.
+**Owns:** `Case`, `Turn`, revisions, all state enums, `TurnOrchestrator`, moderation policy (warning-first threshold), routing policy, idempotency, handoff aggregate/outbox, `IngestHandoffStatus` use-case, completion/archive, notifications table + owner SSE stream, owner session cookie, feedback (four signals), HTTP/SSE/authz, support webhook endpoint.
 
 **Reads first:** `product-spec.md`, `architecture.md §4–8`, `contracts/web-api-v0.md`, `contracts/knowledge-v0.md`, `contracts/support-adapter-v0.md`.
 
@@ -64,23 +64,23 @@
 
 ## 6. D — Web / Chat (`apps/web`)
 
-**Owns:** presentation only — chat timeline, source drawer/button, progress stages, handoff CTA/status widget, completion/feedback widget, archive/read-only view, analytics screens.
+**Owns:** presentation only — chat timeline, source drawer/button, progress stages, moderation warning rendering, handoff CTA/status widget (status + stage/specialist rows from server facts), «Завершить обращение» control, completion/feedback widget, case list with «Архив», notification toast/badge/inbox + Web Notifications API integration, analytics screens.
 
-**Reads first:** `contracts/web-api-v0.md`, `product-spec.md §3, §16–18`, `architecture.md §13–14`.
+**Reads first:** `contracts/web-api-v0.md`, `product-spec.md §3, §14, §16–18`, `architecture.md §5.8–5.9, §13–14`.
 
-**Must not:** call `knowledge`; infer `RESOLVED` from `ANSWER`; invent specialist/stage/SLA; persist authoritative lifecycle only in local state.
+**Must not:** call `knowledge`; infer `RESOLVED` from `ANSWER`; invent specialist/stage/SLA or placeholder rows; decide the moderation threshold locally; persist authoritative lifecycle only in local state; use Web Push/service-worker push.
 
 **Ready when:** reload reconstructs the same UI from `CaseSnapshot`; SSE reconnect can resume by event ID; every visible source/status came from server state.
 
 ## 7. E — Handoff / Support integration (`api-worker`)
 
-**Owns:** outbox delivery, retry/backoff, adapter calls, acknowledgement/status ingestion, demo adapter modes.
+**Owns:** outbox delivery, retry/backoff, `SubmitAsync` calls, `handoff-status-sync` polling job (`GetStatusAsync`), demo adapter (submit modes + `staged` status script), quality pushes (`turns`, `feedback`, `completions`).
 
-**Reads first:** `contracts/support-adapter-v0.md`, `product-spec.md §17`, `architecture.md §7, §12, §15`.
+**Reads first:** `contracts/support-adapter-v0.md`, `product-spec.md §17`, `architecture.md §7, §12, §15`, ADR-0002.
 
-**Must not:** mark accepted before adapter acknowledgement; fabricate assignee/stage; require knowledge availability to submit a prepared handoff.
+**Must not:** mark accepted before adapter acknowledgement; fabricate assignee/stage/terminal; treat a poll failure as a status change; require knowledge availability to submit a prepared handoff.
 
-**Ready when:** success/timeout/failure/simulated paths are deterministic, idempotent and reflected to browser through API-owned state/events.
+**Ready when:** success/timeout/failure/simulated submit paths and the `staged` status script are deterministic, idempotent by `(handoff_id, external_revision)` and reflected to browser through API-owned state/events; terminal status completes the case once.
 
 ## 8. F — Quality analytics (`knowledge-worker`)
 
@@ -119,9 +119,10 @@ Do not parallelize uncoordinated edits to:
 
 - `Decision`/state enum semantics;
 - `knowledge-v0.openapi.yaml`;
-- public timeline event shapes;
+- public timeline event shapes and notification shapes;
 - database ownership;
-- moderation policy;
-- handoff acknowledgement semantics.
+- moderation policy/threshold;
+- handoff acknowledgement and status-ingestion semantics;
+- completion paths (who may set `RESOLVED`).
 
 Those are integration-owner changes and need one coordinated diff.

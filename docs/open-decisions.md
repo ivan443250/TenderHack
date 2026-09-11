@@ -4,92 +4,14 @@
 
 Когда решение принято, обновить source-of-truth документ/контракт и удалить пункт отсюда тем же change.
 
-## OD-001 — moderation: закрывать сразу или после предупреждения
+## Закрытые (для истории — не редактировать, не переоткрывать без нового факта)
 
-**Статус:** needs organizer/team confirmation before G2.
+| ID | Решение | Где зафиксировано | Дата |
+|---|---|---|---|
+| OD-001 | Модерация warning-first: `MODERATION_WARNING` при первом подтверждённом нарушении, `MODERATION_CLOSE` при повторном; порог — серверная конфигурация | `product-spec.md §14`, `architecture.md §5.4, §6`, `web-api-v0.md §2, §7`, `quality.md §6` | 2026-09-12 |
+| OD-002 | Feedback: четыре независимых сигнала; `QualityFeedbackPush` расширен additive-полями `specialist_rating`, `information_quality_rating`, `specialist_ref`, `integration_mode`; добавлен `POST /v0/quality/completions` | `product-spec.md §18`, `knowledge-v0.md §4–5`, `knowledge-v0.openapi.yaml`, `web-api-v0.md §9` | 2026-09-12 |
 
-### Текущий repository source of truth
-
-`product-spec.md` и `quality.md` сейчас фиксируют:
-
-```text
-confirmed profanity → MODERATION_CLOSE
-```
-
-### Последнее продуктовое уточнение команды
-
-Желаемый UX:
-
-```text
-first confirmed violation
-→ warning in current chat
-→ conversation stays active
-
-next confirmed violation in the same chat
-→ close/block this chat
-```
-
-Это не account ban, не удаление истории и не отмена уже accepted handoff.
-
-### Архитектурная подготовка
-
-`web-api-v0.md` резервирует server event/decision `MODERATION_WARNING` и `moderation_warning_count`, чтобы warning-first policy не требовала breaking frontend change.
-
-До принятия решения:
-
-- Domain policy не реализовывать на предположении;
-- moderation evals должны уметь покрыть оба threshold-варианта fixtures;
-- UI может реализовать rendering warning event, но не сам threshold;
-- после подтверждения синхронно обновить `hackathon-requirements.md` (если это официальное уточнение), `product-spec.md`, `architecture.md`, `quality.md`, Domain enum/tests и BPMN.
-
-## OD-002 — feedback granularity в `knowledge-v0`
-
-**Статус:** additive contract gap; resolve before Quality Analytics G3.
-
-### Product UX now requires
-
-После завершения обращения пользователь должен иметь возможность раздельно передать:
-
-- оценку работы специалиста (`POSITIVE | NEGATIVE | null`);
-- оценку качества полученной информации (`POSITIVE | NEGATIVE | null`);
-- `solved: bool?`;
-- комментарий.
-
-`web-api-v0.md` уже фиксирует эти browser-facing поля.
-
-### Current gap
-
-Замороженный `QualityFeedbackPush` в `knowledge-v0.openapi.yaml` пока содержит только:
-
-```text
-helpful?
-solved?
-comment_text?
-```
-
-Этого недостаточно для раздельной аналитики специалиста и информации.
-
-### Planned additive resolution
-
-До реализации G3 расширить `QualityFeedbackPush` **optional** полями без breaking change:
-
-```text
-specialist_rating?: POSITIVE | NEGATIVE
-information_quality_rating?: POSITIVE | NEGATIVE
-specialist_ref?: string
-```
-
-`specialist_ref` передаётся только если реальный/simulated adapter фактически сообщил идентификатор специалиста. Он нужен для trace/grouping, но P0 **не** строит персональный рейтинг сотрудника.
-
-`helpful` можно сохранить как backward-compatible общий signal до конца v0; новая UI не должна подменять им два раздельных поля.
-
-При изменении обязательно синхронно обновить:
-
-- `docs/contracts/knowledge-v0.md`;
-- `docs/contracts/knowledge-v0.openapi.yaml`;
-- knowledge stub fixtures;
-- generated NSwag client;
-- quality contract tests.
+Основание для OD-001: организаторы формулируют требование как «завершать нарушающее взаимодействие согласно согласованной политике» (`hackathon-requirements.md §1 п.5`); warning-first — согласованная политика команды, не противоречащая формулировке. Если организаторы/эксперты явно потребуют закрытие с первого раза — это одно значение `Moderation:CloseAfterWarnings=0` и правка `product-spec.md §14`, без изменения контрактов.
 
 ## OD-003 — support system real API
 
@@ -97,10 +19,17 @@ specialist_ref?: string
 
 На текущий момент нет подтверждённого production API/SSO/SLA/status vocabulary Портала поддержки.
 
-P0 использует `support-adapter-v0.md` + server-configured demo adapter. Нельзя:
+P0 использует `support-adapter-v0.md` (submit + `GetStatusAsync` polling) + server-configured demo adapter со `staged`-сценарием. Нельзя:
 
 - придумывать endpoint/credentials;
 - фиксировать SLA;
-- обещать assigned specialist/stage, если adapter их не вернул.
+- показывать assigned specialist/stage, если adapter их не вернул;
+- включать webhook (`Support:Webhook:Enabled`) без реального адаптера и секрета.
 
-При появлении реальной спецификации нужен новый adapter implementation; Domain/Application contract меняется только если реальная система не может выразить текущие acknowledgement semantics.
+При появлении реальной спецификации нужна новая adapter implementation. Domain/Application contract меняется только если реальная система не может выразить acknowledgement или `HandoffStatusSnapshot` semantics (ADR-0002 §5).
+
+## OD-004 — внешний канал уведомлений (Web Push / email)
+
+**Статус:** deferred to P1; not blocking.
+
+ADR-0002 сознательно ограничивает P0 in-app inbox + owner-level SSE + Web Notifications API. Web Push требует внешних push-сервисов браузеров, email — контактов и провайдера. Открывать этот пункт только если организаторы явно разрешат внешний канал доставки или потребуют уведомление при закрытом браузере как обязательную функцию.

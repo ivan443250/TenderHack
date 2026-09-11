@@ -68,13 +68,15 @@ api (.NET)  ── single public boundary
    ├── Case orchestration / turn state machine
    ├── Decision (ANSWER / CLARIFY / HANDOFF_OFFER / ...)
    ├── Deterministic moderation rules
-   ├── Routing / handoff / outbox
+   ├── Routing / handoff / outbox / status ingestion
+   ├── Completion / archive / notifications
    ├── Feedback
    └── Read-only analytics (proxied, authz here)
    │
    ├────────────► PostgreSQL 16 (api-owned tables)
    │               cases/messages/turns/case_events
-   │               handoffs/outbox/feedback/api_jobs
+   │               handoffs/handoff_status_updates/outbox
+   │               feedback/notifications/api_jobs
    │
    └── HTTP, contract v0, X-Trace-Id ────► knowledge (Python)
                                              ├── understand / retrieve / answerability
@@ -94,8 +96,12 @@ api (.NET)  ── single public boundary
 api-worker (.NET)                 knowledge-worker (Python)
    ├── outbox delivery                ├── ingestion / parsing / indexing
    ├── handoff adapter retries        ├── embeddings batches
+   ├── handoff-status-sync (poll) ◄── support adapter (demo / real)
    └── quality-audit / feedback ────► └── quality audit / issue groups
        push (full payload, outbox)        (works only on knowledge-owned tables)
+
+api (.NET) ◄── POST /api/v0/integrations/support/status   optional HMAC webhook
+                                                          (real adapter push only)
 ```
 
 `knowledge` has **no dependency on `api`**: no HTTP calls back, no reads of `api` tables, no shared views. Everything it knows about cases arrives as pushed payloads over contract `v0`. It can be started, tested and evaluated with `api` absent.
@@ -152,13 +158,14 @@ Owner column is normative (see ADR-0001 §3).
 
 Owns:
 
-- case identity;
-- conversation state;
+- case identity and `owner_id` (anonymous browser session, §17);
+- conversation state, including `moderation_warning_count`;
 - turn revisions;
 - decision history;
-- resolution status;
-- handoff state;
-- feedback references.
+- resolution status and completion (§5.8);
+- handoff state, stage and specialist facts received from the adapter (§5.6, §15);
+- feedback references;
+- notifications derived from case events (§5.9).
 
 Critical rule: state transitions are explicit methods with preconditions on the aggregate, not arbitrary field mutation.
 
@@ -197,6 +204,8 @@ No shared convenience query that lets generation accidentally retrieve historica
 
 Deterministic-first in `Domain`: profanity normalizer, rule set with version, traceable match metadata. The LLM/context check lives in `knowledge` and is called only for ambiguity; it returns an ambiguity assessment, not a moderation outcome. The policy outcome is produced in `api`.
 
+Policy is **warning-first** (`product-spec.md §14`): the first confirmed violation in a case yields `Decision = MODERATION_WARNING` and increments `moderation_warning_count`; a confirmed violation when `moderation_warning_count >= Moderation:CloseAfterWarnings` (default `1`) yields `MODERATION_CLOSE` → `ConversationStatus = CLOSED_MODERATION`. The threshold is server configuration, never a client parameter. Both outcomes end the current turn before understand/retrieve/draft run. The counter is case-scoped: a new case starts at `0`.
+
 ### 5.5. Routing — owner: `api`
 
 Owns `service_need`, `recommended_line`, `dispatch_queue`, `engineering_review_suggested`, `reason_codes` and channel policy as `Domain` policies.
@@ -211,9 +220,17 @@ Owns:
 - `PENDING / ACCEPTED / SIMULATED_ACCEPTED / FAILED`;
 - adapter idempotency key;
 - outbox delivery (`api-worker`);
-- external ticket ID when real/simulated adapter returns one.
+- external ticket ID when real/simulated adapter returns one;
+- **status ingestion after acceptance**: `stage`, `assigned_specialist`, terminal outcome — as adapter facts, stored in `handoff_status_updates` and projected to `HANDOFF_STATUS` case events (§15).
 
 Handoff package must be buildable with `knowledge` down.
+
+Status facts reach `api` through two channels that converge in one Application use-case (`IngestHandoffStatus`):
+
+1. **polling** — `api-worker` job `handoff-status-sync` calls `IHandoffAdapter.GetStatusAsync` for every non-terminal accepted handoff (P0 mechanism; works with the demo adapter and with any real system that has a read endpoint);
+2. **inbound webhook** — `POST /api/v0/integrations/support/status`, HMAC-signed, disabled unless configured (used only when a real adapter can push).
+
+Neither channel may invent a specialist or stage; a null from the adapter stays null in the UI.
 
 ### 5.7. Quality / Analytics — owner: `knowledge`
 
@@ -223,16 +240,60 @@ Input case data arrives only as pushed payloads from `api-worker` (§10: `POST /
 
 Results are exposed to the browser through `api` proxy endpoints with server-side authorization.
 
+### 5.8. Completion and archive — owner: `api`
+
+«Завершение обращения» is an explicit aggregate transition, never inferred from `ANSWER` or from silence. A case completes by exactly one of:
+
+| Trigger | `ConversationStatus` | `ResolutionStatus` |
+|---|---|---|
+| user command `complete` (`solved: true / false / null`) | `CLOSED_USER` | `RESOLVED` / `UNRESOLVED` / `UNKNOWN` |
+| adapter terminal status (`RESOLVED`, `CLOSED_UNRESOLVED`, `CANCELLED`) via §5.6 | `CLOSED_SUPPORT` | `RESOLVED` / `UNRESOLVED` / `UNKNOWN` |
+| second confirmed profanity violation (§5.4) | `CLOSED_MODERATION` | unchanged |
+
+Completion emits, in one transaction: `CASE_RESOLUTION_CHANGED` (if changed), `CASE_COMPLETED`, `FEEDBACK_REQUESTED` (not for `CLOSED_MODERATION`), and a notification (§5.9). A completed case is read-only for new user messages; it stays fully readable and is listed by `GET /api/v0/cases?status=archived`. «Архив» is a projection over `ConversationStatus != ACTIVE`, not a fourth lifecycle enum.
+
+There is no inactivity auto-completion in P0.
+
+### 5.9. Notifications — owner: `api`
+
+Notifications are derived facts, written in the same transaction as the case event that causes them, into the `api`-owned `notifications` table, scoped by `owner_id`:
+
+| Case event | Notification type |
+|---|---|
+| `HANDOFF_STATUS` with a new `stage` / `assigned_specialist` / acceptance | `HANDOFF_UPDATED` |
+| `CASE_COMPLETED` | `CASE_COMPLETED` |
+| `FEEDBACK_REQUESTED` | `FEEDBACK_REQUESTED` |
+
+Delivery tiers (ADR-0002):
+
+1. **persisted inbox** — `GET /api/v0/notifications?after=` on return, badge on archive list; survives closed browser;
+2. **owner-level SSE** — `GET /api/v0/notifications/stream`, independent of any one case; the browser renders a toast and, when the tab is hidden and permission was granted, an OS-level notification through the Web Notifications API (local, no external push service);
+3. **Web Push / email / SMS — not P0.** Web Push depends on external browser push services and breaks the offline demo requirement (`quality.md §11`); email/SMS require contact data the product does not collect and a delivery service the stack does not include.
+
+`MODERATION_WARNING` is rendered in the chat timeline and is not a notification.
+
 ## 6. State model
 
 Keep orthogonal dimensions:
 
 ```text
-ConversationStatus = ACTIVE | CLOSED_USER | CLOSED_MODERATION
+ConversationStatus = ACTIVE | CLOSED_USER | CLOSED_SUPPORT | CLOSED_MODERATION
 ResolutionStatus   = UNKNOWN | RESOLVED | UNRESOLVED
 TurnStatus         = QUEUED | RUNNING | COMPLETED | FAILED | SUPERSEDED
 HandoffStatus      = NOT_REQUESTED | PENDING | ACCEPTED | SIMULATED_ACCEPTED | FAILED
-Decision           = ANSWER | CLARIFY | HANDOFF_OFFER | ANSWER_AND_HANDOFF | MODERATION_CLOSE | TECHNICAL_ERROR
+Decision           = ANSWER | CLARIFY | HANDOFF_OFFER | ANSWER_AND_HANDOFF |
+                     MODERATION_WARNING | MODERATION_CLOSE | TECHNICAL_ERROR
+```
+
+Additional case-scoped state that is not an enum:
+
+```text
+moderation_warning_count : int      (§5.4)
+handoff.stage            : { code, display_name }?        adapter fact, not a Domain enum (§15)
+handoff.assigned_specialist : { ref, display_name? }?     adapter fact
+handoff.terminal         : RESOLVED | CLOSED_UNRESOLVED | CANCELLED | null
+handoff.stale            : bool      status polling reached TTL without a terminal fact (§12)
+completion_reason        : USER | SUPPORT | MODERATION | null   (§5.8)
 ```
 
 Do not collapse these into one enum. These enums are defined in `TenderHack.Domain`; their string values are the contract for `case_events`, the web API and the pushed quality payloads. `knowledge` receives them as opaque labels for analytics and never produces them.
@@ -242,9 +303,15 @@ Do not collapse these into one enum. These enums are defined in `TenderHack.Doma
 - One active revision is authoritative.
 - Running old turn cannot publish after a newer user revision supersedes it.
 - `ANSWER` cannot set `RESOLVED`.
+- Positive feedback (`information_quality_rating`, `specialist_rating`) cannot set `RESOLVED`; only `complete(solved=true)` or an adapter terminal `RESOLVED` can.
 - Handoff status changes to accepted only on adapter acknowledgement.
-- Moderation close does not delete or revoke already accepted handoff.
+- `stage` / `assigned_specialist` / `terminal` change only through `IngestHandoffStatus` with an adapter-sourced payload; a status update cannot target a different `handoff_id`/`case_id` than it was issued for.
+- Duplicate status update (same `handoff_id` + `external_revision`) is a no-op.
+- Terminal adapter status on a case that is already `CLOSED_USER` updates `ResolutionStatus`/handoff facts but does not reopen or re-close the conversation.
+- First confirmed profanity violation produces `MODERATION_WARNING`, not `MODERATION_CLOSE`; the close threshold is read from configuration.
+- Moderation warning/close does not delete or revoke already accepted handoff.
 - Failed AI turn does not silently mutate previous accepted handoff.
+- A completed case rejects new user messages with `CASE_CLOSED`.
 - `knowledge` failure on any stage produces `TECHNICAL_ERROR` with a category, never a knowledge-not-found decision.
 
 ## 7. Idempotency and concurrency
@@ -258,6 +325,8 @@ Expected behavior:
 - only one active/accepted handoff per case/problem;
 - both workers are at-least-once; effects are idempotent by business key;
 - turn publication unique by `turn_id` + revision;
+- handoff status ingestion unique by `handoff_id` + `external_revision` (poll and webhook share this key, so a fact delivered by both channels is applied once);
+- notification unique by `(owner_id, case_id, type, source_event_id)`;
 - jobs use lease/heartbeat or equivalent recoverable claiming;
 - `api → knowledge` calls are retried only for idempotent stages (understand/retrieve/answerability/verify); `draft` is retried at most once and only if no draft was persisted.
 
@@ -269,7 +338,7 @@ PostgreSQL 16 is both system of record and initial retrieval engine. One databas
 
 | Owner | Migration tool | Tables |
 |---|---|---|
-| `api` | EF Core migrations | `cases`, `messages`, `turns`, `case_events`, `handoffs`, `outbox`, `feedback`, `api_jobs`, `idempotency_keys` |
+| `api` | EF Core migrations | `cases`, `messages`, `turns`, `case_events`, `handoffs`, `handoff_status_updates`, `outbox`, `feedback`, `notifications`, `api_jobs`, `idempotency_keys` |
 | `knowledge` | Alembic | `kb_documents`, `kb_document_versions`, `kb_snapshots`, `kb_fragments`, `kb_condition_cards`, `kb_ingestion_runs`, `quality_cases`, `quality_evaluations`, `issue_groups`, `knowledge_jobs` |
 
 Rules:
@@ -382,7 +451,17 @@ POST /v0/quality/turns               (pushed by api-worker via outbox; at-least-
 POST /v0/quality/feedback            (pushed by api-worker via outbox; at-least-once;
      {                                 idempotent by feedback_id)
        feedback_id, case_id, turn_id, occurred_at,
-       helpful: bool?, solved: bool?, comment_text?
+       specialist_rating?, information_quality_rating?,   -- POSITIVE | NEGATIVE
+       specialist_ref?, integration_mode?,
+       solved: bool?, comment_text?
+     }
+
+POST /v0/quality/completions         (pushed by api-worker via outbox; at-least-once;
+     {                                 idempotent by case_id)
+       case_id, completed_at,
+       completion_reason, resolution_status,             -- opaque labels for knowledge
+       handoff_status?, integration_mode?, specialist_ref?, stage_code?,
+       moderation_warning_count?, turn_count?
      }
 
 GET  /v0/quality/evaluations?case_id=
@@ -430,18 +509,20 @@ Two worker processes, each built from its runtime's codebase, separate only beca
 
 | Worker | Jobs | Job table |
 |---|---|---|
-| `api-worker` (.NET `BackgroundService`) | outbox delivery, handoff adapter retries, quality-turn / feedback payload pushes to `knowledge`, stale-turn cleanup | `api_jobs`, `outbox` |
+| `api-worker` (.NET `BackgroundService`) | outbox delivery, handoff adapter submit retries, `handoff-status-sync` polling of non-terminal accepted handoffs (backoff from `Support:StatusPoll:Initial` to `Support:StatusPoll:Max`, stops at terminal status or `Support:StatusPoll:Ttl`), quality-turn / feedback payload pushes to `knowledge`, stale-turn cleanup | `api_jobs`, `outbox` |
 | `knowledge-worker` (Python) | ingest/parse/index, embeddings batches, quality audit, issue-group recomputation | `knowledge_jobs` |
 
 Both start with PostgreSQL job tables / `FOR UPDATE SKIP LOCKED`, lease/heartbeat, explicit attempt/error state. Do not add Redis/Kafka until measured need.
 
 ## 13. Frontend boundaries
 
-Three primary surfaces:
+Primary surfaces:
 
-1. **Case / chat** — question, progress, answer/clarification/handoff, feedback.
+1. **Case / chat** — question, progress, answer with source buttons, clarification, moderation warning, handoff offer → editable package → status widget (status, `integration_mode`, stage/specialist when supplied), completion notice, feedback widget.
 2. **Source view** — exact document/page/fragment (served by `api` via `knowledge /v0/sources`).
-3. **Read-only quality/issues** — quality evidence and repeated problem groups (served by `api` proxy).
+3. **Case list / archive** — owner-scoped list of active and completed cases (`GET /api/v0/cases`), completed cases open read-only.
+4. **Notifications** — inbox badge + toast from the owner-level SSE stream; OS-level notification via Web Notifications API when the tab is hidden (§5.9).
+5. **Read-only quality/issues** — quality evidence and repeated problem groups (served by `api` proxy).
 
 Technical trace for judges/team is protected detail, not end-user UI.
 
@@ -462,20 +543,26 @@ Stages are `case_events` written by `TurnOrchestrator`. Technical detail may exp
 
 ## 15. Handoff adapter — owner: `api`
 
-P0 adapter is controlled by the team and explicitly demo-labelled.
+P0 adapter is controlled by the team and explicitly demo-labelled. Normative semantics: `contracts/support-adapter-v0.md`.
 
 Interface concept:
 
 ```csharp
 public interface IHandoffAdapter
 {
+    // outbound: submit prepared package, get synchronous acknowledgement
     Task<HandoffAck> SubmitAsync(HandoffRequest request, string idempotencyKey, CancellationToken ct);
+
+    // inbound (pull): current external status; null when the adapter has no status API
+    Task<HandoffStatusSnapshot?> GetStatusAsync(HandoffStatusQuery query, CancellationToken ct);
 }
 ```
 
-Test modes: success, timeout, failure (selected by config, never by request payload).
+`HandoffStatusSnapshot` carries only adapter facts: `external_case_id`, `stage { code, display_name }?`, `assigned_specialist { ref, display_name? }?`, `terminal?`, `external_revision`, `occurred_at`, `integration_mode`. The same record is produced by the optional inbound webhook (`POST /api/v0/integrations/support/status`), so `IngestHandoffStatus` is the single write path regardless of channel.
 
-Real Portal integration remains a future adapter against an agreed contract.
+Demo adapter modes (selected by config, never by request payload): submit `success | timeout | failure`; status timeline `none | staged` — `staged` replays a deterministic script per `handoff_id` (queued → assigned to «Демо-специалист» → in progress → resolved) with configurable delays. Every simulated fact carries `integration_mode = SIMULATED` and the UI labels it as demo.
+
+Real Portal integration remains a future adapter against this contract; if the real system cannot express acknowledgement or status semantics, the contract — not the Domain — is versioned.
 
 ## 16. Failure semantics
 
@@ -500,7 +587,8 @@ If `knowledge` is unavailable and user requests human support, the handoff packa
 - secrets only through environment/secret mounts;
 - user/document text treated as data, never executable prompt policy;
 - sanitized Markdown rendering;
-- authorization/ownership checked server-side in `api`;
+- authorization/ownership checked server-side in `api`: every case, notification and archive row carries `owner_id`; the browser presents an opaque anonymous owner session issued by `api` in an `HttpOnly` cookie (`contracts/web-api-v0.md §13`) — no accounts, no passwords in P0;
+- inbound support webhook, when enabled, verifies an HMAC signature over the raw body with a secret from environment; unsigned or replayed (`external_revision` already seen) requests are rejected before any state change;
 - `knowledge` is not exposed outside the Compose network;
 - `knowledge` DB role: privileges only on its own tables; no access to `api` tables in any form;
 - logs contain IDs/reason codes, not chain-of-thought/private full prompts by default;

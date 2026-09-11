@@ -102,6 +102,14 @@ Metrics:
 - false-positive rate;
 - deterministic rule coverage.
 
+Policy tests (warning-first, `product-spec.md §14`):
+
+- first confirmed violation → `MODERATION_WARNING`, `moderation_warning_count = 1`, conversation stays `ACTIVE`, no retrieve/draft call made;
+- second confirmed violation in the same case → `MODERATION_CLOSE`, `CLOSED_MODERATION`;
+- `UNCERTAIN` from `knowledge.moderation_context` does not count as confirmed and does not increment the counter;
+- a new case starts at `0` regardless of the previous case of the same owner;
+- `Moderation:CloseAfterWarnings = 0` reproduces close-on-first for the organizer fallback.
+
 Store failing examples as regression cases.
 
 ## 7. Routing evaluation
@@ -123,17 +131,26 @@ Topic classification, if added, is a helper and must not be confused with line r
 Mandatory regression examples around state:
 
 - `ANSWER` leaves resolution `UNKNOWN` until explicit confirmation;
-- positive usefulness feedback does not resolve case;
+- positive `information_quality_rating` / `specialist_rating` does not resolve case;
+- `complete(solved=true)` → `CLOSED_USER` + `RESOLVED`; `complete(solved=null)` → `CLOSED_USER` + `UNKNOWN`;
+- adapter terminal `RESOLVED` on `ACTIVE` case → `CLOSED_SUPPORT` + `RESOLVED` + one `CASE_COMPLETED`; on `CLOSED_USER` case → no second `CASE_COMPLETED`, resolution updated only from `UNKNOWN`;
+- message on a completed case → `CASE_CLOSED`, no turn created;
+- feedback twice on one case → `FEEDBACK_ALREADY_SUBMITTED`; same `Idempotency-Key` → stored feedback returned;
 - same idempotency key + same payload repeats result;
 - same key + different payload conflicts;
 - stale running turn cannot publish after new user revision;
 - second handoff cannot bypass active/accepted one;
 - timeout does not convert `PENDING` to accepted;
-- moderation close preserves already accepted handoff;
+- status snapshot with same `(handoff_id, external_revision)` applied once; lower revision ignored; mismatched `external_case_id` rejected;
+- `GetStatusAsync` failure changes nothing and keeps the poll schedule;
+- `stage` / `assigned_specialist` are null when the adapter did not supply them — never defaulted;
+- notification row is written in the same transaction as its source event and is unique by `(owner_id, case_id, type, source_event_id)`;
+- moderation warning/close preserves already accepted handoff;
 - infrastructure failure is `TECHNICAL_ERROR`, not «knowledge missing»;
 - `knowledge` timeout / 5xx / schema-invalid body on any stage → `TECHNICAL_ERROR` with `KnowledgeFailure` category, persisted stage events preserved;
 - `knowledge` down + human request → handoff package still built from persisted fields;
-- UI restore reads state from API after reload.
+- owner cookie mismatch → `404`/`403` on case, notifications, feedback; `case_id` alone grants nothing;
+- UI restore reads state from API after reload, including completed/archived cases and unread notifications.
 
 Where these tests run (ADR-0001 §3, rule 8):
 
@@ -190,18 +207,21 @@ A cluster is not automatically an incident or bug.
 
 Keep a small suite that can run before demo/release:
 
-1. Typical navigation question with typo → grounded answer + source opens.
-2. Similar topic but missing applicable answer → no hallucination; handoff offer.
+1. Typical navigation question with typo → grounded answer + «Открыть источник» button resolves the fragment.
+2. Similar topic but missing applicable answer → explicit «подтверждённого ответа нет» + «Обратиться к оператору поддержки»; no hallucination.
 3. Condition changes branch (e.g. duration threshold) → correct decision.
 4. Similar but different error code → no substitution.
 5. Direct human request → no forced FAQ loop.
-6. Profanity → moderation close.
-7. Handoff success → pending then accepted/simulated accepted.
+6. Profanity once → warning in chat, chat stays open; profanity again → chat closed, history readable, no new messages.
+7. Handoff success → pending → accepted/simulated accepted → (`staged` demo) stage «В очереди» → «Назначен специалист» (labelled demo) → «В работе» → «Решено»; widget updates without reload.
 8. Handoff timeout/failure → honest failure and safe retry.
 9. Generator unavailable + human request → handoff path still possible where DB/adapter work.
-10. Positive usefulness without resolution confirmation → resolution remains unknown.
+10. Positive feedback without resolution confirmation → resolution remains unknown.
 11. Source recommending external support → no fake Portal/internal dispatch.
-12. Offline/external internet disabled → normal demo remains functional.
+12. Offline/external internet disabled → normal demo remains functional, including notifications.
+13. Completion by support (`staged` terminal) while the user is on another case → toast + badge; with the tab hidden and permission granted → OS notification; after closing and reopening the browser → unread badge on the archived case.
+14. User completes the case («Завершить обращение» → «решена?») → completion notice, feedback widget with four signals, case appears under «Архив», read-only.
+15. Feedback after a simulated handoff → specialist row labelled demo; submitting twice is rejected.
 
 ## 12. Component Definition of Done
 
@@ -248,8 +268,9 @@ Done only if:
 
 - deterministic rules versioned;
 - false-positive cases tested;
-- close state implemented server-side;
-- retrieval/generation not executed after confirmed close.
+- warning and close states implemented server-side with a configurable threshold;
+- retrieval/generation not executed after confirmed warning or close;
+- warning text and count come from the server event, not from local UI state.
 
 ### Handoff
 
@@ -257,9 +278,22 @@ Done only if:
 
 - summary is inspectable/editable;
 - pending/accepted/simulated/failed are distinct;
-- idempotency works;
-- adapter timeout/failure tested;
+- idempotency works for submit and for status ingestion;
+- adapter timeout/failure tested for both `SubmitAsync` and `GetStatusAsync`;
+- `staged` demo script reproducible; every simulated step labelled;
+- stage/specialist rows appear only from adapter facts;
+- webhook, when enabled, rejects unsigned/replayed requests;
 - UI never claims real dispatch in demo mode.
+
+### Completion, archive, notifications
+
+Done only if:
+
+- all three completion paths produce exactly one `CASE_COMPLETED` and are read-only afterwards;
+- archive list and read-only case view restore from API after reload;
+- notification is persisted with its source event and delivered via inbox, owner SSE and (when permitted) Web Notifications API;
+- no external push/email service is required for the demo;
+- owner scoping is enforced on every case/notification/feedback endpoint.
 
 ### Quality analytics
 
@@ -267,8 +301,9 @@ Done only if:
 
 - source type/data sufficiency captured;
 - UNKNOWN/NA supported;
-- feedback separated from resolution;
-- no personal ranking claim;
+- feedback separated from resolution; `specialist_rating` separated from `information_quality_rating`;
+- completion facts ingested from `/v0/quality/completions`, not inferred from feedback presence;
+- per-`specialist_ref` slices carry `n` and limitations; no personal ranking claim;
 - group conclusions disclose limitations.
 
 ### Frontend

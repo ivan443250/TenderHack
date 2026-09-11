@@ -306,6 +306,32 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /v0/quality/completions:
+    post:
+      operationId: pushQualityCompletion
+      summary: >
+        Push the completion fact of one case (sent by api-worker via outbox,
+        at-least-once, idempotent by case_id). Additive v0 endpoint (2026-09-12).
+      parameters:
+        - $ref: "#/components/parameters/XTraceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QualityCompletionPush"
+      responses:
+        "202":
+          description: Stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /v0/quality/evaluations:
     get:
       operationId: getQualityEvaluations
@@ -856,9 +882,19 @@ components:
           type: string
           nullable: true
 
+    FeedbackRating:
+      type: string
+      enum: [POSITIVE, NEGATIVE]
+
     QualityFeedbackPush:
       type: object
       required: [feedback_id, case_id, turn_id, occurred_at]
+      description: >
+        Four independent user signals. specialist_rating / information_quality_rating /
+        specialist_ref are additive v0 fields (2026-09-12). `helpful` is kept for
+        compatibility and mirrors information_quality_rating (POSITIVE→true, NEGATIVE→false);
+        new consumers must read the two explicit ratings. specialist_ref is an opaque
+        adapter identifier used for grouping only — knowledge never publishes a per-person ranking.
       properties:
         feedback_id:
           type: string
@@ -872,11 +908,64 @@ components:
         helpful:
           type: boolean
           nullable: true
+          deprecated: true
+        specialist_rating:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/FeedbackRating"
+        information_quality_rating:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/FeedbackRating"
+        specialist_ref:
+          type: string
+          nullable: true
+        integration_mode:
+          type: string
+          enum: [REAL, SIMULATED]
+          nullable: true
         solved:
           type: boolean
           nullable: true
         comment_text:
           type: string
+          nullable: true
+
+    QualityCompletionPush:
+      type: object
+      required: [case_id, completed_at, completion_reason, resolution_status]
+      description: >
+        completion_reason, resolution_status, handoff_status are opaque labels produced by api.
+        specialist_ref / stage_code are adapter facts forwarded as-is; null when the adapter
+        did not supply them.
+      properties:
+        case_id:
+          type: string
+        completed_at:
+          type: string
+          format: date-time
+        completion_reason:
+          type: string
+        resolution_status:
+          type: string
+        handoff_status:
+          type: string
+          nullable: true
+        integration_mode:
+          type: string
+          enum: [REAL, SIMULATED]
+          nullable: true
+        specialist_ref:
+          type: string
+          nullable: true
+        stage_code:
+          type: string
+          nullable: true
+        moderation_warning_count:
+          type: integer
+          nullable: true
+        turn_count:
+          type: integer
           nullable: true
 
     DimensionValue:

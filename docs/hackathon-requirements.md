@@ -145,7 +145,25 @@ At minimum model:
 
 Use gateways for profanity, answerability, clarification, handoff confirmation and feedback/systemic-analysis conditions. Analytics must not block the primary response path.
 
-## 9. What this document intentionally excludes
+## 9. Team clarifications applied to the formal items (2026-09-12)
+
+These are **team decisions** that interpret the formal items above; they are not organizer facts. If an organizer/expert clarification contradicts one, the organizer wins and this section plus `product-spec.md` are updated together.
+
+The scored chat functionality is fixed as seven user-visible behaviours:
+
+| # | Behaviour | Formal item(s) | Team interpretation |
+|---|---|---|---|
+| 1 | Ask in chat, get an answer | §1.3, §2 | core turn |
+| 2 | Source button in the answer when a fragment was used | §2 «traceable source» | `fragment_id` → `GET /api/v0/sources/{id}` |
+| 3 | Explicit «no confirmed answer» + «Обратиться к оператору поддержки» button | §1.4, §2 | `HANDOFF_OFFER` |
+| 4 | Profanity: one warning in chat, chat closed on repeat | §1.5 «according to the agreed policy» | warning-first, `product-spec.md §14` |
+| 5 | Notification when the case is completed | §2 «processing state» | in-app inbox + owner SSE + browser notification; no push/email (ADR-0002) |
+| 6 | After handoff: widget with status, specialist and stage | §2 «visible addressee/route and processing state» | status always; specialist/stage **only when the adapter reports them**, demo-labelled when simulated |
+| 7 | After completion: archive + feedback (specialist, information quality, solved, comment) + systemic conclusions | §1.7, §2 | four independent signals; no personal ranking (§7) |
+
+§7 remains in force: no operator cabinet, no real operator chat. Item 6 therefore depends on the adapter contract (`contracts/support-adapter-v0.md`), not on an operator UI.
+
+## 10. What this document intentionally excludes
 
 It does not specify:
 
