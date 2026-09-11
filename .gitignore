@@ -1,17 +1,61 @@
-## .NET
-bin/
-obj/
-*.user
-
-## IDE
-.vs/
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
 .vscode/
-*.suo
 
-## Frontend (once web/ exists)
+# Secrets / environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.pyright/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.egg-info/
+build/
+
+# Node / Vite
 node_modules/
 dist/
+.vite/
+coverage/
 
-## Env / secrets
-.env
-Docs/HackDocs/.obsidian/
+# Local models / ML artifacts
+models/
+model-cache/
+*.safetensors
+*.gguf
+*.bin
+*.onnx
+
+# Hackathon / private data
+# Never commit organizer-provided raw data unless explicitly approved.
+data/raw/
+data/private/
+data/import/
+artifacts/
+outputs/
+
+# Generated / local runtime
+logs/
+.tmp/
+tmp/
+*.log
+
+# Database / local volumes
+postgres-data/
+pgdata/
+
+# Python tooling locks/caches generated outside the chosen project layout
+.uv-cache/

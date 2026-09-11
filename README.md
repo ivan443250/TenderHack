@@ -1,61 +1,89 @@
-# TenderHack — первая линия поддержки Портала поставщиков
+# TenderHack 2026 — интеллектуальная поддержка Портала поставщиков
 
-RAG-бот поверх структурированной базы знаний с явным отказом от ответа, модерацией и маршрутизацией обращений, аналитикой отзывов. Полное ТЗ — [`Docs/HackDocs/tz-tenderhack.md`](Docs/HackDocs/tz-tenderhack.md), план по этапам — [`Docs/HackDocs/implementation-plan.md`](Docs/HackDocs/implementation-plan.md).
+Репозиторий команды для кейса TenderHack НН 2026: локальная система поддержки, которая отвечает только по проверяемым знаниям, умеет честно уточнять/отказываться/предлагать передачу специалисту и отдельно анализирует качество ответов и повторяющиеся проблемы.
 
-## Сервисы
+## Статус
 
-| Сервис | Стек | Ответственность |
-|---|---|---|
-| `web` | React + Vite + TS | Чат, кабинет оператора, дашборд, BPMN |
-| `api` | ASP.NET Core (net9.0) | Домен, пайплайн, реальное время, аналитика |
-| `ml` | FastAPI | Поиск, триаж, генерация, кластеризация |
-| `db` | PostgreSQL 16 + pgvector | Домен + база знаний |
-| `ingest` | Python, разовый job | Индексация базы знаний |
+`master` намеренно очищен от раннего .NET-шаблона. Предыдущий scaffold фиксировал архитектуру до финального ревью требований и конфликтовал с принятой спецификацией. Текущая база — **docs-first, agent-first**: сначала зафиксированы формальные ограничения, продуктовые инварианты, архитектура, стек, quality gates и правила работы coding agents; реализация должна строиться поверх них.
 
-`ml` никогда не вызывает `api`; решение об эскалации принимает `api` по `no_answer`/`confidence` из ответа `ml`.
+## Что строим
 
-## Слои `api`
+Два равноправных контура:
 
+1. **Пользовательский:** вопрос → контекст → поиск и проверка знаний → `ANSWER / CLARIFY / HANDOFF_OFFER / ANSWER_AND_HANDOFF` → понятный статус → feedback.
+2. **Аналитический:** доступные обращения/ответы/отзывы → раздельная оценка качества текста, результата и обратной связи → объяснимые группы повторяющихся проблем.
+
+Не строим полноценный helpdesk, автономное изменение сущностей Портала, voice, GraphRAG «для инновационности» или swarm автономных runtime-агентов.
+
+## Принятый стек
+
+- **Web:** React + TypeScript + Vite, Node.js 24 LTS, pnpm.
+- **API / orchestration:** Python 3.12, FastAPI, Pydantic v2.
+- **Persistence:** PostgreSQL 16, SQLAlchemy 2, Alembic, asyncpg.
+- **Search:** PostgreSQL FTS + `pg_trgm` + `pgvector`; сначала exact vector search.
+- **Parsing:** `pdfplumber` baseline; Docling/OCR адресно после измерения качества.
+- **Embeddings:** `Qwen3-Embedding-0.6B`, до 1024 dimensions.
+- **Reranker:** `BAAI/bge-reranker-v2-m3`.
+- **Generation:** `Qwen3-4B-Instruct-2507`, local-only.
+- **Inference:** vLLM после hardware smoke-test; один fallback на llama.cpp при несовместимости/нехватке VRAM.
+- **Deployment:** Docker Compose; один modular monolith + отдельный worker process того же Python-проекта.
+
+Подробности и обоснования: [`docs/stack.md`](docs/stack.md) и [`docs/architecture.md`](docs/architecture.md).
+
+## Карта документации
+
+Начинать с [`AGENTS.md`](AGENTS.md), затем открывать только нужные документы:
+
+- [`docs/index.md`](docs/index.md) — карта источников истины;
+- [`docs/hackathon-requirements.md`](docs/hackathon-requirements.md) — стабильный слой требований, ограничений, критериев и защиты;
+- [`docs/product-spec.md`](docs/product-spec.md) — продуктовые границы и логика решений;
+- [`docs/architecture.md`](docs/architecture.md) — модули, состояния, data boundaries;
+- [`docs/stack.md`](docs/stack.md) — выбранный стек и rejected alternatives;
+- [`docs/agent-workflow.md`](docs/agent-workflow.md) — обязательный цикл coding agents, subagents и skeptic review;
+- [`docs/quality.md`](docs/quality.md) — тестирование, evals и Definition of Done;
+- [`docs/execution-plan.md`](docs/execution-plan.md) — порядок реализации и gates;
+- [`docs/references.md`](docs/references.md) — первичные источники и OpenAI guidance.
+
+## Главные инженерные правила
+
+- Внешние AI API не используются в интеллектуальном контуре.
+- Исторические решения тикетов — аналитический корпус, **не** нормативная база ответов.
+- Наличие похожего фрагмента не означает answerability.
+- `ANSWER` не означает `RESOLVED`.
+- `handoff prepared` не означает `handoff accepted`.
+- Пользовательские факты не превращаются в verified Portal state.
+- Нельзя показывать chain-of-thought как «прозрачность»; показываем source, condition, reason code, route и observable event.
+- Для рискованных/неподтвержденных условий безопасный отказ или передача лучше уверенной галлюцинации.
+
+## Планируемая структура после scaffold
+
+```text
+apps/
+  api/          FastAPI modular monolith
+  web/          React/Vite UI
+worker/         background jobs using the same domain/application code
+evals/          retrieval, decision, moderation, quality and E2E suites
+scripts/        ingestion/dev/reproducibility helpers
+docs/           repository knowledge system of record
 ```
-TenderHack.sln
-├── src/
-│   ├── TenderHack.Domain          — без зависимостей вообще
-│   ├── TenderHack.Application     — → Domain (+ DI.Abstractions)
-│   ├── TenderHack.Infrastructure  — → Application (EF Core, Npgsql, Polly, SignalR-хосты — нет)
-│   └── TenderHack.Web             — → Application, Infrastructure (Minimal API, SignalR, Serilog)
-└── tests/
-    └── TenderHack.UnitTests       — → Domain, Application
+
+Не создавать эти каталоги пустыми ради вида. Первый implementation change должен создать только реально используемый scaffold и одновременно обновить команды в `AGENTS.md`/docs.
+
+## Первый implementation gate
+
+До расширения функций должен работать один вертикальный путь на реальных документах:
+
+```text
+реальный вопрос
+→ локальный retrieval
+→ применимый fragment/source
+→ проверенный ответ или честный abstain
+→ состояние сохраняется
+→ UI открывает источник
 ```
 
-**Правило зависимостей:** `Domain.csproj` не содержит ни одного `PackageReference`; `Application.csproj` не содержит EF Core и `Microsoft.AspNetCore.*`. `ml` не имеет доступа к доменным таблицам (`tickets`, `messages`, ...) — только к `kb_*`, которые не мапятся EF.
+После этого добавляются routing/moderation/handoff, затем quality analytics, затем улучшения retrieval и polish.
 
-## Запуск
+## Работа coding agents
 
-```bash
-docker compose up --build
-```
-
-Поднимает `db` (pgvector) и `api` (порт 8080, Swagger на `/swagger` в Development). `ml`/`ingest`/`web` — закомментированы в `docker-compose.yml` до появления соответствующих директорий.
-
-Локально без Docker:
-
-```bash
-dotnet build
-dotnet test tests/TenderHack.UnitTests
-dotnet run --project src/TenderHack.Web
-```
-
-## Обоснование выбора моделей (раздел 4 ТЗ)
-
-- **Поиск** — гибрид BM25 (Postgres FTS, русский словарь) + pgvector, слияние через RRF; отдельная векторная БД не нужна для нескольких тысяч чанков.
-- **Эмбеддинги** — `intfloat/multilingual-e5-small` (~118M) — баланс качества и скорости для русского языка; `e5-large` сознательно не взят как избыточно тяжёлый для задачи.
-- **Опечатки** — SymSpell поверх словаря из самой базы знаний (эмбеддинги прощают опечатки лишь частично, а требование в ТЗ явное).
-- **Генерация** — llama.cpp, 1.5–3B Q4_K_M, строгий RAG-промпт; экстрактивный фолбэк, если генерация нестабильна на демо.
-- **Модерация мата** — нормализатор обфускации + словарь + `rubert-tiny-toxicity` (29M) как второй сигнал; ни один из двух сигналов отдельно не работает надёжно.
-- **Линия поддержки** — логрегрессия поверх тех же e5-эмбеддингов — обучается за секунды, объясняется жюри одной фразой, не нагружает инференс.
-
-Общий принцип: везде легковесные модели с высоким инференсом на CPU, ничего не сравнимого с внешними LLM-API (что и запрещено ограничениями раздела 2.3 ТЗ).
-
-## Деградация при отказе `ml`
-
-`MlServiceClient` (Infrastructure) никогда не выбрасывает исключение наружу — любая ошибка HTTP-вызова превращается в безопасный дефолт (`no_answer: true`, `is_profane: false`). Погашенный `ml`-контейнер выглядит для пользователя как обычная эскалация к оператору, а не как сбой интерфейса.
+Для нетривиальных задач root-agent действует как manager: читает карту docs, формирует короткий план, параллелит независимые исследования/проверки через subagents, интегрирует изменения, делает self-review, затем запускает независимый skeptic review и только после исправлений/проверок считает работу завершенной. Подробный протокол: [`docs/agent-workflow.md`](docs/agent-workflow.md).
