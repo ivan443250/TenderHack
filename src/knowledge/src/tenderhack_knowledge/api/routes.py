@@ -1,7 +1,8 @@
+from functools import lru_cache
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Header, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import AfterValidator
 
 from tenderhack_knowledge.contracts.v0 import (
@@ -29,10 +30,39 @@ from tenderhack_knowledge.contracts.v0 import (
     VerifyRequest,
     VerifyResponse,
     VerifyResult,
-    now_iso,
 )
+from tenderhack_knowledge.ingestion.ids import normalize_source_name
+from tenderhack_knowledge.ingestion.repository import UnknownFragmentError, UnknownSnapshotError
+from tenderhack_knowledge.persistence.db import create_engine
+from tenderhack_knowledge.persistence.repository import PostgresKnowledgeRepository
 
 router = APIRouter()
+
+
+@lru_cache(maxsize=1)
+def get_knowledge_repository() -> PostgresKnowledgeRepository | None:
+    """Build the durable repository lazily; importing the API never opens a DB."""
+
+    engine = create_engine()
+    return PostgresKnowledgeRepository(engine) if engine is not None else None
+
+
+def _internal_error(message: str) -> HTTPException:
+    from tenderhack_knowledge.contracts.v0 import ErrorCode
+
+    return HTTPException(status_code=500, detail={"code": ErrorCode.INTERNAL_ERROR.value, "message": message})
+
+
+def _safe_title(filename: str) -> str:
+    normalized = normalize_source_name(filename)
+    return normalized.rsplit("/", 1)[-1] or "source.pdf"
+
+
+def _anchor_text(resolution: object) -> str | None:
+    anchor = resolution.source_anchor
+    if anchor.bbox is not None:
+        return "bbox:" + ",".join(str(value) for value in anchor.bbox)
+    return anchor.section or resolution.section
 
 
 def _require_uuid4(value: UUID) -> UUID:
@@ -170,9 +200,33 @@ def verify(
     response_model=SourceResponse,
     responses={400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
 )
-def source(fragment_id: str, x_trace_id: TraceIdHeader) -> SourceResponse:
-    del fragment_id, x_trace_id
-    return SourceResponse(document_id="stub-document", title="Stub source", version="stub-v0", text="", snapshot_id="snapshot-stub-v0")
+async def source(fragment_id: str, x_trace_id: TraceIdHeader) -> SourceResponse:
+    del x_trace_id
+    repository = get_knowledge_repository()
+    if repository is None:
+        raise _internal_error("knowledge database is not configured")
+    try:
+        resolution = await repository.resolve_source(fragment_id)
+    except UnknownFragmentError as exc:
+        from tenderhack_knowledge.contracts.v0 import ErrorCode
+
+        raise HTTPException(
+            status_code=404,
+            detail={"code": ErrorCode.UNKNOWN_FRAGMENT.value, "message": f"Unknown fragment: {fragment_id}"},
+        ) from exc
+    except UnknownSnapshotError as exc:
+        raise _internal_error("no current normative snapshot") from exc
+    except Exception as exc:  # pragma: no cover - depends on external DB
+        raise _internal_error("unable to resolve source fragment") from exc
+    return SourceResponse(
+        document_id=resolution.document_id,
+        title=_safe_title(resolution.original_filename),
+        version=resolution.declared_version or resolution.document_version_id,
+        page=resolution.page_start,
+        anchor=_anchor_text(resolution),
+        text=resolution.text,
+        snapshot_id=resolution.snapshot_id or "",
+    )
 
 
 @router.get(
@@ -180,9 +234,26 @@ def source(fragment_id: str, x_trace_id: TraceIdHeader) -> SourceResponse:
     response_model=SnapshotResponse,
     responses={400: {"model": ErrorResponse}, 422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
 )
-def current_snapshot(x_trace_id: TraceIdHeader) -> SnapshotResponse:
+async def current_snapshot(x_trace_id: TraceIdHeader) -> SnapshotResponse:
     del x_trace_id
-    return SnapshotResponse(snapshot_id="snapshot-stub-v0", created_at=now_iso(), document_count=0, fragment_count=0)
+    repository = get_knowledge_repository()
+    if repository is None:
+        raise _internal_error("knowledge database is not configured")
+    try:
+        snapshot = await repository.get_current_normative_snapshot()
+        if snapshot is None:
+            raise _internal_error("no current normative snapshot")
+        document_count, fragment_count = await repository.snapshot_counts(snapshot.snapshot_id)
+    except HTTPException:
+        raise
+    except Exception as exc:  # pragma: no cover - depends on external DB
+        raise _internal_error("unable to load current normative snapshot") from exc
+    return SnapshotResponse(
+        snapshot_id=snapshot.snapshot_id,
+        created_at=snapshot.created_at,
+        document_count=document_count,
+        fragment_count=fragment_count,
+    )
 
 
 @router.post(

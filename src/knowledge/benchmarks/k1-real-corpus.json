@@ -1,0 +1,201 @@
+{
+  "benchmark": "k1-real-corpus",
+  "status": "PASS_WITH_LIMITATIONS",
+  "real_corpus_ingested": false,
+  "extraction_completed": true,
+  "corpus": "NORMATIVE",
+  "sources_required": 6,
+  "sources_processed": 6,
+  "expected_total_pages": 830,
+  "observed_total_pages": 830,
+  "observed_nonempty_pages": 830,
+  "snapshot": {
+    "snapshot_id": "snap_0e979dfef376faff41f7c76416fda457",
+    "document_count": 6,
+    "fragment_count": 3899,
+    "document_version_ids": [
+      "ver_1d25303e9029726204bc99413b66135b",
+      "ver_4918b5db1bc006fafc56db9876bc5104",
+      "ver_500943380ccb418a8df30b509e9ec4f0",
+      "ver_844eb9c8fe9160d2ba46836d7b88a73e",
+      "ver_b07b7d3f277e77945a397c4b3af9bc9f",
+      "ver_eaf6f826ac609c35c6663ac43c372c1c"
+    ],
+    "persisted_to_postgres": false,
+    "immutable_manifest": true,
+    "historical_versions_included": false
+  },
+  "documents": [
+    {
+      "filename": "Инструкция по электронному актированию.pdf",
+      "document_id": "doc_83e759e189a5d368ec5fca08e83f44d8",
+      "document_version_id": "ver_500943380ccb418a8df30b509e9ec4f0",
+      "sha256": "d14f883b14f8f117842541900300901404b37d43cdddf13c3e3266cfbd9155b3",
+      "declared_version": "v11",
+      "declared_date": "2026-08-11",
+      "expected_pages": 93,
+      "observed_pages": 93,
+      "fragments": 567,
+      "table_count": 26,
+      "table_row_fragments": 189,
+      "fragment_kinds": {
+        "paragraph": 181,
+        "table_row": 189,
+        "procedure_step": 171,
+        "warning": 4,
+        "condition": 4,
+        "status_rule": 5,
+        "definition": 13
+      },
+      "quality_warning_pages": [3, 8, 25, 28, 37, 41, 55, 63, 64, 73, 79],
+      "reviewed_pages": [5, 15, 46, 55]
+    },
+    {
+      "filename": "Инструкция по формированию YML.pdf",
+      "document_id": "doc_9771ba79689567975e6e9e38f817cd53",
+      "document_version_id": "ver_eaf6f826ac609c35c6663ac43c372c1c",
+      "sha256": "753fc58d5c7ae3b15932ef658d88f4eb2886273af2e3067389c5aa0934bd9a9c",
+      "declared_version": null,
+      "declared_date": null,
+      "metadata_note": "Source visibly identifies 2025; no exact release version was inferred.",
+      "expected_pages": 39,
+      "observed_pages": 39,
+      "fragments": 298,
+      "table_count": 25,
+      "table_row_fragments": 215,
+      "fragment_kinds": {
+        "paragraph": 45,
+        "procedure_step": 17,
+        "definition": 12,
+        "table_row": 215,
+        "status_rule": 5,
+        "condition": 2,
+        "warning": 2
+      },
+      "quality_warning_pages": [8, 11, 15, 19, 20, 24, 30, 31, 32, 33, 34, 35, 36],
+      "reviewed_pages": [13, 14, 30]
+    },
+    {
+      "filename": "Инструкция по работе с Порталом для поставщика.pdf",
+      "document_id": "doc_f29c96501ac73d655736cb15c72cbf68",
+      "document_version_id": "ver_b07b7d3f277e77945a397c4b3af9bc9f",
+      "sha256": "3c52c3633b6bc84e99ca1a23336536e9408ba83b28f160ee5c02738a2f754c6b",
+      "declared_version": "v87",
+      "declared_date": "2026-08-11",
+      "expected_pages": 370,
+      "observed_pages": 370,
+      "fragments": 1439,
+      "table_count": 102,
+      "table_row_fragments": 558,
+      "fragment_kinds": {
+        "paragraph": 506,
+        "table_row": 558,
+        "status_rule": 55,
+        "procedure": 294,
+        "warning": 14,
+        "definition": 3,
+        "condition": 9
+      },
+      "quality_warning_pages": [6, 7, 109, 158, 169, 184, 188, 217, 220, 221, 224, 229, 246, 262, 318, 328, 330, 337, 345, 353],
+      "reviewed_pages": [2, 75, 76, 77, 78, 185, 213, 263]
+    },
+    {
+      "filename": "Инструкция по созданию оферты и СТЕ.pdf",
+      "document_id": "doc_4fd64269638081d7aa288790577958ce",
+      "document_version_id": "ver_1d25303e9029726204bc99413b66135b",
+      "sha256": "ce50227cb1bb29b9145dd0fb52181c353c03bb11e00a0ab467cf544914b20159",
+      "declared_version": null,
+      "declared_date": "2026-06-04",
+      "expected_pages": 65,
+      "observed_pages": 65,
+      "fragments": 360,
+      "table_count": 4,
+      "table_row_fragments": 25,
+      "fragment_kinds": {
+        "paragraph": 157,
+        "table_row": 25,
+        "procedure": 169,
+        "condition": 3,
+        "status_rule": 3,
+        "definition": 2,
+        "warning": 1
+      },
+      "quality_warning_pages": [],
+      "reviewed_pages": [6, 10, 39, 54]
+    },
+    {
+      "filename": "Инструкция по работе с машиночитаемыми доверенностями.pdf",
+      "document_id": "doc_e554b4e2e1dbed6e43f9f0948505b7a8",
+      "document_version_id": "ver_4918b5db1bc006fafc56db9876bc5104",
+      "sha256": "755870a7454fd166146bfd64a7c50009fc834340798d28ff9cee3132265272b9",
+      "declared_version": null,
+      "declared_date": null,
+      "metadata_note": "No authoritative version/date was visible; values remain null.",
+      "expected_pages": 7,
+      "observed_pages": 7,
+      "fragments": 15,
+      "table_count": 1,
+      "table_row_fragments": 0,
+      "fragment_kinds": {
+        "definition": 1,
+        "paragraph": 5,
+        "procedure": 8,
+        "status_rule": 1
+      },
+      "quality_warning_pages": [4],
+      "reviewed_pages": [4, 5]
+    },
+    {
+      "filename": "Инструкция по работе с Порталом для заказчика.pdf",
+      "document_id": "doc_f90e8a5c85a63af410d2126becff5f7a",
+      "document_version_id": "ver_844eb9c8fe9160d2ba46836d7b88a73e",
+      "sha256": "7355b2c39b4aa4fbac758f64aeab0bdfd4a8219cc483dd5ca52e28eacb59fcde",
+      "declared_version": "v65",
+      "declared_date": "2026-08-11",
+      "expected_pages": 256,
+      "observed_pages": 256,
+      "fragments": 1220,
+      "table_count": 108,
+      "table_row_fragments": 586,
+      "fragment_kinds": {
+        "paragraph": 351,
+        "procedure": 238,
+        "table_row": 586,
+        "warning": 8,
+        "definition": 6,
+        "status_rule": 28,
+        "condition": 3
+      },
+      "quality_warning_pages": [5, 6, 43, 74, 81, 99, 100, 101, 102, 103, 104, 127, 131, 132, 137, 144, 145, 153, 155, 165, 172, 176, 178, 192, 193, 198, 204, 205, 213, 216, 218, 234],
+      "reviewed_pages": [3, 17, 241, 242, 243]
+    }
+  ],
+  "manual_validation": {
+    "rendered_pages": 26,
+    "fragments_checked": 44,
+    "documents_with_samples": 6,
+    "minimum_two_pages_per_document": true,
+    "supplier_received_extended_review": true,
+    "source_anchor_page_matches_fragment_page": true,
+    "checked_topics": [
+      "electronic document exchange and act status",
+      "YML category, identifier and element rules",
+      "supplier business assistant, support, tables and statuses",
+      "offer/STE required fields, import and versioning",
+      "MCD upload, deletion and permissions",
+      "customer support forms, screenshots and additional services"
+    ]
+  },
+  "persistence_execution": {
+    "status": "BLOCKED_ENVIRONMENT",
+    "persisted": false,
+    "reason": "No configured PostgreSQL connection was available in this environment; extraction and deterministic in-memory snapshot completed.",
+    "rerun": "DATABASE_URL=postgresql+asyncpg://knowledge_rw:<password>@<host>:5432/<db> uv run alembic upgrade head && uv run tenderhack-knowledge-ingest --manifest <manifest.json> --corpus NORMATIVE --publish-snapshot"
+  },
+  "limitations": [
+    "pdfplumber baseline only; OCR was not applied globally",
+    "table structure warnings require targeted review before promotion",
+    "PostgreSQL durability and endpoint integration require a configured database",
+    "retrieval, embeddings, condition-card persistence and quality analytics are out of scope for K1C"
+  ]
+}
