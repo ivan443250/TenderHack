@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { ButtonSecondary, ButtonPrimary } from "../../design-system/Button";
+import { ButtonPrimary, SpecialistCta } from "../../design-system/Button";
 import { TextField } from "../../design-system/TextField";
 import { HeadsetIcon } from "../../design-system/icons";
 import type { HandoffView } from "../../api/types";
@@ -23,23 +23,19 @@ export function HandoffCard({ handoff, onPrepare, onConfirm, onRetry }: HandoffC
 
   if (status === "NOT_REQUESTED" && !preparing) {
     return (
-      <div className="flex w-full max-w-[512px] flex-col items-start rounded-[18px] border border-[var(--border-default)] bg-white p-3.5">
-        <ButtonSecondary
-          icon={<HeadsetIcon className="size-[18px]" />}
-          onClick={async () => {
-            setPreparing(true);
-            await onPrepare();
-          }}
-        >
-          Передать специалисту
-        </ButtonSecondary>
-      </div>
+      <SpecialistCta
+        icon={<HeadsetIcon className="size-[18px]" />}
+        onClick={async () => {
+          setPreparing(true);
+          await onPrepare();
+        }}
+      />
     );
   }
 
   if (status === "NOT_REQUESTED" && preparing) {
     return (
-      <div className="flex w-full max-w-[512px] flex-col gap-3 rounded-[18px] border border-[var(--border-default)] bg-white p-3.5">
+      <div className="flex w-full max-w-[560px] flex-col gap-3 animate-pop-in rounded-[18px] border border-[var(--border-default)] bg-white p-3.5">
         <p className="text-xs font-medium text-[var(--content-primary)]">Опишите ситуацию для специалиста</p>
         <TextField value={summary} onChange={(event) => setSummary(event.target.value)} placeholder="Коротко опишите проблему" />
         <ButtonPrimary
@@ -61,7 +57,7 @@ export function HandoffCard({ handoff, onPrepare, onConfirm, onRetry }: HandoffC
 
   if (status === "FAILED") {
     return (
-      <div className="flex w-full max-w-[512px] flex-col gap-3 rounded-[18px] border border-[#f5c7cc] bg-[#fff6f7] p-3.5">
+      <div className="flex w-full max-w-[560px] flex-col gap-3 animate-pop-in rounded-[18px] border border-[#f5c7cc] bg-[#fff6f7] p-3.5">
         <p className="text-xs text-[var(--content-primary)]">Не удалось передать обращение специалисту.</p>
         <ButtonPrimary
           disabled={busy}
@@ -84,7 +80,7 @@ export function HandoffCard({ handoff, onPrepare, onConfirm, onRetry }: HandoffC
   const isPending = status === "PENDING";
 
   return (
-    <div className="flex w-full max-w-[512px] flex-col gap-1.5 rounded-[18px] border border-[var(--border-default)] bg-white p-3.5">
+    <div className="flex w-full max-w-[560px] flex-col gap-1.5 animate-pop-in rounded-[18px] border border-[var(--border-default)] bg-white p-3.5">
       <p className="text-xs font-medium text-[var(--content-primary)]">
         Обращение передано специалисту{isSimulated ? " (демо-режим)" : ""}
       </p>

@@ -1,6 +1,112 @@
 @import "tailwindcss";
 @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap");
 
+/* Larger reading scale than Tailwind's default: every `text-xs`/`text-sm` in the app moves up one
+ * step (12→14, 14→16) so the chat stays legible at arm's length without touching each component. */
+@theme {
+  --text-xs: 0.875rem;
+  --text-xs--line-height: 1.35rem;
+  --text-sm: 1rem;
+  --text-sm--line-height: 1.5rem;
+  --text-base: 1.0625rem;
+  --text-base--line-height: 1.6rem;
+  --text-lg: 1.25rem;
+  --text-lg--line-height: 1.7rem;
+  --text-xl: 1.5rem;
+  --text-xl--line-height: 1.9rem;
+
+  --animate-fade-up: fade-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-pop-in: pop-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-slide-in-right: slide-in-right 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-slide-in-left: slide-in-left 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-fade-in: fade-in 0.2s ease-out both;
+  --animate-bob: bob 3s ease-in-out infinite;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-glow-pulse: glow-pulse 4s ease-in-out infinite;
+  --animate-dots: dots 1.2s steps(4, end) infinite;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: scale(0.94) translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+  @keyframes slide-in-right {
+    from {
+      opacity: 0;
+      transform: translateX(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  @keyframes slide-in-left {
+    from {
+      opacity: 0;
+      transform: translateX(-24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes bob {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-7px);
+    }
+  }
+  @keyframes glow-pulse {
+    0%,
+    100% {
+      text-shadow: 0 0 40px #e21d2d;
+    }
+    50% {
+      text-shadow: 0 0 70px #ff2fb0;
+    }
+  }
+  @keyframes dots {
+    to {
+      width: 1.25em;
+    }
+  }
+}
+
 :root {
   --content-primary: #2e2e2e;
   --content-secondary: #5e6875;
@@ -26,8 +132,45 @@ body {
   background: var(--app-background);
   color: var(--content-primary);
   font-family: "Montserrat", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 #root {
   height: 100vh;
+}
+
+button,
+[role="button"],
+a {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
+/* Animated "…" for in-progress notices: the element clips a growing ellipsis. */
+.loading-dots::after {
+  content: "…";
+  display: inline-block;
+  width: 0;
+  overflow: hidden;
+  vertical-align: bottom;
+  animation: var(--animate-dots);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

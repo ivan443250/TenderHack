@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 
 import { IconButton } from "../../design-system/IconButton";
+import { PortalLogo, PortalMark } from "../../design-system/Brand";
 import { EditIcon, HelpIcon, SearchIcon, SettingsIcon, SidebarToggleIcon, DotIcon } from "../../design-system/icons";
 import type { CaseListItem } from "../../api/types";
 
@@ -17,7 +18,7 @@ function HistoryItem({ item, active }: { item: CaseListItem; active: boolean }) 
   return (
     <Link
       to={`/cases/${item.case_id}`}
-      className={`flex h-9 w-full items-center gap-1.5 rounded-[10px] py-2 pl-2.5 pr-2 text-xs ${
+      className={`flex h-10 w-full items-center gap-1.5 rounded-[10px] py-2 pl-2.5 pr-2 text-xs transition-[background-color,transform,color] duration-150 hover:translate-x-0.5 ${
         active ? "bg-[var(--surface-subtle)] text-[var(--content-primary)]" : "text-[var(--content-secondary)] hover:bg-[var(--surface-subtle)]"
       }`}
     >
@@ -32,7 +33,10 @@ export function Sidebar({ recentCases, archivedCases, activeCaseId, collapsed, o
 
   if (collapsed) {
     return (
-      <div className="flex h-full w-[60px] shrink-0 flex-col items-center gap-3 rounded-r-xl bg-[var(--surface-default)] py-3">
+      <div className="flex h-full w-[60px] shrink-0 animate-fade-in flex-col items-center gap-3 rounded-r-xl bg-[var(--surface-default)] py-3">
+        <Link to="/" aria-label="На главную">
+          <PortalMark />
+        </Link>
         <IconButton icon={<SidebarToggleIcon className="size-[18px]" />} label="Развернуть меню" onClick={onToggleCollapsed} />
         <IconButton icon={<EditIcon className="size-5" />} label="Новый чат" onClick={() => navigate("/")} />
       </div>
@@ -40,23 +44,23 @@ export function Sidebar({ recentCases, archivedCases, activeCaseId, collapsed, o
   }
 
   return (
-    <nav className="flex h-full w-[213px] shrink-0 flex-col gap-1.5 rounded-r-xl bg-[var(--surface-default)] px-2.5 py-3">
+    <nav className="flex h-full w-[232px] shrink-0 animate-slide-in-left flex-col gap-1.5 rounded-r-xl bg-[var(--surface-default)] px-2.5 py-3">
       <div className="flex h-[52px] items-center gap-1.5">
-        <Link to="/" className="flex h-[46px] w-[137px] items-center text-sm font-bold text-[var(--action-primary)]">
-          ПОРТАЛ ПОСТАВЩИКОВ
+        <Link to="/" className="flex h-[46px] w-[137px] items-center" aria-label="На главную">
+          <PortalLogo />
         </Link>
         <div className="flex-1" />
         <IconButton icon={<SidebarToggleIcon className="size-[18px]" />} label="Свернуть меню" onClick={onToggleCollapsed} />
       </div>
 
       <div className="flex flex-col gap-1">
-        <Link to="/" className="flex h-10 items-center gap-2 rounded-xl bg-[var(--surface-subtle)] px-2.5 text-xs font-medium text-[var(--content-primary)]">
+        <Link to="/" className="flex h-11 items-center gap-2 rounded-xl bg-[var(--surface-subtle)] px-2.5 text-xs font-medium text-[var(--content-primary)] transition-[background-color,transform] duration-150 hover:bg-[#f3f5f7] active:scale-[0.99]">
           <EditIcon className="size-5" />
           Новый чат
         </Link>
         <button
           type="button"
-          className="flex h-10 items-center gap-2 rounded-xl px-2.5 text-left text-xs font-medium text-[var(--content-secondary)] hover:bg-[var(--surface-subtle)]"
+          className="flex h-11 items-center gap-2 rounded-xl px-2.5 text-left text-xs font-medium text-[var(--content-secondary)] transition-[background-color,color] duration-150 hover:bg-[var(--surface-subtle)] hover:text-[var(--content-primary)]"
         >
           <SearchIcon className="size-5" />
           Поиск по чатам
@@ -65,7 +69,7 @@ export function Sidebar({ recentCases, archivedCases, activeCaseId, collapsed, o
 
       {recentCases.length > 0 && (
         <>
-          <p className="mt-2 text-[11px] font-medium text-[var(--content-secondary)]">НЕДАВНИЕ</p>
+          <p className="mt-3 text-xs font-medium uppercase tracking-wide text-[var(--content-tertiary)]">НЕДАВНИЕ</p>
           <div className="flex flex-col gap-0.5">
             {recentCases.map((item) => (
               <HistoryItem key={item.case_id} item={item} active={item.case_id === activeCaseId} />
@@ -76,7 +80,7 @@ export function Sidebar({ recentCases, archivedCases, activeCaseId, collapsed, o
 
       {archivedCases.length > 0 && (
         <>
-          <p className="mt-2 text-[11px] font-medium text-[var(--content-secondary)]">ЗАВЕРШЕННЫЕ</p>
+          <p className="mt-3 text-xs font-medium uppercase tracking-wide text-[var(--content-tertiary)]">ЗАВЕРШЕННЫЕ</p>
           <div className="flex flex-col gap-0.5">
             {archivedCases.map((item) => (
               <HistoryItem key={item.case_id} item={item} active={item.case_id === activeCaseId} />
@@ -88,11 +92,11 @@ export function Sidebar({ recentCases, archivedCases, activeCaseId, collapsed, o
       <div className="flex-1" />
       <div className="h-px w-full bg-[var(--border-default)]" />
       <div className="flex flex-col gap-0.5 py-1">
-        <button type="button" className="flex h-10 items-center gap-2 rounded-xl px-2.5 text-left text-xs font-medium text-[var(--content-secondary)] hover:bg-[var(--surface-subtle)]">
+        <button type="button" className="flex h-11 items-center gap-2 rounded-xl px-2.5 text-left text-xs font-medium text-[var(--content-secondary)] transition-[background-color,color] duration-150 hover:bg-[var(--surface-subtle)] hover:text-[var(--content-primary)]">
           <HelpIcon className="size-5" />
           Помощь
         </button>
-        <button type="button" className="flex h-10 items-center gap-2 rounded-xl px-2.5 text-left text-xs font-medium text-[var(--content-secondary)] hover:bg-[var(--surface-subtle)]">
+        <button type="button" className="flex h-11 items-center gap-2 rounded-xl px-2.5 text-left text-xs font-medium text-[var(--content-secondary)] transition-[background-color,color] duration-150 hover:bg-[var(--surface-subtle)] hover:text-[var(--content-primary)]">
           <SettingsIcon className="size-5" />
           Настройки
         </button>

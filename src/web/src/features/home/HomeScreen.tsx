@@ -38,24 +38,24 @@ export function HomeScreen({ api }: { api: ApiClient }) {
     <div className="relative flex h-full flex-1 items-center justify-center overflow-hidden bg-[var(--app-background)]">
       <InteractiveGlow className="absolute" />
 
-      <SuggestionChip className="absolute left-[13%] top-[20%]" onClick={() => startCase(SUGGESTIONS[1])} disabled={busy}>
+      <SuggestionChip className="absolute left-[13%] top-[20%] animate-float [animation-delay:0s]" onClick={() => startCase(SUGGESTIONS[1])} disabled={busy}>
         {SUGGESTIONS[1]}
       </SuggestionChip>
-      <SuggestionChip className="absolute left-[6%] top-[33%]" onClick={() => startCase(SUGGESTIONS[0])} disabled={busy}>
+      <SuggestionChip className="absolute left-[6%] top-[33%] animate-float [animation-delay:-1.2s]" onClick={() => startCase(SUGGESTIONS[0])} disabled={busy}>
         {SUGGESTIONS[0]}
       </SuggestionChip>
-      <SuggestionChip className="absolute right-[6%] top-[26%]" onClick={() => startCase(SUGGESTIONS[2])} disabled={busy}>
+      <SuggestionChip className="absolute right-[6%] top-[26%] animate-float [animation-delay:-2.4s]" onClick={() => startCase(SUGGESTIONS[2])} disabled={busy}>
         {SUGGESTIONS[2]}
       </SuggestionChip>
-      <SuggestionChip className="absolute bottom-[13%] right-[10%]" onClick={() => startCase(SUGGESTIONS[3])} disabled={busy}>
+      <SuggestionChip className="absolute bottom-[13%] right-[10%] animate-float [animation-delay:-3.6s]" onClick={() => startCase(SUGGESTIONS[3])} disabled={busy}>
         {SUGGESTIONS[3]}
       </SuggestionChip>
-      <SuggestionChip className="absolute bottom-[19%] left-[15%]" onClick={() => startCase(SUGGESTIONS[4])} disabled={busy}>
+      <SuggestionChip className="absolute bottom-[19%] left-[15%] animate-float [animation-delay:-4.8s]" onClick={() => startCase(SUGGESTIONS[4])} disabled={busy}>
         {SUGGESTIONS[4]}
       </SuggestionChip>
 
-      <div className="relative flex flex-col items-center gap-[45px]">
-        <h1 className="text-[40px] font-bold tracking-[0.08px] text-white drop-shadow-[0_0_50px_#e21d2d]">
+      <div className="relative flex animate-pop-in flex-col items-center gap-10">
+        <h1 className="animate-glow-pulse text-[48px] font-bold tracking-[0.08px] text-white">
           Вопрос по Порталу?
         </h1>
         <Composer context="home" onSubmit={startCase} disabled={busy} />

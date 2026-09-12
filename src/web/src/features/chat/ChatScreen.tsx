@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import type { ApiClient } from "../../api/client";
 import type { SourceDetail } from "../../api/types";
 import { useCaseSession } from "../../state/caseStore";
 import { Composer } from "./Composer";
+import { ModerationBlockedNotice } from "./Messages";
 import { MessageList } from "./MessageList";
 import { ContextPanel } from "./ContextPanel";
 import { RequestStatusStepper } from "./RequestStatusStepper";
@@ -13,9 +14,9 @@ import { BookOpenIcon } from "../../design-system/icons";
 
 function SourceModal({ source, onClose }: { source: SourceDetail; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex animate-fade-in items-center justify-center bg-black/30 p-6 backdrop-blur-[2px]" onClick={onClose}>
       <div
-        className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5"
+        className="max-h-[80vh] w-full max-w-xl animate-pop-in overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         <p className="text-sm font-semibold text-[var(--content-primary)]">{source.title}</p>
@@ -24,7 +25,7 @@ function SourceModal({ source, onClose }: { source: SourceDetail; onClose: () =>
           {source.page ? ` · стр. ${source.page}` : ""}
         </p>
         <p className="mt-3 whitespace-pre-wrap text-sm text-[var(--content-primary)]">{source.text}</p>
-        <button type="button" onClick={onClose} className="mt-4 text-xs font-medium text-[var(--action-primary)]">
+        <button type="button" onClick={onClose} className="mt-5 text-sm font-medium text-[var(--action-primary)] transition-opacity hover:opacity-80">
           Закрыть
         </button>
       </div>
@@ -40,9 +41,16 @@ export function ChatScreen({ api }: { api: ApiClient }) {
   const [usedSources, setUsedSources] = useState<Record<string, SourceDetail>>({});
 
   const usedSourcesList = useMemo(() => Object.values(usedSources), [usedSources]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const timelineLength = session.snapshot?.timeline.length ?? 0;
+  const feedbackDone = Boolean(session.snapshot?.feedback);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [timelineLength, feedbackDone]);
 
   if (session.loading || !session.snapshot) {
-    return <div className="flex flex-1 items-center justify-center text-sm text-[var(--content-tertiary)]">Загрузка обращения…</div>;
+    return <div className="loading-dots flex flex-1 animate-fade-in items-center justify-center text-sm text-[var(--content-tertiary)]">Загрузка обращения</div>;
   }
 
   if (session.error) {
@@ -54,14 +62,14 @@ export function ChatScreen({ api }: { api: ApiClient }) {
   return (
     <div className="flex h-full flex-1">
       <div className="flex h-full flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--border-default)] px-6">
+        <header className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--border-default)] px-6">
           <RequestStatusStepper snapshot={snapshot} />
           {!panelOpen && (
             <IconButton icon={<BookOpenIcon className="size-[18px]" />} label="Источники и материалы" onClick={() => setPanelOpen(true)} />
           )}
         </header>
 
-        <div className="flex-1 overflow-y-auto px-8 py-6">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-8 py-6 scroll-smooth">
           <MessageList
             snapshot={snapshot}
             api={api}
@@ -80,6 +88,11 @@ export function ChatScreen({ api }: { api: ApiClient }) {
         {snapshot.conversation_status === "ACTIVE" && (
           <div className="flex shrink-0 justify-center border-t border-[var(--border-default)] px-8 py-4">
             <Composer context="conversation" onSubmit={session.sendMessage} />
+          </div>
+        )}
+        {snapshot.conversation_status === "CLOSED_MODERATION" && (
+          <div className="flex shrink-0 justify-center border-t border-[var(--border-default)] px-8 py-4">
+            <ModerationBlockedNotice />
           </div>
         )}
       </div>

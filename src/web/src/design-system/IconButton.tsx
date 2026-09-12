@@ -7,7 +7,7 @@ type IconButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 export function IconButton({ icon, style = "neutral", label, className = "", disabled, ...rest }: IconButtonProps) {
-  const base = "flex size-9 shrink-0 items-center justify-center rounded-full transition-colors";
+  const base = "flex size-10 shrink-0 items-center justify-center rounded-full transition-[background-color,transform,opacity] duration-150 hover:scale-105 active:scale-95";
   const styles =
     style === "brand"
       ? "bg-[var(--action-primary)] text-white hover:opacity-92 active:opacity-82 disabled:opacity-42"

@@ -42,18 +42,18 @@ export function RequestStatusStepper({ snapshot }: { snapshot: CaseSnapshot }) {
   const progress = stage / 7;
 
   return (
-    <div className="flex h-11 items-center gap-3">
+    <div className="flex h-12 items-center gap-3">
       <div
-        className="relative size-11 shrink-0 rounded-full"
+        className="relative size-12 shrink-0 rounded-full transition-[background] duration-500"
         style={{ background: `conic-gradient(var(--action-primary) ${progress * 360}deg, var(--border-default) 0deg)` }}
       >
-        <div className="absolute inset-1 flex items-center justify-center rounded-full bg-white text-[10px] font-medium text-[var(--content-primary)]">
+        <div className={`absolute inset-1 flex items-center justify-center rounded-full bg-white text-xs font-semibold text-[var(--content-primary)] ${stage < 7 ? "animate-pulse [animation-duration:2.5s]" : ""}`}>
           {stage}/7
         </div>
       </div>
-      <div className="flex h-11 flex-col justify-center gap-px">
-        <p className="text-[10px] text-[var(--content-secondary)]">{copy.eyebrow}</p>
-        <p className="text-xs font-medium text-[var(--content-primary)]">{copy.title}</p>
+      <div key={stage} className="flex h-12 animate-fade-up flex-col justify-center gap-px">
+        <p className="text-xs text-[var(--content-secondary)]">{copy.eyebrow}</p>
+        <p className="text-sm font-medium text-[var(--content-primary)]">{copy.title}</p>
       </div>
     </div>
   );
