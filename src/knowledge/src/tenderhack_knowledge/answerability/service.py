@@ -57,7 +57,10 @@ _DURATION_RE = re.compile(
 )
 _WORD_DURATION_RE = re.compile(r"(?i)(?:\u0431\u043e\u043b\u044c\u0448\u0435|\u0431\u043e\u043b\u0435\u0435|\u043f\u0440\u043e\u0448\u043b\w*)\s+(?:\u043e\u0434\u043d\u043e\u0433\u043e\s+)?\u0447\u0430\u0441")
 _ALREADY_TRIED_RE = re.compile(
-    r"(?i)(?:\u0443\u0436\u0435|\u043f\u0440\u043e\u0431\u043e\u0432\w*|\u0441\u0434\u0435\u043b\u0430\u043b\w*|\u0437\u0430\u0433\u0440\u0443\u0437\u0438\u043b\w*|\u043d\u0435\s+\u043f\u043e\u043c\u043e\u0433\u043b\w*|\u043d\u0435\s+\u043f\u043e\u043b\u0443\u0447\u0430\u0435\u0442\u0441\u044f)"
+    r"(?i)(?:\u0443\u0436\u0435\s+(?:\u043f\u0440\u043e\u0431\u043e\u0432\w*|\u0441\u0434\u0435\u043b\u0430\u043b\w*|\u0437\u0430\u0433\u0440\u0443\u0437\u0438\u043b\w*)|"
+    r"\u043f\u0440\u043e\u0431\u043e\u0432\w*\s+(?:\u043d\u0435\s+)?\u043f\u043e\u043c\u043e\u0433\u043b\w*|"
+    r"\u0441\u0434\u0435\u043b\u0430\u043b\w*\s+\u0438\u043b\u0438\s+\u0437\u0430\u0433\u0440\u0443\u0437\u0438\u043b\w*\s+(?:\u043d\u043e\s+)?\u043d\u0435\s+\u043f\u043e\u043c\u043e\u0433\u043b\w*|"
+    r"\u043d\u0435\s+\u043f\u043e\u043c\u043e\u0433\u043b\w*)"
 )
 _NEGATED_ASSERTION_RE = re.compile(r"(?i)(?:\u043d\u0435\s+\u043d\u0443\u0436\u043d\w*|\u043d\u0435\s+\u0442\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044f|\u043d\u0435\u043b\u044c\u0437\u044f|\u043d\u0435\u0432\u043e\u0437\u043c\u043e\u0436\u043d\w*)")
 r"""
@@ -251,6 +254,44 @@ def _specificity(query: str, fragments: tuple[KnowledgeFragment, ...]) -> tuple[
     return addressed, ratio
 
 
+def _select_relevant_evidence(
+    query: str,
+    fragments: tuple[KnowledgeFragment, ...],
+    *,
+    limit: int = 6,
+) -> tuple[KnowledgeFragment, ...]:
+    """Keep the ordered high-signal subset of retrieval candidates.
+
+    Retrieval returns candidates, not proof. Treating every top-10 row as
+    equally authoritative made unrelated role/workflow snippets create false
+    conflicts and sent excessive context to generation. This gate preserves
+    caller order and only keeps rows sharing query concepts (or an explicit
+    code). A single distinctive row is retained when it is the only evidence.
+    """
+
+    if len(fragments) <= limit:
+        return fragments
+    query_stems = {_stem(token) for token in _content_tokens(query)}
+    exact_codes = {_normalize(code) for code in _CODE_RE.findall(query)}
+    scored: list[tuple[int, bool, KnowledgeFragment]] = []
+    for fragment in fragments:
+        source_stems = {_stem(token) for token in _content_tokens(fragment.text)}
+        overlap = len(query_stems & source_stems)
+        code_hit = bool(exact_codes) and exact_codes.issubset(
+            {_normalize(code) for code in _CODE_RE.findall(fragment.text)}
+        )
+        scored.append((overlap, code_hit, fragment))
+    best_overlap = max((score for score, _code_hit, _fragment in scored), default=0)
+    threshold = max(2, int(best_overlap * 0.6 + 0.999)) if best_overlap else 0
+    selected = [fragment for score, code_hit, fragment in scored if code_hit or score >= threshold]
+    if not selected:
+        selected = [scored[0][2]] if scored else []
+    if len(selected) > limit:
+        selected_ids = {fragment.fragment_id for fragment in selected[:limit]}
+        selected = [fragment for fragment in fragments if fragment.fragment_id in selected_ids]
+    return tuple(selected)
+
+
 def _contradictory(fragments: tuple[KnowledgeFragment, ...]) -> bool:
     if len(fragments) < 2:
         return False
@@ -354,6 +395,7 @@ async def assess_answerability(
             dimensions=EvidenceDimensionResult(True, False, False, False, False),
         )
 
+    evidence = _select_relevant_evidence(query, evidence)
     all_cards = _latest_cards(tuple(cards)) if cards is not None else await _load_cards(repository, snapshot_id)
     context = _context(query, all_cards)
     linked_cards = tuple(

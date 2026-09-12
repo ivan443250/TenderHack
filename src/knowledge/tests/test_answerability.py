@@ -173,6 +173,47 @@ async def test_partial_invalid_candidate_set_cannot_be_answered() -> None:
 
 
 @pytest.mark.asyncio
+async def test_top10_candidates_are_reduced_to_relevant_evidence_before_gate() -> None:
+    relevant = _fragment("f-relevant", "UPD signing requires CryptoPro CSP and a supported browser.")
+    distractors = tuple(
+        _fragment(f"f-distractor-{index}", "Customer portal document fields and delivery address.")
+        for index in range(6)
+    )
+    assessment = await assess_answerability(
+        "UPD signing with CryptoPro",
+        SNAPSHOT_ID,
+        [relevant.fragment_id, *(fragment.fragment_id for fragment in distractors)],
+        _Repository((relevant, *distractors)),
+    )
+    assert assessment.evidence_sufficiency is EvidenceSufficiency.SUFFICIENT
+    assert assessment.evidence_fragment_ids == (relevant.fragment_id,)
+    assert "ROLE_AMBIGUITY" not in assessment.risk_flags
+
+
+@pytest.mark.asyncio
+async def test_simple_inability_is_not_post_instruction_failure_but_explicit_retry_is() -> None:
+    fragment = _fragment("f-signing", "Для подписания УПД требуется КриптоПро CSP.")
+    repository = _Repository((fragment,))
+    initial = await assess_answerability(
+        "Не получается подписать УПД через КриптоПро",
+        SNAPSHOT_ID,
+        [fragment.fragment_id],
+        repository,
+    )
+    assert initial.evidence_sufficiency is EvidenceSufficiency.SUFFICIENT
+    assert "POST_INSTRUCTION_FAILURE" not in initial.risk_flags
+
+    retried = await assess_answerability(
+        "Я уже попробовал подписать УПД, но не помогло",
+        SNAPSHOT_ID,
+        [fragment.fragment_id],
+        repository,
+    )
+    assert retried.evidence_sufficiency is EvidenceSufficiency.INSUFFICIENT
+    assert "POST_INSTRUCTION_FAILURE" in retried.risk_flags
+
+
+@pytest.mark.asyncio
 async def test_latest_card_version_supersedes_old_required_slots_without_mutating_storage() -> None:
     fragment = _fragment("f-version", "Поставщику выбрать тип документа УПД при создании исполнения.")
     old = _card("f-version", card_id="versioned", version="1", required_slots=("duration",), process=("contract execution",))

@@ -178,7 +178,10 @@ class FakeHttpClient:
 
 
 @pytest.mark.asyncio
-async def test_generator_client_uses_local_vllm_boundary() -> None:
+async def test_generator_client_uses_local_vllm_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Do not let a developer's optional bearer token change this legacy
+    # compatibility test's unauthenticated request shape.
+    monkeypatch.delenv("KNOWLEDGE_INFERENCE_BEARER_TOKEN", raising=False)
     fake = FakeHttpClient(FakeResponse({"choices": [{"text": "Ответ"}]}))
     client = VllmGeneratorClient(client=fake, base_url="http://localhost:8000", max_tokens=12)
     assert await client.draft("тест") == "Ответ"
@@ -187,7 +190,10 @@ async def test_generator_client_uses_local_vllm_boundary() -> None:
 
 
 @pytest.mark.asyncio
-async def test_generator_client_rejects_malformed_response_and_transport_failure() -> None:
+async def test_generator_client_rejects_malformed_response_and_transport_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("KNOWLEDGE_INFERENCE_BEARER_TOKEN", raising=False)
     malformed = VllmGeneratorClient(client=FakeHttpClient(FakeResponse({"choices": []})))
     with pytest.raises(GeneratorClientError, match="no choices"):
         await malformed.draft("тест")
