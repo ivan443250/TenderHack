@@ -16,10 +16,10 @@ Two backend runtimes with one PostgreSQL, per `adr/0001-dotnet-support-core-pyth
 | Retrieval | PostgreSQL FTS + pg_trgm + pgvector (used by `knowledge` only) |
 | Inter-service contract | FastAPI OpenAPI → NSwag-generated C# client; contract `v0` frozen in first hour |
 | PDF parsing | pdfplumber baseline; Docling/OCR only for measured failures |
-| Embeddings | Qwen3-Embedding-0.6B, up to 1024 dimensions |
-| Reranking | BAAI/bge-reranker-v2-m3 |
-| Generation | Qwen3-4B-Instruct-2507 |
-| Inference | vLLM after smoke-test; one llama.cpp fallback if needed |
+| Embeddings | ai-sage/Giga-Embeddings-instruct-3B-0826; 2048 normalized dimensions |
+| Reranking | Querit/Querit-4B; custom adapter, quantized runtime TBD until certified |
+| Generation | empero-ai/Qwen3.8-4B-Distill, Qwen3.8-4B-Q6_K.gguf |
+| Inference | recent llama.cpp OpenAI-compatible local endpoints; profiles are separate |
 | Background jobs | one worker per runtime, PostgreSQL-backed job tables/outbox |
 | Deployment | Docker Compose on Linux, local volumes, reverse proxy if needed |
 
@@ -135,7 +135,9 @@ Two DB roles and schemas: `api_rw` owns the `api` schema; `knowledge_rw` owns th
 
 The reviewed corpus is thousands, not millions, of semantic fragments. Exact vector search is cheap enough initially and easier to reason about.
 
-A 1024-d float32 vector is about 4 KiB before overhead; 10k vectors are still small enough that operational simplicity dominates.
+A 2048-d float32 vector is 8192 bytes (8 KiB) before overhead; 10k vectors are
+about 78.1 MiB of raw values, still small enough that operational simplicity
+dominates.
 
 ### Why no HNSW initially
 
@@ -174,48 +176,37 @@ Store page/section/anchor provenance for every fragment.
 
 ## 9. Local model stack
 
-### Embeddings: Qwen3-Embedding-0.6B
+### Embeddings: Giga Embeddings 3B 0826
 
-Reasons:
+`ai-sage/Giga-Embeddings-instruct-3B-0826` provides Russian/English,
+instruction-aware, mean-pooled and L2-normalized 2048-dimensional vectors.
+Queries use the versioned `giga_portal_support_v1` instruction; documents are
+embedded as plain text. The selected `ai-babai/giga-embeddings-0826-3b-gguf`
+Q8_0 file is an independent third-party conversion, not an official ai-sage
+release. Upstream MTEB values are not TenderHack measurements.
 
-- multilingual;
-- instruction-aware embeddings;
-- local inference;
-- up to 1024 dims;
-- model size reasonable for hackathon hardware.
+### Reranker: Querit/Querit-4B
 
-Benchmark on real retrieval gold set before declaring it final.
+Use the custom Querit `AutoModel` score interface for query-passage reranking
+only after a trusted quantized runtime is certified. No Q6 artifact is
+currently verified, so the production fallback is Giga dense + exact/FTS + RRF.
+Scores are relevance evidence, **not a calibrated probability**.
 
-### Reranker: BAAI/bge-reranker-v2-m3
+### Generator: Qwen3.8-4B-Distill
 
-Use pairwise query-passage reranking for the fused candidate set.
-
-Its score is relevance evidence, **not a calibrated probability that the final answer is correct**.
-
-### Generator: Qwen3-4B-Instruct-2507
-
-Chosen starting point from the final reviewed spec because it is small enough for local serving while supporting structured answer drafting.
-
-Do not advertise Russian superiority or quality numbers before measurement.
+`Qwen3.8-4B-Q6_K.gguf` is served locally by recent llama.cpp. The model is a
+reasoning model; `<think>` spans are stripped before structured parsing and
+never enter evidence, API payloads or analytics.
 
 ## 10. Inference runtime
 
-### Primary: vLLM
+### Local llama.cpp endpoints
 
-Use if actual GPU/runtime smoke test passes.
-
-Benefits:
-
-- local server boundary;
-- batching/concurrency;
-- structured outputs support;
-- predictable API boundary.
-
-### Fallback: llama.cpp
-
-Only if vLLM/model does not fit/boot reliably on provided hardware.
-
-Do **not** maintain two inference paths in parallel. Hardware gate chooses one. Only `knowledge` talks to the inference runtime.
+The active runtime is recent llama.cpp with internal OpenAI-compatible HTTP:
+`/v1/embeddings` for Giga and `/v1/chat/completions` for Qwen3.8. Embedding,
+reranker and generator endpoints are configured independently and may be
+co-located later. Querit remains disabled until its runtime artifact and
+scoring interface are certified. No external AI API is used.
 
 ## 11. Hardware gate
 

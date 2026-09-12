@@ -8,7 +8,9 @@ class Settings(BaseModel):
     service_name: str = "knowledge"
     database_url: str = Field(default="", description="Knowledge-owned PostgreSQL URL")
     check_database_on_ready: bool = True
-    inference_base_url: str = "http://inference:8000"
+    embedding_base_url: str = "http://embedding-inference:8080"
+    reranker_base_url: str = ""
+    generator_base_url: str = "http://generator-inference:8080"
     environment: str = "Development"
 
     @classmethod
@@ -17,7 +19,9 @@ class Settings(BaseModel):
         return cls(
             database_url=os.getenv("DATABASE_URL", os.getenv("KNOWLEDGE_DATABASE_URL", "")),
             check_database_on_ready=raw_check not in {"0", "false", "no"},
-            inference_base_url=os.getenv("INFERENCE_BASE_URL", "http://inference:8000"),
+            embedding_base_url=os.getenv("KNOWLEDGE_EMBEDDING_BASE_URL", "http://embedding-inference:8080"),
+            reranker_base_url=os.getenv("KNOWLEDGE_RERANKER_BASE_URL", ""),
+            generator_base_url=os.getenv("KNOWLEDGE_GENERATOR_BASE_URL", "http://generator-inference:8080"),
             environment=os.getenv("ASPNETCORE_ENVIRONMENT", os.getenv("ENVIRONMENT", "Development")),
         )
 

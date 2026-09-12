@@ -14,7 +14,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from tenderhack_knowledge.contracts.v0 import Corpus, RetrieveRequest
-from tenderhack_knowledge.inference.model_refs import EMBEDDING_MODEL_ID, EMBEDDING_REVISION
+from tenderhack_knowledge.inference.model_refs import EMBEDDING_DIMENSION, EMBEDDING_MODEL_ID, EMBEDDING_REVISION, RERANKER_MODEL_ID, RERANKER_REVISION
 from tenderhack_knowledge.persistence.repository import PostgresKnowledgeRepository
 from tenderhack_knowledge.retrieval.hybrid import HybridRetriever
 from tenderhack_knowledge.retrieval.service import LexicalRetriever
@@ -124,12 +124,12 @@ async def evaluate_gold(gold_path: Path, database_url: str, snapshot_id: str) ->
             snapshot_id,
             model_id=EMBEDDING_MODEL_ID,
             model_revision=EMBEDDING_REVISION,
-            dimension=1024,
+            dimension=EMBEDDING_DIMENSION,
         )
         blocker: str | None = None
         if not stats["identity_preserved"] or stats["embeddings"] != stats["snapshot_fragments"]:
             blocker = (
-                "Qwen3 embeddings are not backfilled: expected "
+                "Giga embeddings are not backfilled: expected "
                 f"{stats['snapshot_fragments']}, found {stats['embeddings']}"
             )
         if blocker is None:
@@ -175,9 +175,9 @@ async def evaluate_gold(gold_path: Path, database_url: str, snapshot_id: str) ->
             "failure_analysis_b1_recall_at_10": _failure_analysis(baseline_rows),
             "embedding_persistence": {
                 "model_id": EMBEDDING_MODEL_ID, "model_revision": EMBEDDING_REVISION,
-                "dimension": 1024, "stats": stats,
+                "dimension": EMBEDDING_DIMENSION, "stats": stats,
             },
-            "reranker": {"model_id": "BAAI/bge-reranker-v2-m3", "model_revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e", "pair_max_length": 512, "score_semantics": "raw relevance score, not probability"},
+            "reranker": {"model_id": RERANKER_MODEL_ID, "model_revision": RERANKER_REVISION, "pair_max_length": 512, "score_semantics": "raw relevance score, not probability"},
             "rrf": {"k": 60, "channels": ["exact", "fts", "dense"], "dedupe_key": "fragment_id"},
             "blockers": [blocker] if blocker else [],
             "verification": {"gold_labels_changed": False, "no_approximate_vector_index": True},

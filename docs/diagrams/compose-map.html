@@ -406,9 +406,9 @@
         <rect x="750" y="670" width="260" height="68" rx="7" fill="var(--paper-raised)" stroke="var(--accent-b)" stroke-width="2"/>
         <line x1="758" y1="681" x2="1002" y2="681" stroke="var(--line)"/>
         <line x1="758" y1="686" x2="1002" y2="686" stroke="var(--line)"/>
-        <text x="880" y="705" text-anchor="middle" class="node-title" fill="var(--ink)">INFERENCE</text>
-        <text x="880" y="720" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">vLLM (embed · rerank · generate)</text>
-        <text x="880" y="732" text-anchor="middle" class="node-mono" fill="var(--ink-muted)">no host port · GPU</text>
+        <text x="880" y="705" text-anchor="middle" class="node-title" fill="var(--ink)">INFERENCE PROFILES</text>
+        <text x="880" y="720" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">embedding-inference · generator-inference</text>
+        <text x="880" y="732" text-anchor="middle" class="node-mono" fill="var(--ink-muted)">llama.cpp · no host port · GPU optional</text>
       </g>
 
       <!-- arrows: api -> postgres, api-worker -> postgres (gutter trunks) -->
@@ -427,7 +427,7 @@
       <line x1="880" y1="486" x2="880" y2="668" stroke="var(--accent-b)" stroke-width="1.8" marker-end="url(#arrow-b)"/>
       <rect x="945" y="500" width="150" height="30" rx="4" fill="var(--accent-b-soft)"/>
       <text x="1020" y="513" text-anchor="middle" class="diagram-label" fill="var(--accent-b)">embed · rerank</text>
-      <text x="1020" y="525" text-anchor="middle" class="diagram-label" fill="var(--accent-b)">generate (vLLM)</text>
+      <text x="1020" y="525" text-anchor="middle" class="diagram-label" fill="var(--accent-b)">generate (llama.cpp)</text>
 
       <!-- ===== external demo adapter ===== -->
       <g>
@@ -508,11 +508,11 @@
             <td>One database, two roles: <span class="mono" style="font-family:'IBM Plex Mono',monospace">api_rw</span>, <span class="mono" style="font-family:'IBM Plex Mono',monospace">knowledge_rw</span>. No cross-schema reads. <span class="mono" style="font-family:'IBM Plex Mono',monospace">pgvector</span> + <span class="mono" style="font-family:'IBM Plex Mono',monospace">pg_trgm</span> extensions <b>are</b> the vector DB — no separate service.</td>
           </tr>
           <tr>
-            <td class="container-name">inference</td>
-            <td>vLLM (llama.cpp fallback)</td>
+            <td class="container-name">embedding-inference<br/>generator-inference</td>
+            <td>llama.cpp (profile-gated, separate endpoints)</td>
             <td><span class="tag internal">internal</span></td>
             <td class="mono">—</td>
-            <td>Embed / rerank / generate. Reachable only from <span class="mono" style="font-family:'IBM Plex Mono',monospace">knowledge*</span>.</td>
+            <td>Giga embed and Qwen3.8 generate; Querit remains disabled until certified. Reachable only from <span class="mono" style="font-family:'IBM Plex Mono',monospace">knowledge*</span>.</td>
           </tr>
           <tr>
             <td class="container-name">reverse-proxy</td>

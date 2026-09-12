@@ -35,6 +35,7 @@ from tenderhack_knowledge.inference.errors import (
     EmbeddingRevisionMismatchError,
     EmbeddingUnavailableError,
 )
+from tenderhack_knowledge.inference.model_refs import EMBEDDING_DIMENSION, EMBEDDING_MODEL_ID, EMBEDDING_REVISION
 from tenderhack_knowledge.conditions.cards import ConditionCard
 
 
@@ -113,7 +114,7 @@ kb_fragment_embeddings = sa.Table(
     sa.Column("model_id", sa.Text(), nullable=False),
     sa.Column("model_revision", sa.Text(), nullable=False),
     sa.Column("dimension", sa.Integer(), nullable=False),
-    # The deployed column is pgvector vector(1024).  Text here keeps the
+    # The deployed column is pgvector vector(2048).  Text here keeps the
     # lightweight package importable without the optional pgvector SQLAlchemy
     # extension; writes/searches cast explicitly in SQL below.
     sa.Column("embedding", sa.Text(), nullable=False),
@@ -511,7 +512,7 @@ class PostgresKnowledgeRepository:
         *,
         model_id: str,
         model_revision: str,
-        dimension: int = 1024,
+        dimension: int = EMBEDDING_DIMENSION,
     ) -> int:
         """Insert or deterministically re-run embeddings for snapshot members.
 
@@ -591,7 +592,7 @@ class PostgresKnowledgeRepository:
         *,
         model_id: str,
         model_revision: str,
-        dimension: int = 1024,
+        dimension: int = EMBEDDING_DIMENSION,
     ) -> dict[str, int | bool]:
         """Return count/dimension/identity checks for a snapshot embedding set."""
 
@@ -643,7 +644,7 @@ class PostgresKnowledgeRepository:
         *,
         model_id: str,
         model_revision: str,
-        dimension: int = 1024,
+        dimension: int = EMBEDDING_DIMENSION,
         limit: int = 30,
     ) -> tuple[dict[str, object], ...]:
         """Exact cosine-distance scan constrained to one immutable snapshot."""
@@ -904,11 +905,15 @@ def _escape_like(value: str) -> str:
 def _validate_embedding_metadata(model_id: str, model_revision: str, dimension: int) -> None:
     if not model_id or not model_revision:
         raise ValueError("embedding model_id and model_revision are required")
-    if int(dimension) != 1024:
-        raise ValueError("only 1024-dimensional embeddings are supported")
+    if model_id != EMBEDDING_MODEL_ID or model_revision != EMBEDDING_REVISION:
+        raise EmbeddingRevisionMismatchError(
+            f"only active Giga model metadata is accepted: {(EMBEDDING_MODEL_ID, EMBEDDING_REVISION)}"
+        )
+    if int(dimension) != EMBEDDING_DIMENSION:
+        raise ValueError(f"only {EMBEDDING_DIMENSION}-dimensional embeddings are supported")
 
 
-def _validate_vector(vector: Sequence[float], dimension: int = 1024) -> None:
+def _validate_vector(vector: Sequence[float], dimension: int = EMBEDDING_DIMENSION) -> None:
     import math
 
     if len(vector) != int(dimension):

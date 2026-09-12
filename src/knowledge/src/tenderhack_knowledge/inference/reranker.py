@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .errors import AdapterOutputError, ModelLoadError, OptionalDependencyError
-from .model_refs import RERANKER_MODEL_ID, RERANKER_REVISION
+from .model_refs import LEGACY_RERANKER_MODEL_ID, LEGACY_RERANKER_REVISION
 
 
 @dataclass(frozen=True)
@@ -74,13 +74,14 @@ def _default_components_factory(
 class BgeRerankerAdapter:
     """Score query/candidate pairs while preserving the candidate order."""
 
-    model_id = RERANKER_MODEL_ID
+    # Historical K0 adapter; active V2 reranking is Querit-specific.
+    model_id = LEGACY_RERANKER_MODEL_ID
 
     def __init__(
         self,
         *,
         model_id: str = model_id,
-        revision: str | None = RERANKER_REVISION,
+        revision: str | None = LEGACY_RERANKER_REVISION,
         device: str = "auto",
         dtype: str = "auto",
         batch_size: int = 8,

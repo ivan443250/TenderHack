@@ -191,7 +191,7 @@
       <g>
         <rect x="700" y="244" width="280" height="64" rx="7" fill="var(--paper-raised)" stroke="var(--accent-b)" stroke-width="2"/>
         <text x="840" y="269" text-anchor="middle" class="node-title" fill="var(--ink)">INFERENCE RUNTIME</text>
-        <text x="840" y="284" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">vLLM — embed / rerank / generate</text>
+        <text x="840" y="284" text-anchor="middle" class="node-sub" fill="var(--ink-muted)">llama.cpp — Giga embed / Qwen3.8 generate</text>
         <text x="840" y="297" text-anchor="middle" class="node-mono" fill="var(--ink-muted)">used only by knowledge*</text>
       </g>
       <line x1="840" y1="204" x2="840" y2="242" stroke="var(--accent-b)" stroke-width="1.8" marker-end="url(#m-b)"/>
@@ -301,7 +301,7 @@
           </tr>
           <tr>
             <td class="abs-name">Inference runtime</td>
-            <td class="mono">inference (vLLM, llama.cpp fallback)</td>
+            <td class="mono">embedding-inference + generator-inference (llama.cpp)</td>
             <td>—</td>
             <td>Compose, internal · called only by knowledge*</td>
           </tr>
@@ -387,7 +387,7 @@
         <span class="desc">Тот же код, без HTTP. Парсит документы, считает embeddings, гоняет quality audit по уже накопленным данным.</span>
       </div>
       <div class="entity-card" style="--card-accent:var(--accent-b)">
-        <span class="name">inference (vLLM)</span>
+        <span class="name">local inference (llama.cpp profiles)</span>
         <span class="role">модельный runtime</span>
         <span class="desc">Просто сервер с моделями (embedder/reranker/generator). Вызывается только из Python-кода, у <span class="mono">api</span> к нему нет доступа вообще.</span>
       </div>
@@ -441,7 +441,7 @@
           </tr>
           <tr>
             <td class="flow"><span class="dot" style="background:var(--accent-b)"></span><b>knowledge / knowledge-worker → inference</b></td>
-            <td class="api">HTTP (OpenAI-совместимый API vLLM) через узкие адаптеры <span class="mono">Embedder / Reranker / Generator / Verifier</span></td>
+            <td class="api">Internal OpenAI-compatible HTTP via narrow adapters <span class="mono">Embedder / Querit / Generator / Verifier</span></td>
             <td>«Посчитай embedding», «оцени релевантность пары», «сгенерируй structured draft», «проверь claim по evidence». Никакого произвольного tool-use, только эти 4 операции.</td>
           </tr>
           <tr>

@@ -1,8 +1,9 @@
 """Opt-in capability smoke for the selected local inference stack.
 
 Run explicitly with ``python -m tenderhack_knowledge.inference.smoke`` (or the
-project script).  Ordinary imports and tests never execute this module and it
-does not download model weights unless ``--allow-model-download`` is supplied.
+project script). Ordinary imports and tests never execute this module. The
+embedding and reranker probes contact only explicitly configured local
+endpoints/runtimes; they never download model weights implicitly.
 """
 
 from __future__ import annotations
@@ -19,10 +20,10 @@ from pathlib import Path
 from typing import Any
 
 from .config import InferenceSettings
-from .embedding import Qwen3EmbeddingAdapter
+from .giga import GigaEmbeddingAdapter
 from .errors import InferenceAdapterError
-from .generator import VllmGeneratorClient
-from .reranker import BgeRerankerAdapter
+from .generator import LocalOpenAIChatGenerator
+from .querit import QueritRerankerAdapter
 
 
 def _default_report_path() -> Path:
@@ -74,12 +75,10 @@ def _model_report(adapter: object, *, status: str, samples: dict[str, int], **ex
 
 
 async def _run_embedding(settings: InferenceSettings, allow_download: bool) -> dict[str, object]:
-    adapter = Qwen3EmbeddingAdapter(
+    adapter = GigaEmbeddingAdapter(
+        base_url=settings.embedding_base_url,
         model_id=settings.embedding_model_id,
         revision=settings.embedding_revision,
-        device=settings.embedding_device,
-        dtype=settings.embedding_dtype,
-        batch_size=settings.embedding_batch_size,
     )
     samples = {"single_query": 1, "batch": 8, "long_support_request": 1}
     if not allow_download:
@@ -87,7 +86,7 @@ async def _run_embedding(settings: InferenceSettings, allow_download: bool) -> d
             adapter,
             status="BLOCKED_OPT_IN_REQUIRED",
             samples={key: 0 for key in samples},
-            limitations=["Pass --allow-model-download to load local weights."],
+            limitations=["Pass --allow-model-download to opt into the local embedding capability probe."],
         )
     before = _nvidia_memory()
     failures: list[str] = []
@@ -111,8 +110,8 @@ async def _run_embedding(settings: InferenceSettings, allow_download: bool) -> d
             output = await adapter.embed(values)
             latencies[name] = round((time.perf_counter() - started) * 1000, 3)
             actual_samples[name] = len(values)
-            if len(output) != len(values) or any(len(row) != 1024 for row in output):
-                failures.append(f"{name}: output shape is not (n, 1024)")
+            if len(output) != len(values) or any(len(row) != 2048 for row in output):
+                failures.append(f"{name}: output shape is not (n, 2048)")
             if any(not math.isfinite(value) for row in output for value in row):
                 failures.append(f"{name}: non-finite output")
     except Exception as exc:
@@ -130,7 +129,7 @@ async def _run_embedding(settings: InferenceSettings, allow_download: bool) -> d
 
 
 async def _run_reranker(settings: InferenceSettings, allow_download: bool) -> dict[str, object]:
-    adapter = BgeRerankerAdapter(
+    adapter = QueritRerankerAdapter(
         model_id=settings.reranker_model_id,
         revision=settings.reranker_revision,
         device=settings.reranker_device,
@@ -144,7 +143,7 @@ async def _run_reranker(settings: InferenceSettings, allow_download: bool) -> di
             adapter,
             status="BLOCKED_OPT_IN_REQUIRED",
             samples={key: 0 for key in samples},
-            limitations=["Pass --allow-model-download to load local weights."],
+            limitations=["Pass --allow-model-download to opt into an explicitly provisioned Querit runtime probe."],
         )
     before = _nvidia_memory()
     failures: list[str] = []
@@ -186,19 +185,21 @@ async def _run_reranker(settings: InferenceSettings, allow_download: bool) -> di
     )
 
 
-async def _run_generator(settings: InferenceSettings, probe_vllm: bool) -> dict[str, object]:
-    client = VllmGeneratorClient(
-        base_url=settings.vllm_base_url,
+async def _run_generator(settings: InferenceSettings, probe_local: bool) -> dict[str, object]:
+    client = LocalOpenAIChatGenerator(
+        base_url=settings.generator_base_url,
         model_id=settings.generator_model_id,
         revision=settings.generator_revision,
         timeout_seconds=settings.generator_timeout_seconds,
         temperature=settings.generator_temperature,
+        top_p=settings.generator_top_p,
+        top_k=settings.generator_top_k,
         max_tokens=settings.generator_max_tokens,
     )
     report: dict[str, object] = {
         "model_id": settings.generator_model_id,
         "revision": settings.generator_revision,
-        "runtime": "vLLM OpenAI-compatible HTTP",
+        "runtime": "llama.cpp OpenAI-compatible HTTP",
         "device": "remote-local-runtime",
         "dtype": "runtime-defined",
         "status": "BLOCKED_ENVIRONMENT",
@@ -207,15 +208,15 @@ async def _run_generator(settings: InferenceSettings, probe_vllm: bool) -> dict[
         "latency_ms": {"short_prompt": None, "long_evidence_prompt": None},
         "memory_observations": {"before": None, "after": None},
         "schema_failures": [],
-        "vllm_status": "blocked_environment",
+        "runtime_status": "blocked_environment",
         "limitations": [],
     }
-    if not probe_vllm:
+    if not probe_local:
         report["limitations"] = [
-            "K0A classified vLLM as target-Linux-only; pass --probe-vllm on a reachable local runtime to execute HTTP smoke."
+            "Pass --probe-local on a reachable llama.cpp runtime to execute HTTP smoke."
         ]
         return report
-    report["vllm_status"] = "probed"
+    report["runtime_status"] = "probed"
     failures: list[str] = []
     prompts = {
         "short_prompt": "Кратко перечисли два шага проверки заявки.",
@@ -250,11 +251,11 @@ async def _run_generator(settings: InferenceSettings, probe_vllm: bool) -> dict[
     return report
 
 
-async def run_smoke(*, allow_model_download: bool = False, probe_vllm: bool = False) -> dict[str, object]:
+async def run_smoke(*, allow_model_download: bool = False, probe_vllm: bool = False, probe_local: bool | None = None) -> dict[str, object]:
     settings = InferenceSettings.from_env()
     embedding = await _run_embedding(settings, allow_model_download)
     reranker = await _run_reranker(settings, allow_model_download)
-    generator = await _run_generator(settings, probe_vllm)
+    generator = await _run_generator(settings, probe_vllm if probe_local is None else probe_local)
     statuses = [embedding["status"], reranker["status"], generator["status"]]
     if any(status == "FAIL" for status in statuses):
         status = "FAIL"
@@ -280,10 +281,10 @@ async def run_smoke(*, allow_model_download: bool = False, probe_vllm: bool = Fa
             "torch": _version("torch"),
             "transformers": _version("transformers"),
             "sentence-transformers": _version("sentence-transformers"),
-            "vllm": _version("vllm"),
+            "llama-cpp": None,
             "httpx": _version("httpx"),
         },
-        "vllm_status": generator["vllm_status"],
+        "runtime_status": generator["runtime_status"],
         "limitations": [
             "This smoke checks adapter capability and transport/schema invariants only; it does not measure retrieval or answer quality.",
             "No cloud LLM or external search API is used.",
@@ -299,9 +300,10 @@ def _parse_args() -> argparse.Namespace:
         help="allow loading/downloading the configured embedding and reranker weights",
     )
     parser.add_argument(
-        "--probe-vllm",
+        "--probe-local",
+        dest="probe_vllm",
         action="store_true",
-        help="probe the configured local vLLM HTTP endpoint",
+        help="probe configured local llama.cpp HTTP endpoints",
     )
     parser.add_argument("--report", type=Path, default=_default_report_path(), help="machine-readable report path")
     return parser.parse_args()

@@ -12,7 +12,8 @@ Chosen shape (see `adr/0001-dotnet-support-core-python-knowledge-service.md`):
 - **`knowledge-worker`** — same Python codebase: ingestion, embeddings, quality audit, issue-group recomputation.
 - **`web`** — React SPA.
 - **PostgreSQL 16** — single database, strict per-runtime table ownership.
-- **inference** — local vLLM (or documented fallback) used only by `knowledge`.
+- **embedding-inference / generator-inference** — local llama.cpp endpoints
+  used only by `knowledge`; Querit remains a gated optional runtime.
 
 Do not add a third backend runtime, a queue or a separate vector DB unless new hard requirements justify the split.
 
@@ -95,7 +96,7 @@ api (.NET)  ── single public boundary
                                              │     issue_groups / knowledge_jobs
                                              │     FTS / pg_trgm / pgvector
                                              ├──► local embedding/reranker runtime
-                                             └──► local generation runtime (vLLM)
+                                             └──► local generation runtime (llama.cpp)
 
 api-worker (.NET)                 knowledge-worker (Python)
    ├── outbox delivery                ├── ingestion / parsing / indexing
@@ -495,7 +496,10 @@ Verifier.check_claim(claim, evidence)
 
 No module gets a generic «LLM with arbitrary tools» interface.
 
-The model cannot call SQL, shell or arbitrary HTTP. `api` never talks to vLLM.
+The model cannot call SQL, shell or arbitrary HTTP. `api` never talks to a
+local model runtime; only `knowledge` calls the internal embedding/generator
+endpoints. The Giga, Querit and Qwen3.8 choices are runtime dependencies, not
+business decision makers.
 
 ### Generator budget
 

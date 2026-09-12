@@ -51,10 +51,10 @@ class RepositoryStub:
 class EmbedderStub:
     model_id = EMBEDDING_MODEL_ID
     revision = EMBEDDING_REVISION
-    dimension = 1024
+    dimension = 2048
 
     async def embed_query(self, _query: str) -> list[float]:
-        return [0.0] * 1024
+        return [0.0] * 2048
 
 
 class RerankerStub:
@@ -87,7 +87,7 @@ async def test_rrf_is_deterministic_and_deduplicates_fragment_ids() -> None:
     second = await _retriever().retrieve(_request())
     assert [candidate.fragment_id for candidate in first.candidates] == [candidate.fragment_id for candidate in second.candidates]
     assert len({candidate.fragment_id for candidate in first.candidates}) == len(first.candidates)
-    assert first.config_version == "hybrid-rrf-v1"
+    assert first.config_version == "hybrid-giga2048-querit-v2"
     assert first.candidates[0].scores.rerank is not None
     assert first.candidates[0].scores.dense is not None
 
@@ -99,7 +99,7 @@ async def test_embedding_dimension_and_revision_are_checked_before_vector_query(
 
     wrong_dimension = _retriever(embedder=WrongDimension())
     wrong_dimension.allow_lexical_fallback = False
-    with pytest.raises(Exception, match="1024"):
+    with pytest.raises(Exception, match="2048"):
         await wrong_dimension.retrieve(_request())
 
     class WrongRevision(EmbedderStub):
@@ -118,7 +118,7 @@ async def test_reranker_failure_is_versioned_and_preserves_fused_cardinality() -
             raise RuntimeError("offline")
 
     result = await _retriever(reranker=FailingReranker()).retrieve(_request(), final_limit=10)
-    assert result.config_version == "hybrid-rrf-v1-no-reranker"
+    assert result.config_version == "hybrid-giga2048-rrf-v2-no-reranker"
     assert result.degraded_reason and "offline" in result.degraded_reason
     assert len(result.candidates) == 3
     assert len({candidate.fragment_id for candidate in result.candidates}) == 3
@@ -128,7 +128,7 @@ async def test_reranker_failure_is_versioned_and_preserves_fused_cardinality() -
             return [1.0]
 
     malformed = await _retriever(reranker=WrongCardinality()).retrieve(_request(), final_limit=10)
-    assert malformed.config_version == "hybrid-rrf-v1-no-reranker"
+    assert malformed.config_version == "hybrid-giga2048-rrf-v2-no-reranker"
     assert len(malformed.candidates) == 3
 
 
@@ -139,6 +139,6 @@ async def test_dense_unavailable_uses_explicit_no_dense_fallback() -> None:
             raise RuntimeError("model unavailable")
 
     result = await _retriever(embedder=FailingEmbedder()).retrieve(_request())
-    assert result.config_version == "hybrid-rrf-v1-no-dense"
+    assert result.config_version == "hybrid-giga2048-rrf-v2-no-dense"
     assert result.degraded_reason and "dense_unavailable" in result.degraded_reason
     assert all(candidate.scores.dense is None for candidate in result.candidates)

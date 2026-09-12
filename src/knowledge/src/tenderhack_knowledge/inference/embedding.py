@@ -15,7 +15,7 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 from .errors import AdapterOutputError, ModelLoadError, OptionalDependencyError
-from .model_refs import EMBEDDING_MODEL_ID, EMBEDDING_REVISION
+from .model_refs import LEGACY_EMBEDDING_MODEL_ID, LEGACY_EMBEDDING_REVISION
 
 
 ModelFactory = Callable[..., object]
@@ -55,14 +55,16 @@ def _default_model_factory(
 class Qwen3EmbeddingAdapter:
     """Embed Russian or multilingual text with a strict 1024-wide output."""
 
-    model_id = EMBEDDING_MODEL_ID
+    # Historical K0 adapter retained for benchmark reproducibility.  Active
+    # retrieval uses GigaEmbeddingAdapter and the 2048-dimensional contract.
+    model_id = LEGACY_EMBEDDING_MODEL_ID
     dimension = 1024
 
     def __init__(
         self,
         *,
         model_id: str = model_id,
-        revision: str | None = EMBEDDING_REVISION,
+        revision: str | None = LEGACY_EMBEDDING_REVISION,
         device: str = "auto",
         dtype: str = "auto",
         batch_size: int = 8,

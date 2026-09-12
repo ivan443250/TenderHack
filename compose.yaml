@@ -57,7 +57,9 @@ services:
     environment:
       DATABASE_URL: ${KNOWLEDGE_DATABASE_URL:-postgresql+asyncpg://knowledge_rw:${KNOWLEDGE_DB_PASSWORD:-knowledge_dev_only}@postgres:5432/${POSTGRES_DB:-tenderhack}}
       KNOWLEDGE_CHECK_DB: ${KNOWLEDGE_CHECK_DB:-true}
-      INFERENCE_BASE_URL: http://inference:8000
+      KNOWLEDGE_EMBEDDING_BASE_URL: ${KNOWLEDGE_EMBEDDING_BASE_URL:-http://embedding-inference:8080}
+      KNOWLEDGE_RERANKER_BASE_URL: ${KNOWLEDGE_RERANKER_BASE_URL:-}
+      KNOWLEDGE_GENERATOR_BASE_URL: ${KNOWLEDGE_GENERATOR_BASE_URL:-http://generator-inference:8080}
     expose:
       - "8000"
     depends_on:
@@ -100,14 +102,23 @@ services:
       timeout: 3s
       retries: 10
 
-  inference:
-    profiles: ["inference"]
-    image: vllm/vllm-openai:v0.10.2
-    command: ["--model", "${INFERENCE_MODEL:-/models/Qwen3-4B-Instruct-2507}", "--host", "0.0.0.0"]
+  embedding-inference:
+    profiles: ["inference", "embedding"]
+    image: ghcr.io/ggml-org/llama.cpp:server
+    command: ["-m", "/models/giga-embeddings-0826-3b-q8_0.gguf", "--embeddings", "-c", "2048", "-b", "2048", "-ub", "2048", "-ngl", "99", "--host", "0.0.0.0", "--port", "8080"]
     volumes:
       - ${MODEL_ARTIFACTS_DIR:-./infra/inference/models}:/models:ro
     expose:
-      - "8000"
+      - "8080"
+
+  generator-inference:
+    profiles: ["inference", "generator"]
+    image: ghcr.io/ggml-org/llama.cpp:server
+    command: ["-m", "/models/Qwen3.8-4B-Q6_K.gguf", "--jinja", "-c", "8192", "-ngl", "99", "--host", "0.0.0.0", "--port", "8080"]
+    volumes:
+      - ${MODEL_ARTIFACTS_DIR:-./infra/inference/models}:/models:ro
+    expose:
+      - "8080"
 
 volumes:
   postgres-data:

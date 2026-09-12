@@ -1,175 +1,83 @@
 # References and source hierarchy
 
-This file records primary sources used to design the repository instructions and technical baseline. It is not a substitute for the source itself.
+This file records primary sources for the current repository decisions. Product
+rules and public contracts remain unchanged by the Model Stack V2 migration.
 
-## 1. Team canonical input
+## Team canonical input
 
-### TenderHack НН 2026 — финальная спецификация реализации
+The reviewed TenderHack implementation specification and organizer materials
+remain the source for product behaviour. This repository documents the current
+runtime decision; the external historical implementation spec is not rewritten.
 
-User-provided reviewed implementation specification, dated 11 September 2026. It is the direct basis for the product/technical decisions distilled into `docs/product-spec.md`, `docs/architecture.md`, `docs/stack.md`, `docs/quality.md` and `docs/execution-plan.md`.
+## Model / inference sources
 
-Important principle from the spec: previously proposed concepts may be overturned when they conflict with formal requirements or real data. The repository docs therefore capture **current decisions**, not immutable dogma.
+### Giga Embeddings 3B 0826 (source model)
 
-## 2. OpenAI guidance for coding-agent workflow
+https://huggingface.co/ai-sage/Giga-Embeddings-instruct-3B-0826
 
-### OpenAI — Harness engineering: leveraging Codex in an agent-first world
+Russian/English mean-pooled, L2-normalized 2048-dimensional embeddings. Query
+retrieval uses the versioned `giga_portal_support_v1` instruction; documents
+remain plain text.
 
-https://openai.com/index/harness-engineering/
+### Giga Embeddings GGUF (independent runtime artifact)
 
-Used for:
+https://huggingface.co/ai-babai/giga-embeddings-0826-3b-gguf
 
-- treating repository knowledge as first-class infrastructure;
-- keeping `AGENTS.md` concise and navigational instead of one giant manual;
-- storing deeper context in structured versioned docs;
-- plans as first-class artifacts;
-- agents performing implementation, review and testing;
-- self-review and iterative agent-to-agent review;
-- mechanically enforceable architecture where useful.
+The Q8_0 file is an **INDEPENDENT GGUF CONVERSION**, not an official ai-sage
+release. Its exact hash is recorded in `src/knowledge/model-manifest.json`.
 
-### OpenAI — A practical guide to building agents
+### Querit/Querit-4B
 
-https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+https://huggingface.co/Querit/Querit-4B
 
-Used for:
+Custom `AutoModel` multilingual reranker. The adapter consumes the upstream
+`score` output as raw relevance evidence, not a calibrated probability. A
+trusted Q6-class runtime artifact is not yet verified.
 
-- manager/orchestrator pattern;
-- starting with a single controlled agent and adding specialization only where complexity justifies it;
-- explicit tools/instructions/guardrails;
-- human intervention and risk boundaries.
+### Qwen3.8-4B-Distill
 
-The repository applies this primarily to the **product runtime**: one explicit orchestrator rather than a decorative multi-agent swarm.
+https://huggingface.co/empero-ai/Qwen3.8-4B-Distill
 
-### OpenAI — Model behavior / coding guidance for delegation and verification
+### Qwen3.8-4B-Distill-GGUF
 
-https://model-spec.openai.com/
+https://huggingface.co/empero-ai/Qwen3.8-4B-Distill-GGUF
 
-and the current OpenAI coding-agent/model guidance available through OpenAI documentation.
-
-Used for:
-
-- delegating independent subtasks when it improves speed or quality;
-- keeping root-agent responsibility for integration;
-- proportional verification rather than blindly running every test after every small edit;
-- precise subagent task contracts.
-
-### OpenAI — Introducing Codex
-
-https://openai.com/index/introducing-codex/
-
-Used for:
-
-- repository-level `AGENTS.md` instructions;
-- telling coding agents how to navigate, test and follow local conventions;
-- keeping repo instructions close to code and versioned.
-
-## 3. Model / inference sources
-
-### Qwen3-4B-Instruct-2507
-
-https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507
-
-Current starting generator candidate. Final selection is subject to real hardware/quality benchmark.
-
-### Qwen3-Embedding-0.6B
-
-https://huggingface.co/Qwen/Qwen3-Embedding-0.6B
-
-Current starting embedding candidate; supports up to 1024 dimensions. Benchmark on real corpus before claiming superiority.
-
-### BAAI/bge-reranker-v2-m3
-
-https://huggingface.co/BAAI/bge-reranker-v2-m3
-
-Pairwise multilingual reranker candidate. Its raw/sigmoid score is relevance evidence, not automatically a calibrated probability of answer correctness.
-
-### vLLM — Structured Outputs
-
-https://docs.vllm.ai/en/latest/features/structured_outputs/
-
-Used for local serving/structured schema output if hardware/runtime compatibility passes smoke testing. Structured format constrains shape, not truth.
+The Q6_K GGUF is the local generation artifact; recent llama.cpp is required
+for the Qwen3.5/Gated DeltaNet architecture. `<think>` output is private and
+removed before structured parsing.
 
 ### llama.cpp server
 
 https://github.com/ggml-org/llama.cpp/tree/master/tools/server
 
-Single fallback inference runtime if vLLM/model cannot run reliably on provided hardware. Not maintained as a second default serving stack.
+Active local runtime for embedding and generation through internal
+OpenAI-compatible endpoints. No external AI API is used.
 
-## 4. Retrieval / persistence sources
+## Retrieval / persistence sources
 
-### PostgreSQL 16 — Full Text Search controls
+### PostgreSQL 16 Full Text Search
 
 https://www.postgresql.org/docs/16/textsearch-controls.html
-
-Used for lexeme/query construction and PostgreSQL ranking functions. Repository docs intentionally do not call this BM25.
 
 ### PostgreSQL `pg_trgm`
 
 https://www.postgresql.org/docs/current/pgtrgm.html
 
-Used for controlled typo/term similarity support, not as semantic search for entire conversations.
-
 ### pgvector
 
 https://github.com/pgvector/pgvector
 
-Used for initial exact vector retrieval and later optional ANN only when measured. Exact search is preferred at current corpus scale for simplicity and predictable recall.
+Exact vector scan remains the default at the current corpus scale; no HNSW or
+IVFFlat index is assumed.
 
-## 5. Parsing sources
+## Parsing sources
 
 ### pdfplumber
 
 https://github.com/jsvine/pdfplumber
 
-Lightweight baseline for text extraction and table inspection.
-
-### Docling — chunking / document processing
+### Docling
 
 https://docling-project.github.io/docling/concepts/chunking/
 
-Optional structured parsing/chunking enhancement for pages where it measurably improves extraction. Not assumed to solve every PDF automatically.
-
-### PyMuPDF licensing/about
-
-https://pymupdf.readthedocs.io/en/latest/about.html
-
-If introduced, licensing must be considered explicitly rather than added casually.
-
-## 6. Runtime platform
-
-### Node.js releases
-
-https://nodejs.org/en/about/previous-releases
-
-The baseline frontend runtime in September 2026 is Node.js 24 LTS. Pin exact image/runtime in implementation manifests.
-
-### .NET
-
-https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core
-
-Target baseline for `src/support-core`: .NET 10 LTS (support through November 2028). Pin SDK version in `global.json` and the exact `sdk`/`aspnet` image tags in the Dockerfile when scaffold is created.
-
-EF Core + Npgsql: https://www.npgsql.org/efcore/ — used only for `api`-owned tables; no pgvector mapping in .NET.
-
-NSwag: https://github.com/RicoSuter/NSwag — generates the `knowledge` client from FastAPI OpenAPI; generated code stays in `TenderHack.Infrastructure`.
-
-### Python
-
-Target baseline for `src/knowledge`: Python 3.12. Pin the exact patch/minor constraints in `pyproject.toml`/container when scaffold is created.
-
-## 7. Product/hackathon sources
-
-Formal organizer requirements, oral clarifications and supplied data have higher priority than generic technology guidance. They are not duplicated in this repository if distribution restrictions apply.
-
-Repository rule:
-
-> If a mentor/organizer clarification changes a requirement, record the clarification in a non-sensitive repository note/decision where legally allowed, update the relevant source-of-truth docs and add a regression/acceptance check where possible.
-
-## 8. Citation discipline inside the project
-
-For engineering claims:
-
-- prefer primary docs/model cards;
-- distinguish documented capability from our benchmarked result;
-- do not turn vendor claims into measured product facts;
-- record model/runtime/library version/revision used in actual experiments;
-- presentation numbers must come from reproducible eval output, not this planning document.
+Docling/OCR remain targeted options for measured extraction failures only.

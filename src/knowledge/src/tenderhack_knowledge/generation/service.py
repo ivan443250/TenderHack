@@ -10,6 +10,7 @@ from typing import Any
 from tenderhack_knowledge.answerability import assess_answerability
 from tenderhack_knowledge.contracts.v0 import Claim, DraftRequest, DraftResponse, EvidenceSufficiency, TokenUsage
 from tenderhack_knowledge.inference.errors import GeneratorClientError
+from tenderhack_knowledge.inference.safety import strip_reasoning
 from tenderhack_knowledge.inference.prompts import DRAFT_PROMPT_VERSION, build_draft_prompt
 from tenderhack_knowledge.ingestion.models import Corpus, KnowledgeFragment
 from tenderhack_knowledge.ingestion.repository import CorpusBoundaryError, UnknownSnapshotError
@@ -84,8 +85,11 @@ class GroundedDraftService:
         except (TimeoutError, ConnectionError, OSError) as exc:
             raise GeneratorUnavailableError("local generator is unavailable") from exc
         try:
-            grounded = parse_model_output(raw)
-        except ModelOutputError as exc:
+            # Reasoning is private runtime material and is removed before the
+            # structured parser, regardless of which local generator adapter
+            # supplied the text.
+            grounded = parse_model_output(strip_reasoning(raw))
+        except (ModelOutputError, GeneratorClientError) as exc:
             raise GeneratorModelError(str(exc)) from exc
 
         # Verify the internal claims before projecting them. This preserves

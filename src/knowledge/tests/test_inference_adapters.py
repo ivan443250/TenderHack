@@ -205,7 +205,7 @@ def test_inference_config_parses_without_loading_models(monkeypatch: pytest.Monk
     assert settings.embedding_device == "cpu"
     assert settings.embedding_batch_size == 4
     assert settings.generator_timeout_seconds == 2.5
-    assert settings.generator_model_id == "Qwen/Qwen3-4B-Instruct-2507"
+    assert settings.generator_model_id == "empero-ai/Qwen3.8-4B-Distill"
     assert settings.embedding_revision is not None
     assert settings.reranker_revision is not None
     assert settings.generator_revision is not None

@@ -1,0 +1,52 @@
+{
+  "manifest_version": "model-stack-v2",
+  "roles": {
+    "embedding": {
+      "role": "embedding",
+      "source_model_id": "ai-sage/Giga-Embeddings-instruct-3B-0826",
+      "source_revision": "ed7db5c91b900b39381b27b6e9c0a3d31137cd29",
+      "source_license": "MIT",
+      "runtime_repo": "ai-babai/giga-embeddings-0826-3b-gguf",
+      "runtime_file": "giga-embeddings-0826-3b-q8_0.gguf",
+      "runtime_revision": "04c5a2d751ce20908200de2324444a14a81b1d80",
+      "runtime_sha256": "429f2d04a968ffe73137fe65c2e458a08236056168b905d208b4d81ecab08c22",
+      "runtime_size_bytes": 3354067168,
+      "quantization": "Q8_0",
+      "runtime_type": "llama.cpp /v1/embeddings",
+      "embedding_dimension": 2048,
+      "query_instruction_version": "giga_portal_support_v1",
+      "verification_status": "VERIFIED",
+      "provenance_note": "ai-babai is an independent third-party GGUF conversion, not an official ai-sage release."
+    },
+    "reranker": {
+      "role": "reranker",
+      "source_model_id": "Querit/Querit-4B",
+      "source_revision": "e557bb5ce6555f16b33dbb7d2ca62e8d27c14c13",
+      "source_license": "Apache-2.0",
+      "runtime_repo": null,
+      "runtime_file": null,
+      "runtime_revision": null,
+      "runtime_sha256": null,
+      "quantization": null,
+      "runtime_type": "TBD_UNVERIFIED",
+      "embedding_dimension": null,
+      "verification_status": "PARTIALLY_VERIFIED",
+      "unverified_reason": "No trusted Q6-class artifact, hash, or llama.cpp scoring interface has been certified."
+    },
+    "generator": {
+      "role": "generator",
+      "source_model_id": "empero-ai/Qwen3.8-4B-Distill",
+      "source_revision": "c83cb7aa2999d2f35c43e9ae0634a30eb8985a1e",
+      "source_license": "Apache-2.0",
+      "runtime_repo": "empero-ai/Qwen3.8-4B-Distill-GGUF",
+      "runtime_file": "Qwen3.8-4B-Q6_K.gguf",
+      "runtime_revision": "391fc7d103e3942a408def3e4f51c2f85d464417",
+      "runtime_sha256": null,
+      "quantization": "Q6_K",
+      "runtime_type": "llama.cpp /v1/chat/completions",
+      "size_gb_approx": 3.563,
+      "verification_status": "PARTIALLY_VERIFIED",
+      "unverified_reason": "Repository/file/runtime family is identified, but an exact artifact SHA-256 and local structured-output smoke are pending."
+    }
+  }
+}

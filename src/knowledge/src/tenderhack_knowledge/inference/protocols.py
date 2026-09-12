@@ -2,6 +2,8 @@ from typing import Protocol, Sequence
 
 
 class Embedder(Protocol):
+    """Model-neutral embedding boundary (query and document paths differ)."""
+
     async def embed(self, texts: Sequence[str]) -> list[list[float]]: ...
 
     async def embed_query(self, text: str) -> list[float]: ...

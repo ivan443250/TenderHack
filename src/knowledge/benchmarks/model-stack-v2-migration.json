@@ -1,0 +1,100 @@
+{
+  "report_version": "model-stack-v2-migration",
+  "status": "IMPLEMENTED_WITH_CERTIFICATION_GATES",
+  "starting_head": "43c281a",
+  "ending_commit": null,
+  "findings": [
+    {
+      "severity": "MEDIUM",
+      "finding": "The embedding service response could contain missing or duplicate indexes, corrupting batch order.",
+      "resolution": "Giga adapter now requires a unique contiguous index range before sorting."
+    },
+    {
+      "severity": "MEDIUM",
+      "finding": "A malformed local reasoning span could escape the grounded-draft error boundary.",
+      "resolution": "<think> sanitation errors are mapped to the fail-closed generator model error path."
+    },
+    {
+      "severity": "MEDIUM",
+      "finding": "Generic capability smoke assumed every adapter exposed device/dtype metadata and load().",
+      "resolution": "Remote Giga lifecycle and Querit metadata now satisfy the explicit non-contacting smoke contract."
+    }
+  ],
+  "embedding": {
+    "source": "ai-sage/Giga-Embeddings-instruct-3B-0826",
+    "source_revision": "ed7db5c91b900b39381b27b6e9c0a3d31137cd29",
+    "runtime_repo": "ai-babai/giga-embeddings-0826-3b-gguf",
+    "runtime_file": "giga-embeddings-0826-3b-q8_0.gguf",
+    "quant": "Q8_0",
+    "bytes": 3354067168,
+    "sha256": "429f2d04a968ffe73137fe65c2e458a08236056168b905d208b4d81ecab08c22",
+    "runtime_revision": "04c5a2d751ce20908200de2324444a14a81b1d80",
+    "dimension": 2048,
+    "query_instruction_version": "giga_portal_support_v1",
+    "verification_status": "VERIFIED",
+    "third_party_conversion": true
+  },
+  "reranker": {
+    "source": "Querit/Querit-4B",
+    "source_revision": "e557bb5ce6555f16b33dbb7d2ca62e8d27c14c13",
+    "adapter_status": "IMPLEMENTED_CUSTOM_SCORE_INTERFACE",
+    "quant_runtime_status": "TBD_UNVERIFIED",
+    "verified_runtime_artifact": null,
+    "fallback": "exact + PostgreSQL FTS + Giga dense + RRF"
+  },
+  "generator": {
+    "source": "empero-ai/Qwen3.8-4B-Distill",
+    "source_revision": "c83cb7aa2999d2f35c43e9ae0634a30eb8985a1e",
+    "runtime_repo": "empero-ai/Qwen3.8-4B-Distill-GGUF",
+    "runtime_file": "Qwen3.8-4B-Q6_K.gguf",
+    "quant": "Q6_K",
+    "size_gb_approx": 3.563,
+    "runtime_revision": "391fc7d103e3942a408def3e4f51c2f85d464417",
+    "sha256": null,
+    "runtime": "recent llama.cpp /v1/chat/completions",
+    "reasoning_safety": "strip <think> spans; fail closed on malformed or unterminated reasoning",
+    "verification_status": "PARTIALLY_VERIFIED"
+  },
+  "database": {
+    "old_dimension": 1024,
+    "new_dimension": 2048,
+    "migration_revision": "0007_giga_2048_embeddings",
+    "old_vectors_invalidated": true,
+    "source_and_snapshot_data_preserved": true,
+    "runtime_upgrade_test": "PASS: fresh head and 0005 synthetic 1024-row upgrade"
+  },
+  "retrieval_config_versions": [
+    "hybrid-giga2048-rrf-v2",
+    "hybrid-giga2048-rrf-v2-no-reranker",
+    "hybrid-giga2048-rrf-v2-no-dense",
+    "hybrid-giga2048-querit-v2"
+  ],
+  "docs_updated": [
+    "docs/stack.md",
+    "docs/architecture.md",
+    "docs/references.md",
+    "docs/diagrams/architecture-map.html",
+    "docs/diagrams/compose-map.html",
+    "docs/adr/0003-model-stack-v2.md"
+  ],
+  "tests": {
+    "offline_adapter_tests": "PASS",
+    "non_contacting_capability_smoke": "PASS_WITH_LIMITATIONS",
+    "model_manifest_validation": "PASS",
+    "legacy_metadata_rejection": "PASS",
+    "database_upgrade": "PASS: fresh head and 0005 synthetic 1024-row upgrade",
+    "real_model_certification": "NOT_STARTED_BY_SCOPE"
+  },
+  "unverified_items": [
+    "Querit Q6 runtime artifact, hash and llama.cpp-compatible scoring path",
+    "Qwen3.8 GGUF exact SHA-256",
+    "real Giga 3899/3899 backfill and B1/B2 retrieval measurements",
+    "structured generation smoke, latency and memory on target hardware"
+  ],
+  "limitations": [
+    "No real model download, full backfill or certification benchmark was run in this migration.",
+    "Historical K0-K6 metrics remain historical and are not V2 results.",
+    "The migration requires pgvector and a disposable upgrade test before production use."
+  ],
+  "next_task": "MODEL STACK V2 REAL CERTIFICATION: real Giga Q8_0 backfill 3899/3899; B1/B2 evaluation; Querit B3 if runtime verified; Qwen3.8 structured generation smoke; latency; memory; offline smoke"
+}

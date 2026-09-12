@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from tenderhack_knowledge.contracts.v0 import Candidate, CandidateScores, RetrieveRequest
-from tenderhack_knowledge.inference.embedding import Qwen3EmbeddingAdapter
+from tenderhack_knowledge.inference.giga import GigaEmbeddingAdapter
 from tenderhack_knowledge.inference.errors import (
     AdapterOutputError,
     EmbeddingRevisionMismatchError,
@@ -21,12 +21,12 @@ from tenderhack_knowledge.inference.errors import (
     RerankerUnavailableError,
 )
 from tenderhack_knowledge.inference.model_refs import (
+    EMBEDDING_DIMENSION,
     EMBEDDING_MODEL_ID,
     EMBEDDING_REVISION,
     RERANKER_MODEL_ID,
     RERANKER_REVISION,
 )
-from tenderhack_knowledge.inference.reranker import BgeRerankerAdapter
 from tenderhack_knowledge.persistence.repository import PostgresKnowledgeRepository
 
 from .service import LexicalRetriever
@@ -58,10 +58,10 @@ class HybridRetrievalResult:
 class HybridRetriever:
     """Fuse exact, PostgreSQL FTS and pgvector results deterministically."""
 
-    config_version = "hybrid-rrf-v1"
-    no_dense_config_version = "hybrid-rrf-v1-no-dense"
-    rrf_only_config_version = "hybrid-rrf-v1-rrf-only"
-    no_reranker_config_version = "hybrid-rrf-v1-no-reranker"
+    config_version = "hybrid-giga2048-querit-v2"
+    no_dense_config_version = "hybrid-giga2048-rrf-v2-no-dense"
+    rrf_only_config_version = "hybrid-giga2048-rrf-v2"
+    no_reranker_config_version = "hybrid-giga2048-rrf-v2-no-reranker"
 
     def __init__(
         self,
@@ -177,7 +177,7 @@ class HybridRetriever:
         if embedder is None:
             # Request handling must never trigger a network download.  The
             # explicit backfill/smoke commands are the only download edges.
-            embedder = Qwen3EmbeddingAdapter(local_files_only=True)
+            embedder = GigaEmbeddingAdapter()
             self.embedder = embedder
         _check_embedding_metadata(embedder)
         method = getattr(embedder, "embed_query", None)
@@ -201,7 +201,7 @@ class HybridRetriever:
                 vector,
                 model_id=EMBEDDING_MODEL_ID,
                 model_revision=EMBEDDING_REVISION,
-                dimension=1024,
+                dimension=EMBEDDING_DIMENSION,
                 limit=limit,
             )
         raise EmbeddingUnavailableError(str(last_error or "embedding failed")) from last_error
@@ -209,8 +209,9 @@ class HybridRetriever:
     async def _rerank(self, query: str, records: Sequence[HybridRecord]) -> tuple[HybridRecord, ...]:
         reranker = self.reranker
         if reranker is None:
-            reranker = BgeRerankerAdapter(local_files_only=True)
-            self.reranker = reranker
+            raise RerankerUnavailableError(
+                "Querit runtime artifact is not certified; use the explicit adapter only when enabled"
+            )
         if getattr(reranker, "model_id", RERANKER_MODEL_ID) != RERANKER_MODEL_ID:
             raise RerankerUnavailableError("unexpected reranker model_id")
         if getattr(reranker, "revision", RERANKER_REVISION) != RERANKER_REVISION:
@@ -341,19 +342,19 @@ def _merge_scores(left: Candidate, right: Candidate) -> Candidate:
 def _check_embedding_metadata(adapter: object) -> None:
     model_id = getattr(adapter, "model_id", EMBEDDING_MODEL_ID)
     revision = getattr(adapter, "revision", EMBEDDING_REVISION)
-    dimension = getattr(adapter, "dimension", 1024)
+    dimension = getattr(adapter, "dimension", EMBEDDING_DIMENSION)
     if model_id != EMBEDDING_MODEL_ID or revision != EMBEDDING_REVISION:
         raise EmbeddingRevisionMismatchError(
             f"embedding model_revision metadata {(model_id, revision)} does not match "
             f"{(EMBEDDING_MODEL_ID, EMBEDDING_REVISION)}"
         )
-    if int(dimension) != 1024:
-        raise AdapterOutputError(f"embedding dimension {dimension}; expected 1024")
+    if int(dimension) != EMBEDDING_DIMENSION:
+        raise AdapterOutputError(f"embedding dimension {dimension}; expected {EMBEDDING_DIMENSION}")
 
 
 def _validate_query_vector(vector: object) -> None:
-    if not isinstance(vector, (list, tuple)) or len(vector) != 1024:
-        raise AdapterOutputError("query embedding must contain exactly 1024 values")
+    if not isinstance(vector, (list, tuple)) or len(vector) != EMBEDDING_DIMENSION:
+        raise AdapterOutputError(f"query embedding must contain exactly {EMBEDDING_DIMENSION} values")
     try:
         if any(not math.isfinite(float(value)) for value in vector):
             raise AdapterOutputError("query embedding contains a non-finite value")

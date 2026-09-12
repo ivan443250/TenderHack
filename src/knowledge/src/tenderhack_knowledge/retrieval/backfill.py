@@ -13,9 +13,9 @@ import json
 import os
 from collections.abc import Sequence
 
-from tenderhack_knowledge.inference.embedding import Qwen3EmbeddingAdapter
+from tenderhack_knowledge.inference.giga import GigaEmbeddingAdapter
 from tenderhack_knowledge.inference.errors import EmbeddingRevisionMismatchError
-from tenderhack_knowledge.inference.model_refs import EMBEDDING_MODEL_ID, EMBEDDING_REVISION
+from tenderhack_knowledge.inference.model_refs import EMBEDDING_DIMENSION, EMBEDDING_MODEL_ID, EMBEDDING_REVISION
 from tenderhack_knowledge.persistence.db import create_engine
 from tenderhack_knowledge.persistence.repository import PostgresKnowledgeRepository
 
@@ -30,13 +30,13 @@ async def backfill(
     if batch_size < 1:
         raise ValueError("batch_size must be positive")
     fragments = await repository.snapshot_fragments(snapshot_id)
-    embedder = adapter if adapter is not None else Qwen3EmbeddingAdapter(batch_size=batch_size, local_files_only=True)
+    embedder = adapter if adapter is not None else GigaEmbeddingAdapter()
     if (
         getattr(embedder, "model_id", EMBEDDING_MODEL_ID) != EMBEDDING_MODEL_ID
         or getattr(embedder, "revision", EMBEDDING_REVISION) != EMBEDDING_REVISION
-        or int(getattr(embedder, "dimension", 1024)) != 1024
+        or int(getattr(embedder, "dimension", EMBEDDING_DIMENSION)) != EMBEDDING_DIMENSION
     ):
-        raise EmbeddingRevisionMismatchError("backfill adapter metadata does not match pinned Qwen3 model")
+        raise EmbeddingRevisionMismatchError("backfill adapter metadata does not match pinned Giga model")
     encode_documents = getattr(embedder, "embed_documents", None)
     if not callable(encode_documents):
         encode_documents = getattr(embedder, "embed", None)
@@ -54,14 +54,14 @@ async def backfill(
             {fragment.fragment_id: vector for fragment, vector in zip(batch, vectors, strict=True)},
             model_id=EMBEDDING_MODEL_ID,
             model_revision=EMBEDDING_REVISION,
-            dimension=1024,
+            dimension=EMBEDDING_DIMENSION,
         )
         total += len(batch)
     stats = await repository.embedding_stats(
         snapshot_id,
         model_id=EMBEDDING_MODEL_ID,
         model_revision=EMBEDDING_REVISION,
-        dimension=1024,
+        dimension=EMBEDDING_DIMENSION,
     )
     expected = len(fragments)
     if (
@@ -76,7 +76,7 @@ async def backfill(
         "snapshot_id": snapshot_id,
         "model_id": EMBEDDING_MODEL_ID,
         "model_revision": EMBEDDING_REVISION,
-        "dimension": 1024,
+        "dimension": EMBEDDING_DIMENSION,
         "fragments_processed": total,
         "verification": stats,
     }
@@ -87,11 +87,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--snapshot-id", required=True)
     parser.add_argument("--database-url", default=os.getenv("DATABASE_URL", ""))
     parser.add_argument("--batch-size", type=int, default=8)
-    parser.add_argument(
-        "--allow-model-download",
-        action="store_true",
-        help="allow Hugging Face to download the pinned model (default: local cache only)",
-    )
+    parser.add_argument("--base-url", default=os.getenv("KNOWLEDGE_EMBEDDING_BASE_URL", "http://embedding-inference:8080"))
+    parser.add_argument("--timeout-seconds", type=float, default=10.0)
     args = parser.parse_args(argv)
     if not args.database_url:
         raise SystemExit("--database-url or DATABASE_URL is required")
@@ -103,9 +100,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise SystemExit("database is not configured")
     async def _run() -> dict[str, object]:
         try:
-            adapter = Qwen3EmbeddingAdapter(
-                batch_size=args.batch_size, local_files_only=not args.allow_model_download
-            )
+            adapter = GigaEmbeddingAdapter(base_url=args.base_url, timeout_seconds=args.timeout_seconds)
             return await backfill(
                 PostgresKnowledgeRepository(engine), args.snapshot_id, adapter=adapter, batch_size=args.batch_size
             )

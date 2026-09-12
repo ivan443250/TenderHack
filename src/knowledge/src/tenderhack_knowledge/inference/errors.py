@@ -30,4 +30,4 @@ class RerankerUnavailableError(InferenceAdapterError):
 
 
 class GeneratorClientError(InferenceAdapterError):
-    """Raised for transport failures or malformed vLLM responses."""
+    """Raised for transport failures or malformed local-runtime responses."""

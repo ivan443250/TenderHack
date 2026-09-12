@@ -35,7 +35,9 @@ from tenderhack_knowledge.answerability import assess_answerability
 from tenderhack_knowledge.generation import create_grounded_draft
 from tenderhack_knowledge.generation.service import GeneratorModelError, GeneratorUnavailableError
 from tenderhack_knowledge.inference.config import InferenceSettings
-from tenderhack_knowledge.inference.generator import VllmGeneratorClient
+from tenderhack_knowledge.inference.giga import GigaEmbeddingAdapter
+from tenderhack_knowledge.inference.generator import LocalOpenAIChatGenerator
+from tenderhack_knowledge.inference.querit import QueritRerankerAdapter
 from tenderhack_knowledge.ingestion.ids import normalize_source_name
 from tenderhack_knowledge.ingestion.repository import CorpusBoundaryError, UnknownFragmentError, UnknownSnapshotError
 from tenderhack_knowledge.persistence.db import create_engine
@@ -54,16 +56,18 @@ def get_knowledge_repository() -> PostgresKnowledgeRepository | None:
     return PostgresKnowledgeRepository(engine) if engine is not None else None
 
 
-def get_generator() -> VllmGeneratorClient:
+def get_generator() -> LocalOpenAIChatGenerator:
     """Create the lazy local generator client without loading model weights."""
 
     settings = InferenceSettings.from_env()
-    return VllmGeneratorClient(
-        base_url=settings.vllm_base_url,
+    return LocalOpenAIChatGenerator(
+        base_url=settings.generator_base_url,
         model_id=settings.generator_model_id,
         revision=settings.generator_revision,
         timeout_seconds=settings.generator_timeout_seconds,
         temperature=settings.generator_temperature,
+        top_p=settings.generator_top_p,
+        top_k=settings.generator_top_k,
         max_tokens=settings.generator_max_tokens,
     )
 
@@ -169,7 +173,25 @@ async def retrieve(
     exact_codes = list(dict.fromkeys([*payload.exact_codes, *understanding.exact_codes]))
     request = payload.model_copy(update={"exact_codes": exact_codes})
     try:
-        result = await HybridRetriever(repository).retrieve(request, final_limit=10)
+        settings = InferenceSettings.from_env()
+        embedder = GigaEmbeddingAdapter(
+            base_url=settings.embedding_base_url,
+            model_id=settings.embedding_model_id,
+            revision=settings.embedding_revision,
+        )
+        reranker = (
+            QueritRerankerAdapter(
+                model_id=settings.reranker_model_id,
+                revision=settings.reranker_revision,
+                device=settings.reranker_device,
+                batch_size=settings.reranker_batch_size,
+                max_length=settings.reranker_max_length,
+                local_files_only=True,
+            )
+            if settings.reranker_enabled
+            else None
+        )
+        result = await HybridRetriever(repository, embedder=embedder, reranker=reranker).retrieve(request, final_limit=10)
     except UnknownSnapshotError as exc:
         from tenderhack_knowledge.contracts.v0 import ErrorCode
 

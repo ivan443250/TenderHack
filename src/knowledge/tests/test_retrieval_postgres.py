@@ -9,7 +9,7 @@ from tenderhack_knowledge.api import routes
 from tenderhack_knowledge.contracts.v0 import Corpus, RetrieveRequest
 from tenderhack_knowledge.ingestion.repository import UnknownSnapshotError
 from tenderhack_knowledge.inference.errors import EmbeddingRevisionMismatchError
-from tenderhack_knowledge.inference.model_refs import EMBEDDING_MODEL_ID, EMBEDDING_REVISION
+from tenderhack_knowledge.inference.model_refs import EMBEDDING_DIMENSION, EMBEDDING_MODEL_ID, EMBEDDING_REVISION
 from tenderhack_knowledge.main import app
 from tenderhack_knowledge.persistence.repository import PostgresKnowledgeRepository
 from tenderhack_knowledge.retrieval import LexicalRetriever
@@ -85,7 +85,7 @@ async def test_real_postgres_dense_embedding_metadata_and_snapshot_boundaries() 
         repository = PostgresKnowledgeRepository(engine)
         fragments = await repository.snapshot_fragments(SNAPSHOT_ID)
         fragment_id = fragments[0].fragment_id
-        vector = [0.001] * 1024
+        vector = [1 / (EMBEDDING_DIMENSION**0.5)] * EMBEDDING_DIMENSION
         await repository.store_embeddings(
             SNAPSHOT_ID,
             {fragment_id: vector},
@@ -150,7 +150,12 @@ def test_real_retrieve_endpoint_uses_hybrid_engine(monkeypatch) -> None:
         assert response.status_code == 200, response.text
         payload = response.json()
         assert payload["snapshot_id"] == SNAPSHOT_ID
-        assert payload["retrieval_config_version"] in {"hybrid-rrf-v1", "hybrid-rrf-v1-no-dense", "hybrid-rrf-v1-no-reranker"}
+        assert payload["retrieval_config_version"] in {
+            "hybrid-giga2048-querit-v2",
+            "hybrid-giga2048-rrf-v2",
+            "hybrid-giga2048-rrf-v2-no-dense",
+            "hybrid-giga2048-rrf-v2-no-reranker",
+        }
         assert payload["candidates"]
         assert missing.status_code == 404
         assert missing.json()["code"] == "UNKNOWN_SNAPSHOT"
