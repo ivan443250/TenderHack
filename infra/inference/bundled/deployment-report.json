@@ -1,0 +1,107 @@
+{
+  "report_version": "portable-bundled-gpu",
+  "starting_head": "588c013",
+  "status": "READY_FOR_A100_SMOKE",
+  "runtime_image": "ghcr.io/ggml-org/llama.cpp:server-cuda13-b10902@sha256:3a88f3dba5f665c0dcb51f68ec990293758ac518b433556013a2e849694c8cd8",
+  "models": {
+    "giga": {
+      "filename": "giga-embeddings-0826-3b-q8_0.gguf",
+      "repository": "ai-babai/giga-embeddings-0826-3b-gguf",
+      "revision": "04c5a2d751ce20908200de2324444a14a81b1d80",
+      "size_bytes": 3354067168,
+      "sha256": "429f2d04a968ffe73137fe65c2e458a08236056168b905d208b4d81ecab08c22",
+      "verified": true
+    },
+    "qwen": {
+      "filename": "Qwen3.8-4B-Q6_K.gguf",
+      "repository": "empero-ai/Qwen3.8-4B-Distill-GGUF",
+      "revision": "391fc7d103e3942a408def3e4f51c2f85d464417",
+      "size_bytes": 3563027744,
+      "sha256": "529393d9f7859122da727a8b662ea063127fb4320af8f58496a794b9bbf46e65"
+    },
+    "querit": {
+      "status": "UNVERIFIED",
+      "filename": null
+    }
+  },
+  "image": {
+    "platform": "linux/amd64",
+    "tag": "tenderhack-inference-bundled:588c013",
+    "digest": "sha256:e0e03db0d97d2973f8d2068e6d783efe1de2acd078f9d329f0fa6a507ca52a5d",
+    "size_bytes_local": 8656313123,
+    "models_baked_in": true,
+    "volume_instruction": false
+  },
+  "port": 8080,
+  "internal_ports": {
+    "giga": "127.0.0.1:8081",
+    "qwen": "127.0.0.1:8082"
+  },
+  "uid": 1000,
+  "gid": 1000,
+  "cloud_independent": true,
+  "runtime_dependencies": [
+    "Docker/OCI-compatible runtime",
+    "NVIDIA GPU runtime for CUDA acceleration"
+  ],
+  "external_ai_api_required": false,
+  "object_storage_required": false,
+  "cloudru_required": false,
+  "runtime_downloads_required": false,
+  "generic_run": "docker run --rm --gpus all --publish 8080:8080 --name tenderhack-inference tenderhack-inference-bundled:<git-sha>",
+  "cloudru_target": {
+    "image": "tenderhack.cr.cloud.ru/tenderhack-inference-bundled:<git-sha>",
+    "gpu": "NVIDIA A100 80 GB",
+    "container_port": 8080,
+    "models_volume_required": false
+  },
+  "push": {
+    "git": "NOT_EXECUTED",
+    "docker": "NOT_EXECUTED_BY_PROJECT_NO-PUSH_RULE",
+    "prepared_command": "docker push tenderhack.cr.cloud.ru/tenderhack-inference-bundled:<git-sha>"
+  },
+  "tests": [
+    {
+      "name": "gateway_unit",
+      "status": "PASS",
+      "detail": "6 tests passed with fake upstream providers"
+    },
+    {
+      "name": "docker_buildx_check",
+      "status": "PASS",
+      "detail": "linux/amd64 Dockerfile check completed with no warnings"
+    },
+    {
+      "name": "docker_build_linux_amd64",
+      "status": "PASS",
+      "detail": "docker buildx build --platform linux/amd64 --load completed"
+    },
+    {
+      "name": "build_time_model_verification",
+      "status": "PASS",
+      "detail": "Giga frozen SHA and manifest-recorded Qwen SHA verified during build"
+    },
+    {
+      "name": "image_static_inspection",
+      "status": "PASS",
+      "detail": "UID/GID, ports, no volumes, model presence and llama-server version verified"
+    },
+    {
+      "name": "a100_runtime_smoke",
+      "status": "NOT_RUN",
+      "detail": "Requires the next task on an NVIDIA A100; no CUDA inference was attempted locally"
+    },
+    {
+      "name": "git_model_tracking",
+      "status": "PASS",
+      "detail": "GGUF files are ignored and git ls-files '*.gguf' is empty"
+    }
+  ],
+  "high_findings": [],
+  "medium_findings": [],
+  "limitations": [
+    "A100 readiness and real embedding/chat smoke remain to be executed on a GPU host.",
+    "No compressed registry size or remote digest exists because Docker push was not executed."
+  ],
+  "next_task": "RUN BUNDLED IMAGE ON A100 + REAL SMOKE"
+}

@@ -1,0 +1,13 @@
+# The bundled build context is infra/inference. Keep transfer limited to the
+# portable profile, its model files, and the two already-reviewed runtime
+# helpers reused from the Cloud.ru profile.
+**
+!bundled/
+!bundled/**
+!cloudru/
+!cloudru/gateway/
+!cloudru/gateway/app.py
+!cloudru/entrypoint.sh
+!cloudru/scripts/
+!cloudru/scripts/verify-models.sh
+!cloudru/scripts/smoke.sh

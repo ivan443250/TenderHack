@@ -1,0 +1,25 @@
+﻿{
+    "schema":  1,
+    "models":  {
+                   "giga":  {
+                                "file":  "giga-embeddings-0826-3b-q8_0.gguf",
+                                "repository":  "ai-babai/giga-embeddings-0826-3b-gguf",
+                                "revision":  "04c5a2d751ce20908200de2324444a14a81b1d80",
+                                "sha256":  "429f2d04a968ffe73137fe65c2e458a08236056168b905d208b4d81ecab08c22",
+                                "expected_sha256":  "429f2d04a968ffe73137fe65c2e458a08236056168b905d208b4d81ecab08c22",
+                                "size_bytes":  3354067168
+                            },
+                   "qwen":  {
+                                "file":  "Qwen3.8-4B-Q6_K.gguf",
+                                "repository":  "empero-ai/Qwen3.8-4B-Distill-GGUF",
+                                "revision":  "391fc7d103e3942a408def3e4f51c2f85d464417",
+                                "sha256":  "529393d9f7859122da727a8b662ea063127fb4320af8f58496a794b9bbf46e65",
+                                "expected_sha256":  null,
+                                "size_bytes":  3563027744
+                            },
+                   "querit":  {
+                                  "status":  "UNVERIFIED",
+                                  "file":  null
+                              }
+               }
+}

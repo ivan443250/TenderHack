@@ -1,0 +1,5 @@
+# Model weights are intentionally baked into local images but never tracked.
+*.gguf
+*.gguf.partial
+*.safetensors
+*.bin
