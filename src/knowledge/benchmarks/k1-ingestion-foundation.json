@@ -1,0 +1,73 @@
+{
+  "status": "FOUNDATION_COMPLETE",
+  "captured_on": "2026-09-12",
+  "implemented_stages": [
+    "document inventory with Unicode-safe filename/reference handling",
+    "content SHA-256 registration and deterministic document-version identity",
+    "pdfplumber baseline page/text/table extraction",
+    "page-level extraction warnings and suspicious/empty quality flags",
+    "conservative heading/procedure/table-row structure recovery",
+    "semantic fragment construction with parent heading and table-header context",
+    "deterministic fragment IDs and source anchors",
+    "knowledge-owned in-memory SourceRepository/SourceResolver boundary",
+    "immutable snapshot manifests with corpus boundary checks",
+    "Alembic knowledge-owned persistence migration"
+  ],
+  "test_fixture_coverage": [
+    "technical multi-page PDF generated in tests",
+    "Unicode/Russian filename and text",
+    "heading and paragraph preservation",
+    "procedure-step classification",
+    "ruled table with repeated headers in table-row fragments",
+    "page/bbox source anchor",
+    "empty-page quality flag",
+    "deterministic source-button fragment -> version -> page/source resolution",
+    "duplicate same-page text with distinct bboxes",
+    "Windows/Posix source-reference normalization",
+    "long condition kept as one semantic fragment",
+    "corrupted PDF rejection and missing-bbox tolerance"
+  ],
+  "known_parser_limitations": [
+    "pdfplumber is a text-PDF baseline; OCR and universal scanned-page recovery are intentionally not implemented",
+    "heading and semantic-kind detection uses conservative heuristics and requires review for complex documents",
+    "table extraction depends on PDF geometry and may emit TABLE_STRUCTURE_WARNING for incomplete cells",
+    "embedding-token counts are an approximate character-based planning estimate until a tokenizer benchmark exists",
+    "cross-page fragments are not merged; page provenance remains exact",
+    "real organizer corpus was not ingested"
+  ],
+  "schema_migrations": {
+    "tool": "Alembic",
+    "migration": "0002_ingestion_provenance",
+    "knowledge_owned_tables": [
+      "kb_documents",
+      "kb_document_versions",
+    "kb_snapshots",
+    "kb_snapshot_document_versions",
+    "kb_fragments",
+    "kb_snapshot_fragments",
+    "kb_ingestion_runs"
+    ],
+    "vector_or_fts_index_added": false,
+    "api_owned_tables_touched": false
+  },
+  "source_resolution_result": {
+    "status": "PASS",
+    "boundary": "SourceResolver.resolve(fragment_id, snapshot_id?)",
+    "returns": "original filename/reference, document version, page range, section, canonical text and source anchor"
+  },
+  "snapshot_semantics": {
+    "id_strategy": "snapshot ID is a hash of corpus plus sorted document-version IDs",
+    "manifest_exact_document_versions": true,
+    "snapshot_fragment_membership_is_associative": true,
+    "unchanged_ingestion_is_idempotent": true,
+    "old_snapshot_content_is_mutated": false,
+    "historical_can_publish_as_normative": false
+  },
+  "identifier_strategy": {
+    "document": "stable Unicode-normalized logical filename identity; filesystem path is provenance only",
+    "document_version": "hash of document identity, content SHA-256 and declared version/date",
+    "fragment": "hash of document version, page/anchor, section and canonical text hash",
+    "random_uuid_as_sole_provenance_identity": false
+  },
+  "real_corpus_ingested": false
+}

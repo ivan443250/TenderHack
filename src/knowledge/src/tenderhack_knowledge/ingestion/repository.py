@@ -1,0 +1,186 @@
+"""Knowledge-owned source repository and immutable snapshot boundary."""
+
+from __future__ import annotations
+
+from collections.abc import Iterable
+from datetime import datetime, timezone
+from typing import Protocol
+
+from .ids import make_snapshot_id
+from .models import (
+    Document,
+    DocumentVersion,
+    IngestionRun,
+    KnowledgeFragment,
+    KnowledgeSnapshot,
+    SourceResolution,
+)
+
+
+class SourceRepository(Protocol):
+    def resolve_source(self, fragment_id: str, snapshot_id: str | None = None) -> SourceResolution: ...
+
+
+class SourceResolutionError(LookupError):
+    """Base error for source/snapshot resolution failures."""
+
+
+class UnknownFragmentError(SourceResolutionError):
+    pass
+
+
+class UnknownSnapshotError(SourceResolutionError):
+    pass
+
+
+class CorpusBoundaryError(ValueError):
+    """Raised when normative and historical corpora are mixed."""
+
+
+class InMemoryKnowledgeRepository(SourceRepository):
+    """Deterministic repository used by ingestion tests and local tooling.
+
+    It mirrors the persistence boundary without opening a database. Canonical
+    fragments stay snapshot-neutral; every published snapshot receives an
+    immutable projection with its own snapshot ID.
+    """
+
+    def __init__(self) -> None:
+        self._documents: dict[str, Document] = {}
+        self._versions: dict[str, DocumentVersion] = {}
+        self._version_corpora: dict[str, str] = {}
+        self._fragments: dict[str, KnowledgeFragment] = {}
+        self._fragments_by_version: dict[str, tuple[str, ...]] = {}
+        self._snapshots: dict[str, KnowledgeSnapshot] = {}
+        self._snapshot_fragments: dict[str, dict[str, KnowledgeFragment]] = {}
+        self._runs: dict[str, IngestionRun] = {}
+
+    def register_document(self, document: Document) -> Document:
+        existing = self._documents.get(document.document_id)
+        if existing is None:
+            self._documents[document.document_id] = document
+            return document
+        if existing.corpus != document.corpus or existing.original_filename != document.original_filename:
+            raise ValueError(f"document identity collision for {document.document_id}")
+        return existing
+
+    def store_version(
+        self,
+        version: DocumentVersion,
+        fragments: Iterable[KnowledgeFragment],
+        run: IngestionRun,
+    ) -> tuple[DocumentVersion, tuple[KnowledgeFragment, ...], IngestionRun, bool]:
+        existing = self._versions.get(version.document_version_id)
+        if existing is not None:
+            if existing.content_sha256 != version.content_sha256:
+                raise ValueError(f"document version collision for {version.document_version_id}")
+            ids = self._fragments_by_version.get(version.document_version_id, ())
+            return (
+                existing,
+                tuple(self._fragments[fragment_id] for fragment_id in ids),
+                self._runs[run.run_id],
+                True,
+            )
+        fragment_values = tuple(fragments)
+        if any(fragment.document_version_id != version.document_version_id for fragment in fragment_values):
+            raise ValueError("fragment belongs to a different document version")
+        self._versions[version.document_version_id] = version
+        self._version_corpora[version.document_version_id] = self._documents[version.document_id].corpus.value
+        ids: list[str] = []
+        for fragment in fragment_values:
+            if fragment.fragment_id in self._fragments and self._fragments[fragment.fragment_id] != fragment:
+                raise ValueError(f"fragment identity collision for {fragment.fragment_id}")
+            self._fragments[fragment.fragment_id] = fragment
+            ids.append(fragment.fragment_id)
+        self._fragments_by_version[version.document_version_id] = tuple(ids)
+        self._runs[run.run_id] = run
+        return version, fragment_values, run, False
+
+    def publish_snapshot(self, document_version_ids: Iterable[str], corpus: str | object) -> KnowledgeSnapshot:
+        corpus_value = getattr(corpus, "value", corpus)
+        corpus_value = str(corpus_value)
+        version_ids = tuple(sorted(set(document_version_ids)))
+        for version_id in version_ids:
+            if version_id not in self._versions:
+                raise UnknownSnapshotError(f"unknown document version {version_id}")
+            if self._version_corpora[version_id] != corpus_value:
+                raise CorpusBoundaryError(
+                    f"cannot publish {self._version_corpora[version_id]} document version in {corpus_value} snapshot"
+                )
+        snapshot_id, manifest_hash = make_snapshot_id(corpus_value, version_ids)
+        existing = self._snapshots.get(snapshot_id)
+        if existing is not None:
+            return existing
+        snapshot = KnowledgeSnapshot(
+            snapshot_id=snapshot_id,
+            corpus=corpus_value,
+            document_version_ids=version_ids,
+            manifest_hash=manifest_hash,
+            created_at=datetime.now(timezone.utc),
+            review_status="PENDING_REVIEW",
+        )
+        projections: dict[str, KnowledgeFragment] = {}
+        for version_id in version_ids:
+            for fragment_id in self._fragments_by_version.get(version_id, ()):
+                fragment = self._fragments[fragment_id]
+                projections[fragment_id] = fragment.model_copy(update={"snapshot_id": snapshot_id})
+        self._snapshots[snapshot_id] = snapshot
+        self._snapshot_fragments[snapshot_id] = projections
+        return snapshot
+
+    def snapshot_fragments(self, snapshot_id: str) -> tuple[KnowledgeFragment, ...]:
+        try:
+            values = self._snapshot_fragments[snapshot_id]
+        except KeyError as exc:
+            raise UnknownSnapshotError(snapshot_id) from exc
+        return tuple(values.values())
+
+    def get_document(self, document_id: str) -> Document | None:
+        return self._documents.get(document_id)
+
+    def get_version(self, document_version_id: str) -> DocumentVersion | None:
+        return self._versions.get(document_version_id)
+
+    def get_run(self, run_id: str) -> IngestionRun | None:
+        return self._runs.get(run_id)
+
+    def get_snapshot(self, snapshot_id: str) -> KnowledgeSnapshot | None:
+        return self._snapshots.get(snapshot_id)
+
+    def resolve_source(self, fragment_id: str, snapshot_id: str | None = None) -> SourceResolution:
+        if snapshot_id is None:
+            fragment = self._fragments.get(fragment_id)
+        else:
+            if snapshot_id not in self._snapshots:
+                raise UnknownSnapshotError(snapshot_id)
+            fragment = self._snapshot_fragments[snapshot_id].get(fragment_id)
+        if fragment is None:
+            raise UnknownFragmentError(fragment_id)
+        version = self._versions[fragment.document_version_id]
+        document = self._documents[version.document_id]
+        return SourceResolution(
+            fragment_id=fragment.fragment_id,
+            document_id=document.document_id,
+            document_version_id=version.document_version_id,
+            original_filename=document.original_filename,
+            source_reference=version.source_reference,
+            snapshot_id=fragment.snapshot_id,
+            page_start=fragment.page_start,
+            page_end=fragment.page_end,
+            section=fragment.section,
+            kind=fragment.kind,
+            heading_path=fragment.heading_path,
+            text=fragment.text,
+            source_anchor=fragment.source_anchor,
+            review_status=fragment.review_status,
+        )
+
+
+class SourceResolver:
+    """Future HTTP source endpoint boundary backed by a repository."""
+
+    def __init__(self, repository: SourceRepository) -> None:
+        self.repository = repository
+
+    def resolve(self, fragment_id: str, snapshot_id: str | None = None) -> SourceResolution:
+        return self.repository.resolve_source(fragment_id, snapshot_id)
