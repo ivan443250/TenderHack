@@ -14,23 +14,23 @@ Two backend runtimes with one PostgreSQL, per `adr/0001-dotnet-support-core-pyth
 | Python package manager | uv |
 | Persistence | PostgreSQL 16; EF Core migrations for `api` tables, Alembic + SQLAlchemy 2 + asyncpg for `knowledge` tables |
 | Retrieval | PostgreSQL FTS + pg_trgm + pgvector (used by `knowledge` only) |
-| Inter-service contract | FastAPI OpenAPI → NSwag-generated C# client; contract `v0` frozen in first hour |
+| Inter-service contract | frozen internal HTTP `v0`; FastAPI/OpenAPI boundary → C# client/mapping in Infrastructure |
 | PDF parsing | pdfplumber baseline; Docling/OCR only for measured failures |
 | Embeddings | ai-sage/Giga-Embeddings-instruct-3B-0826; 2048 normalized dimensions |
-| Reranking | Querit/Querit-4B; custom adapter, quantized runtime TBD until certified |
+| Reranking | Querit/Querit-4B; custom adapter, quantized/runtime path gated until certified |
 | Generation | empero-ai/Qwen3.8-4B-Distill, Qwen3.8-4B-Q6_K.gguf |
-| Inference | recent llama.cpp OpenAI-compatible local endpoints; profiles are separate |
+| Inference | recent llama.cpp provider family; embedding/generator endpoints/profiles are internal |
 | Background jobs | one worker per runtime, PostgreSQL-backed job tables/outbox |
 | Deployment | Docker Compose on Linux, local volumes, reverse proxy if needed |
 
-These model choices are starting hypotheses. Hardware and quality gates may replace a model/runtime, but not silently.
+Model choices above are **accepted selections** (ADR-0003), not completed certification. Hardware/runtime/quality gates may change an artifact/runtime only through the documented decision process; selection alone is not a benchmark result.
 
 ## 2. Why two runtimes
 
-The previous reviewed spec chose a single Python modular monolith to avoid duplicated contracts, network failure modes and two migration systems. That reasoning is still valid; the split is accepted because the team's backend/integration engineer is materially faster in C#, and the `execution-plan.md §2` role split (backend vs ML/data) already draws the same line. The cost is paid consciously and mitigated by the rules in ADR-0001 §3:
+The previous reviewed spec chose a single Python modular monolith to avoid duplicated contracts, network failure modes and two migration systems. That reasoning is still valid; the split is accepted because the team's backend/integration engineer is materially faster in C#, and the `execution-plan.md §2` role split draws the same line. The cost is paid consciously and mitigated by ADR-0001:
 
 - one orchestrator, in .NET; Python returns facts/scores, never decisions;
-- contract `v0` frozen early, stubs first, C# client generated, not hand-written;
+- frozen contract `v0`, generated/mapped boundary client, not hand-written domain coupling;
 - strict table ownership; no cross-runtime reads at all — analytics facts are pushed `api → knowledge` as payloads;
 - `knowledge` unavailability is its own failure category.
 
@@ -43,25 +43,24 @@ Neither runtime is a general-purpose «backend» for the other: `api` never touc
 ASP.NET Core Minimal API
 EF Core 10 + Npgsql.EntityFrameworkCore.PostgreSQL
 Microsoft.Extensions.Hosting (BackgroundService) for api-worker
-NSwag (client generation from knowledge OpenAPI, build-time or checked-in generated file)
-System.Text.Json (source-generated where cheap)
-Microsoft.Extensions.Http.Resilience (per-stage timeouts/retries towards knowledge)
+NSwag/generated boundary client where the contract generation path is used
+System.Text.Json
+Microsoft.Extensions.Http.Resilience where configured
 ```
 
 Quality tooling:
 
 ```text
-dotnet format          formatting
-Roslyn analyzers       TreatWarningsAsErrors in Directory.Build.props
-xUnit + FluentAssertions (or plain Assert — pick one and pin it)
-Testcontainers.PostgreSql for Infrastructure/Api tests
+dotnet build / dotnet test
+Roslyn analyzers / TreatWarningsAsErrors in Directory.Build.props
+xUnit
 ```
 
-Not in `api`: MediatR, AutoMapper, generic repository/UoW frameworks, `Result<T>` libraries, ONNX Runtime, tokenizers, pgvector mapping, PDF parsers. If a use-case needs a handler, it is a class with one method; if a mapping is needed, it is a static method.
+Not in `api`: MediatR, AutoMapper, generic repository/UoW frameworks, generic `Result<T>` libraries, ONNX Runtime, tokenizers, pgvector mapping, PDF parsers. Add an abstraction/package only for a real invariant/replacement point.
 
 ## 4. Python baseline (`src/knowledge`)
 
-Target:
+Current baseline:
 
 ```text
 Python 3.12
@@ -71,24 +70,15 @@ Pydantic v2
 SQLAlchemy 2.x
 Alembic
 asyncpg
-httpx (only for controlled internal/local adapters where needed)
+httpx
+pytest / pytest-asyncio in the test extra
 ```
 
-Quality tooling to establish with scaffold:
-
-```text
-ruff        lint + format
-mypy or pyright  static type check (choose one and pin it)
-pytest
-pytest-asyncio
-coverage.py
-```
-
-Do not install both mypy and pyright unless a measured need exists. The first scaffold task picks one and records the decision.
+Do not document mypy/pyright/ruff/coverage as mandatory gates until the corresponding dependency/config actually exists. If introduced, choose/pin only what is needed and add the real command to `quality.md` in the same change.
 
 ## 5. Frontend baseline
 
-Target:
+Current baseline:
 
 ```text
 Node.js 24 LTS
@@ -98,18 +88,18 @@ TypeScript
 Vite
 ```
 
-Recommended small set once UI scaffold begins:
+Recommended small set only as real UI needs appear:
 
 - React Router if multiple routes are real;
 - TanStack Query for server state;
 - Zod for boundary parsing where useful;
-- accessible headless primitives/component library rather than a bespoke design system during the hackathon;
+- accessible headless/component primitives instead of a bespoke design system during the hackathon;
 - Vitest + Testing Library;
 - Playwright only for critical E2E flows after P0 works.
 
-Do not add Redux/Zustand by default. Most application state should remain server state + local UI state; introduce a global client store only when a concrete cross-route state problem appears.
+Do not add Redux/Zustand by default. Most application state should remain server state + local UI state. Frontend talks only to `api`.
 
-Frontend talks only to `api`.
+Current Web is still a minimal shell; target UX in `product-spec.md` / `product-experience.md` is not an implementation claim.
 
 ## 6. PostgreSQL as primary infrastructure
 
@@ -122,22 +112,20 @@ PostgreSQL 16 is chosen because the MVP needs:
 - trigram matching;
 - vector retrieval.
 
-Extensions (created by the PostgreSQL admin bootstrap before runtime migrations):
+Extensions (created by PostgreSQL admin bootstrap before runtime migrations):
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 ```
 
-Two DB roles and schemas: `api_rw` owns the `api` schema; `knowledge_rw` owns the `knowledge` schema. Neither role can read the other's tables; there are no shared views. Table ownership: `architecture.md §8`.
+Two DB roles and schemas: `api_rw` owns the `api` schema; `knowledge_rw` owns the `knowledge` schema. Neither role can read the other's tables; there are no shared views.
 
 ### Why no separate vector DB initially
 
 The reviewed corpus is thousands, not millions, of semantic fragments. Exact vector search is cheap enough initially and easier to reason about.
 
-A 2048-d float32 vector is 8192 bytes (8 KiB) before overhead; 10k vectors are
-about 78.1 MiB of raw values, still small enough that operational simplicity
-dominates.
+A 2048-d float32 vector is 8192 bytes (8 KiB) before overhead; 10k vectors are about 78.1 MiB of raw values, still small enough that operational simplicity dominates.
 
 ### Why no HNSW initially
 
@@ -147,14 +135,14 @@ ANN adds tuning and recall/filter tradeoffs. Enable only after benchmark proves 
 
 PostgreSQL FTS is **not called BM25** in docs/pitch unless BM25 is explicitly implemented.
 
-Initial components (all inside `knowledge`):
+Initial/current components inside `knowledge`:
 
 - exact code/status/entity search;
 - `to_tsvector` / `tsquery` + `ts_rank`/`ts_rank_cd`;
 - `pg_trgm` for spelling/term expansion;
 - pgvector exact similarity;
 - application-layer RRF;
-- local reranker.
+- local reranker only after its runtime path is certified.
 
 Keep retrieval behind a typed interface so production can move to OpenSearch later without rewriting product logic.
 
@@ -178,56 +166,39 @@ Store page/section/anchor provenance for every fragment.
 
 ### Embeddings: Giga Embeddings 3B 0826
 
-`ai-sage/Giga-Embeddings-instruct-3B-0826` provides Russian/English,
-instruction-aware, mean-pooled and L2-normalized 2048-dimensional vectors.
-Queries use the versioned `giga_portal_support_v1` instruction; documents are
-embedded as plain text. The selected `ai-babai/giga-embeddings-0826-3b-gguf`
-Q8_0 file is an independent third-party conversion, not an official ai-sage
-release. Upstream MTEB values are not TenderHack measurements.
+`ai-sage/Giga-Embeddings-instruct-3B-0826` provides Russian/English, instruction-aware, mean-pooled and L2-normalized 2048-dimensional vectors. Queries use the versioned `giga_portal_support_v1` instruction; documents are embedded as plain text. The selected `ai-babai/giga-embeddings-0826-3b-gguf` Q8_0 file is an independent third-party conversion, not an official ai-sage release. Upstream MTEB values are not TenderHack measurements.
 
 ### Reranker: Querit/Querit-4B
 
-Use the custom Querit `AutoModel` score interface for query-passage reranking
-only after a trusted quantized runtime is certified. No Q6 artifact is
-currently verified, so the production fallback is Giga dense + exact/FTS + RRF.
-Scores are relevance evidence, **not a calibrated probability**.
+Use the custom Querit `AutoModel` score interface for query-passage reranking only after a trusted runtime/artifact/scoring path is certified. No production quantized artifact is treated as verified merely because a filename exists. The safe fallback is exact/FTS/trigram + Giga dense + RRF. Scores are relevance evidence, **not a calibrated probability**.
 
 ### Generator: Qwen3.8-4B-Distill
 
-`Qwen3.8-4B-Q6_K.gguf` is served locally by recent llama.cpp. The model is a
-reasoning model; `<think>` spans are stripped before structured parsing and
-never enter evidence, API payloads or analytics.
+`Qwen3.8-4B-Q6_K.gguf` is the selected local generation artifact. The model may emit hidden reasoning; reasoning spans are removed/fail-closed before structured parsing and never enter evidence, API payloads or analytics.
 
 ## 10. Inference runtime
 
-### Local llama.cpp endpoints
+### Local llama.cpp providers
 
-The active runtime is recent llama.cpp with internal OpenAI-compatible HTTP:
-`/v1/embeddings` for Giga and `/v1/chat/completions` for Qwen3.8. Embedding,
-reranker and generator endpoints are configured independently and may be
-co-located later. Querit remains disabled until its runtime artifact and
-scoring interface are certified. No external AI API is used.
+The accepted runtime family is recent llama.cpp. Embedding and generator providers/endpoints are configured independently and may be exposed behind an internal gateway/profile; Querit remains disabled until its provider/artifact/scoring interface is certified. No external AI API is used.
+
+The repository now includes portable NVIDIA runtime packaging in addition to cloud/bundled inference assets. A Docker image/profile existing in git is not certification: readiness/latency/memory/offline evidence comes from the active Model Stack v2 certification plan.
 
 ## 11. Hardware gate
 
-In the first implementation hours, record:
+For each certified profile record:
 
 - GPU model/VRAM;
-- CUDA/driver;
-- CPU/RAM;
-- disk;
-- model revision/hash.
+- CUDA/driver/runtime;
+- CPU/RAM/disk;
+- exact model revision/hash;
+- representative short/long/concurrent requests;
+- structured-output success;
+- TTFT / total latency where applicable;
+- peak memory/VRAM;
+- offline restart from local artifacts.
 
-Then run:
-
-- 20 short requests;
-- 10 long-context requests;
-- 4 concurrent user requests;
-- structured-output success rate;
-- TTFT / total latency;
-- peak memory.
-
-Only after that pin runtime/model configuration.
+Only after that pin/claim a runtime configuration. Detailed runbook: `plans/active/model-stack-v2-real-certification.md`.
 
 ## 12. Context budget
 
@@ -244,29 +215,14 @@ Never silently truncate the part of a procedure containing an exception/forbidde
 
 One worker per runtime, using the same application code as its API:
 
-- `api-worker`: `outbox` table — handoff delivery/retries, `handoff-status-sync` polling, quality-turn and feedback payload pushes (`POST /v0/quality/turns`, `POST /v0/quality/feedback`), stale-turn cleanup;
-- `knowledge-worker`: `knowledge_jobs` table — ingestion, embeddings, quality audit, issue groups.
+- `api-worker`: outbox — handoff delivery/retries, handoff-status-sync polling, quality-turn / feedback / completion payload pushes to Knowledge, stale-turn cleanup/recovery according to implemented policy;
+- `knowledge-worker`: `knowledge_jobs` — ingestion, embeddings/backfill, quality audit, issue groups.
 
-`knowledge-worker` mechanism:
-
-- job table;
-- `FOR UPDATE SKIP LOCKED` claiming;
-- lease/heartbeat;
-- retries with explicit attempt/error state;
-- idempotent effect key.
-
-`api-worker` mechanism (single replica, hackathon scale — no lease table needed):
-
-- independent fixed-interval `BackgroundService` ticks, one per concern;
-- each tick re-derives its own work set from `cases`/`outbox` state rather than claiming rows;
-- idempotent effect key per write path instead of a lease (outbox delivery keyed by handoff id, status ingestion deduped by external revision, `xmin` optimistic concurrency on `cases`);
-- explicit attempt/error state on `outbox` (`AttemptCount`, `LastError`); handoff-status-sync and stale-turn cleanup log-and-retry-next-tick on failure.
-
-Do not add Redis/Celery/Kafka/RabbitMQ/Hangfire/Quartz before a measured need; likewise, do not add an `api_jobs` lease table to `api-worker` before it needs more than one replica.
+`knowledge-worker` mechanism may use PostgreSQL job claiming/lease/heartbeat/retries. `api-worker` intentionally stays simpler at hackathon single-replica scale; do not add Redis/Celery/Kafka/RabbitMQ/Hangfire/Quartz or an `api_jobs` lease system before a measured need.
 
 ## 14. Docker/deployment
 
-Target final development/demo runtime:
+Current development/demo topology:
 
 ```text
 web
@@ -275,19 +231,17 @@ api-worker          .NET
 knowledge           Python, internal network only
 knowledge-worker    Python
 postgres
-inference
-reverse-proxy (optional)
+inference profile/provider(s)   internal, profile-gated
+reverse-proxy       optional
 ```
 
-Multi-stage Dockerfiles: `sdk:10.0` → `aspnet:10.0` for .NET; the Python image installs the `src/knowledge` package from project metadata (local development uses `uv` and `uv.lock`). `api` has `depends_on` with healthcheck on `postgres` and `knowledge`; `knowledge` depends on `postgres`. The `inference` service is profile-gated and is started explicitly after local model artifacts pass a smoke test.
+Multi-stage Dockerfiles/package installs must stay reproducible. `api` depends on PostgreSQL/Knowledge according to health semantics; Knowledge depends on its own DB and only on enabled/certified model capabilities. Model weights and organizer data live outside normal git/source flow and are mounted/verified according to the repository artifact policy.
 
-One `docker compose up --build` (or documented equivalent where models are pre-mounted) should start the controllable environment.
-
-Model weights and organizer data live outside git and are mounted.
+One `docker compose up --build` (or documented profile-aware equivalent where models are pre-mounted) should start the controllable environment. Presence of a profile is not a readiness claim.
 
 ## 15. Dependency principles
 
-Agents must apply these before adding any package (NuGet or PyPI):
+Agents must apply these before adding any package (NuGet/PyPI/npm) or service:
 
 1. What concrete problem does it solve now?
 2. Is the same capability already in the standard stack?
@@ -302,19 +256,19 @@ Prefer boring, inspectable dependencies over opaque frameworks.
 
 ### Single Python modular monolith (previous decision)
 
-Superseded by ADR-0001. Remains the documented fallback if the boundary rules fail (ADR-0001 §6, §8).
+Superseded by ADR-0001. Remains historical fallback context if ADR revisit conditions are met.
 
 ### Multi-layer .NET scaffold from commit `1b57aa1`
 
-Not restored. Its domain model (`Ticket`, `Specialist`, operator queue, threshold-based escalation) predates the reviewed spec and conflicts with the orthogonal state model; its `IThresholdProvider`/`IDateTimeProvider`/`Result<T>` layering is the ceremonial style `architecture.md §4` forbids. New `src/support-core` is written from the current `architecture.md`, not from that scaffold.
+Not restored. Its old `Ticket`/`Specialist`/operator-queue model predates the reviewed state model and conflicts with current ownership/invariants. Current Support Core is built from `architecture.md`, not that scaffold.
 
 ### Separate ML microservice with its own orchestration
 
-`knowledge` is a knowledge/inference service, not an orchestrator. It does not decide `Decision`, does not own case state and does not call `api`.
+`knowledge` is knowledge/inference, not an orchestrator. It does not decide `Decision`, own case state or call `api`.
 
-### ML inference inside .NET (ONNX Runtime, ML.NET, tokenizers, pgvector mapping)
+### ML inference inside .NET
 
-Rejected: duplicates the Python model stack and moves the volatile part into the runtime the ML engineer does not own.
+Rejected: duplicates the Python model stack and moves volatile inference into the wrong ownership boundary.
 
 ### Qdrant
 
@@ -326,7 +280,7 @@ Good future production adapter and compatible with the Portal developer ecosyste
 
 ### Redis/Celery/Hangfire/Quartz
 
-Not required for initial jobs/outbox. Re-evaluate only if PostgreSQL jobs create measured contention/latency.
+Not required for initial jobs/outbox. Re-evaluate only on measured contention/latency/replica need.
 
 ### Kafka/RabbitMQ
 
@@ -338,11 +292,11 @@ Not MVP deployment. Docker Compose is enough for reproducibility.
 
 ### MediatR / AutoMapper / generic repository frameworks
 
-Not needed for a handful of use-cases; they hide the state machine behind indirection.
+Not needed for current use-cases; avoid hiding the state machine behind indirection.
 
 ### GraphRAG / knowledge graph
 
-No demonstrated requirement. Procedure cards + structured metadata solve current high-risk condition branches more directly.
+No demonstrated requirement. Procedure cards + structured metadata solve current condition branches more directly.
 
 ### Generative fine-tuning
 
@@ -350,16 +304,17 @@ No. Retrieval/knowledge quality, answerability and evaluation are higher leverag
 
 ### Agent framework as core runtime
 
-No framework should obscure the explicit state machine. If a lightweight library is introduced, domain states/decisions remain owned by our C# code.
+No framework should obscure the explicit state machine. Product decisions remain owned by C# code.
 
 ## 17. Reconsideration rule
 
-A rejected technology can be introduced only with:
+A rejected/deferred technology can be introduced only with:
 
-- a measured limitation of current stack;
+- a measured limitation of current stack or explicit new requirement;
 - expected benefit;
 - operational cost;
 - migration/fallback path;
-- targeted benchmark;
-- an ADR in `docs/adr/` plus update to this document and architecture docs;
+- targeted benchmark/test;
+- ADR when runtime/service/DB/state/model policy changes;
+- synchronized stack/architecture docs;
 - skeptic review.

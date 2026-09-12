@@ -1,6 +1,6 @@
 # Model Stack v2 — real certification runbook
 
-Status: **TARGET / TO BE CERTIFIED**. This document is the next-task runbook,
+Status: **ACTIVE TARGET / TO BE CERTIFIED**. This document is the current model/runtime certification runbook,
 not evidence that a model, profile or Cloud.ru deployment has already passed.
 It must be executed on a disposable environment and recorded in
 `src/knowledge/benchmarks/model-stack-v2-real-certification.json`.
@@ -316,10 +316,14 @@ product behavior or ownership boundaries.
 
 ## Organizer checkpoint
 
-The exact self-hosted inference permission question is recorded once in
-`src/knowledge/benchmarks/organizer-questions.md`. Until answered, assume
-team-controlled deployment of permitted open models is acceptable for
-preparation, but do not claim Cloud.ru production certification.
+Outstanding organizer/domain questions are tracked in
+`src/knowledge/benchmarks/checkpoint-questions.md`. The previous reference to a
+non-existent `organizer-questions.md` was documentation drift.
+
+If self-hosted inference permission becomes an actual blocker, add the exact
+question to that checkpoint file explicitly; do not cite an untracked or
+non-existent source. Until clarified, do not claim Cloud.ru production
+certification merely from a local run.
 
 ## Final certification report shape
 

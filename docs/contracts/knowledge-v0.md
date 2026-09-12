@@ -1,6 +1,6 @@
 # Contract v0 — `api` (.NET) ↔ `knowledge` (Python)
 
-Статус: **frozen** (см. `execution-plan.md §3`, ADR-0001 §3 правило 3).
+Статус: **frozen** (ADR-0001). Historical execution-plan language about freezing this boundary in the first hour explains sequencing, not current implementation maturity.
 
 Это нормативная спецификация единственной границы между `api`/`api-worker` и `knowledge`/`knowledge-worker`
 (`architecture.md §3, §10`). Машиночитаемый источник для генерации C#-клиента (NSwag) и для реализации
@@ -15,7 +15,7 @@
    `reason_codes` — никогда.** `knowledge` ничего не знает про эти типы.
 2. **`api` не читает `kb_*`/`quality_*` напрямую.** Единственный путь — HTTP этого контракта.
 3. **`knowledge` не вызывает `api` и не читает его таблицы.** Факты о кейсах приходят только push'ем
-   (`POST /v0/quality/turns`, `POST /v0/quality/feedback`).
+   (`POST /v0/quality/turns`, `POST /v0/quality/feedback`, `POST /v0/quality/completions`).
 4. **Новые поля — только `optional`.** Breaking change версии (`/v1/...`) требует одновременного изменения
    обеих сторон в одном PR/change.
 5. **C#-клиент генерируется**, не пишется руками; сгенерированный код не покидает `TenderHack.Infrastructure`.
@@ -130,13 +130,14 @@
   в версионировании контракта, только в воспроизводимости конкретного ответа (`architecture.md §8`,
   «Knowledge versioning»).
 
-## 7. Первая реализация (stub-режим)
+## 7. Deterministic fixture / stub mode
 
-До появления реальных моделей `knowledge` обязан отвечать на все эндпоинты §5 правдоподобным статическим/
-детерминированным JSON, соответствующим OpenAPI-схеме, включая:
+Детерминированный stub/fixture path сохраняется как **тестовый инструмент** для contract tests и `.NET` decision fixtures. Он не описывает текущую зрелость Knowledge и не является product fallback вместо реального retrieval/model path.
+
+Fixture mode обязан отвечать на эндпоинты §5 правдоподобным статическим/детерминированным JSON, соответствующим OpenAPI-схеме, включая:
 
 - фиксированные `fragment_id`/`snapshot_id` для смоук-тестов `api`;
-- `evidence_sufficiency: INSUFFICIENT` для неизвестных запросов, чтобы `api` мог протестировать `HANDOFF_OFFER`/`CLARIFY` путь без реальной модели;
-- честные `model_version: "stub-v0"` / `retrieval_config_version: "stub-v0"`, чтобы стаб никогда не выглядел как реальный результат в логах/демо.
+- контролируемые answerability/verify варианты для проверки `ANSWER` / `CLARIFY` / `HANDOFF_OFFER` / `TECHNICAL_ERROR` без зависимости от текущего качества модели;
+- честные fixture/stub `model_version` / `retrieval_config_version`, чтобы тестовый результат никогда не выглядел как real-model measurement в логах/демо.
 
-`evals/decisions` (`quality.md §8`) фиксирует набор таких stub-ответов как fixtures и гоняет `api` против них по HTTP.
+Real retrieval/answerability/draft/verify и fixture path обязаны сохранять один и тот же boundary contract. `evals/decisions` / Application tests не должны дублировать C# decision policy в Python ради удобства.
