@@ -13,6 +13,7 @@ from .models import (
     KnowledgeFragment,
     KnowledgeSnapshot,
     PageExtraction,
+    PreparedIngestion,
     SourceAnchor,
     SourceResolution,
     TextBlock,
@@ -30,6 +31,11 @@ from .repository import (
 
 __all__ = [
     "Corpus",
+    "BootstrapError",
+    "BootstrapResult",
+    "CorpusExpectation",
+    "CorpusIdentityMismatch",
+    "EXPECTED_NORMATIVE_CORPUS",
     "CorpusBoundaryError",
     "Document",
     "DocumentVersion",
@@ -40,9 +46,12 @@ __all__ = [
     "IngestionPipeline",
     "IngestionResult",
     "IngestionRun",
+    "InvalidManifest",
     "KnowledgeFragment",
     "KnowledgeSnapshot",
+    "MissingNormativeArtifact",
     "PageExtraction",
+    "PreparedIngestion",
     "PdfPlumberExtractor",
     "SemanticFragmentBuilder",
     "SourceAnchor",
@@ -51,6 +60,35 @@ __all__ = [
     "SourceResolutionError",
     "SourceResolver",
     "TextBlock",
+    "bootstrap_in_memory",
+    "bootstrap_postgres",
+    "load_manifest",
     "UnknownFragmentError",
     "UnknownSnapshotError",
 ]
+
+
+_BOOTSTRAP_EXPORTS = {
+    "BootstrapError",
+    "BootstrapResult",
+    "CorpusExpectation",
+    "CorpusIdentityMismatch",
+    "EXPECTED_NORMATIVE_CORPUS",
+    "InvalidManifest",
+    "MissingNormativeArtifact",
+    "bootstrap_in_memory",
+    "bootstrap_postgres",
+    "load_manifest",
+}
+
+
+def __getattr__(name: str):
+    """Load bootstrap helpers lazily to keep conditions imports acyclic."""
+
+    if name in _BOOTSTRAP_EXPORTS:
+        from importlib import import_module
+
+        value = getattr(import_module(".bootstrap", __name__), name)
+        globals()[name] = value
+        return value
+    raise AttributeError(name)

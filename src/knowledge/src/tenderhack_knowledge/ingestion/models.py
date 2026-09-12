@@ -168,6 +168,22 @@ class IngestionResult(BaseModel):
     idempotent: bool = False
 
 
+class PreparedIngestion(BaseModel):
+    """Validated source facts ready for repository persistence.
+
+    Keeping preparation separate from publication lets a multi-document
+    bootstrap validate the complete corpus before writing anything and then
+    publish one deterministic snapshot for the whole manifest.
+    """
+
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+
+    document: Document
+    document_version: DocumentVersion
+    fragments: tuple[KnowledgeFragment, ...]
+    ingestion_run: IngestionRun
+
+
 def model_payload(model: BaseModel) -> dict[str, Any]:
     """Return JSON-compatible persistence payload for a knowledge model."""
 

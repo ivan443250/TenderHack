@@ -1,0 +1,96 @@
+{
+  "stage": "AI-1",
+  "status": "BLOCKED_ENVIRONMENT",
+  "starting_head": "a123955c1dec92299bae4b778661785baf45a1b7",
+  "scope": "reproducible normative corpus bootstrap and reviewed evidence",
+  "frozen_expectation": {
+    "documents": 6,
+    "pages": 830,
+    "fragments": 3899
+  },
+  "current_run": {
+    "status": "BLOCKED_ENVIRONMENT",
+    "reason": "The six normative PDF artifacts and a usable manifest are not present in this worktree; no source was fabricated and no database was mutated.",
+    "first_bootstrap": "NOT_RUN",
+    "repeated_bootstrap": "NOT_RUN",
+    "duplicate_count": "NOT_MEASURED",
+    "snapshot_id": null
+  },
+  "historical_corpus_identity_reference": {
+    "status": "CERTIFIED_WITH_LIMITATIONS",
+    "source_report": "src/knowledge/benchmarks/k1-postgres-certification.json",
+    "documents": 6,
+    "pages": 830,
+    "fragments": 3899,
+    "snapshot_id": "snap_0e979dfef376faff41f7c76416fda457",
+    "document_versions": 6,
+    "historical_versions_included": 0,
+    "document_identities": [
+      {"filename": "Инструкция по электронному актированию.pdf", "document_version_id": "ver_500943380ccb418a8df30b509e9ec4f0", "sha256": "d14f883b14f8f117842541900300901404b37d43cdddf13c3e3266cfbd9155b3", "pages": 93, "fragments": 567},
+      {"filename": "Инструкция по формированию YML.pdf", "document_version_id": "ver_eaf6f826ac609c35c6663ac43c372c1c", "sha256": "753fc58d5c7ae3b15932ef658d88f4eb2886273af2e3067389c5aa0934bd9a9c", "pages": 39, "fragments": 298},
+      {"filename": "Инструкция по работе с Порталом для поставщика.pdf", "document_version_id": "ver_b07b7d3f277e77945a397c4b3af9bc9f", "sha256": "3c52c3633b6bc84e99ca1a23336536e9408ba83b28f160ee5c02738a2f754c6b", "pages": 370, "fragments": 1439},
+      {"filename": "Инструкция по созданию оферты и СТЕ.pdf", "document_version_id": "ver_1d25303e9029726204bc99413b66135b", "sha256": "ce50227cb1bb29b9145dd0fb52181c353c03bb11e00a0ab467cf544914b20159", "pages": 65, "fragments": 360},
+      {"filename": "Инструкция по работе с машиночитаемыми доверенностями.pdf", "document_version_id": "ver_4918b5db1bc006fafc56db9876bc5104", "sha256": "755870a7454fd166146bfd64a7c50009fc834340798d28ff9cee3132265272b9", "pages": 7, "fragments": 15},
+      {"filename": "Инструкция по работе с Порталом для заказчика.pdf", "document_version_id": "ver_844eb9c8fe9160d2ba46836d7b88a73e", "sha256": "7355b2c39b4aa4fbac758f64aeab0bdfd4a8219cc483dd5ca52e28eacb59fcde", "pages": 256, "fragments": 1220}
+    ],
+    "review_status_distribution": {
+      "status": "NOT_REPORTED_BY_SOURCE_ARTIFACT",
+      "known_sample": {"PENDING_REVIEW": 6, "NEEDS_REVIEW": 1},
+      "note": "The sample is not a corpus-wide count and must not be presented as one."
+    },
+    "source_resolution": {
+      "status": "PASS_HISTORICAL_CERTIFICATION",
+      "representative_samples": 6,
+      "table_sample": "frag_07b1ba211b5d2e8c95af84db7be9f0c5"
+    },
+    "idempotency": {
+      "status": "PASS_HISTORICAL_CERTIFICATION",
+      "same_snapshot_id": true,
+      "duplicate_documents": 0,
+      "duplicate_versions": 0,
+      "duplicate_fragments": 0,
+      "duplicate_memberships": 0
+    }
+  },
+  "condition_cards": {
+    "cards_checked": 20,
+    "persisted_versions_reference": 22,
+    "structurally_verified_reference": 20,
+    "semantically_verified_current": 0,
+    "cards_requiring_semantic_review": 20,
+    "risk_distribution": {"LOW": 4, "MEDIUM": 9, "HIGH": 7},
+    "reason": "The seed has no source_quotes/semantic attestations; fragment IDs alone are not semantic proof."
+  },
+  "historical_corpus_isolation": {
+    "status": "PASS_IN_CODE_AND_TESTS",
+    "stp_solution_used_as_normative": false,
+    "historical_snapshot_rejected": true
+  },
+  "implemented_entrypoints": [
+    "tenderhack_knowledge.ingestion.IngestionPipeline.prepare",
+    "tenderhack_knowledge.ingestion.bootstrap_in_memory",
+    "tenderhack_knowledge.ingestion.bootstrap_postgres"
+  ],
+  "manual_steps_remaining": [
+    "Provide a manifest for the six organizer PDFs with stable source_reference values.",
+    "Run migrations externally before bootstrap_postgres.",
+    "Review the corpus subset and add explicit semantic card attestations/quotes.",
+    "Run source resolution against the new snapshot and preserve snapshot_id in citations."
+  ],
+  "integration_work_required": [
+    "AI-5 must wire bootstrap into startup/Compose without changing this scope.",
+    "AI-5 must make readiness depend on schema, current normative snapshot, review policy and inference availability.",
+    "AI-5 must resolve source citations against their cited snapshot."
+  ],
+  "limitations": [
+    "No organizer PDF bytes are tracked or available in this worktree, so current six-document ingestion was not rerun.",
+    "No migrations, settings, routes, contracts, retrieval or inference were changed.",
+    "Structural card audit is not a substitute for expert semantic review."
+  ],
+  "tests": {
+    "targeted": "24 passed, 1 warning",
+    "command": "python -m pytest -q --basetemp .audit-tmp-ai1 src/knowledge/tests/test_ingestion_bootstrap.py src/knowledge/tests/test_ingestion_foundation.py src/knowledge/tests/test_condition_cards.py",
+    "full_knowledge_suite": "not rerun after this change",
+    "postgres_integration": "not run; no configured database"
+  }
+}

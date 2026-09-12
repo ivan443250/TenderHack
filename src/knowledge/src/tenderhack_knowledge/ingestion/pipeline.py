@@ -15,7 +15,7 @@ from .ids import (
     normalize_source_name,
     sha256_bytes,
 )
-from .models import Corpus, Document, DocumentVersion, IngestionResult, IngestionRun
+from .models import Corpus, Document, DocumentVersion, IngestionResult, IngestionRun, PreparedIngestion
 from .repository import InMemoryKnowledgeRepository
 
 
@@ -51,6 +51,43 @@ class IngestionPipeline:
         corpus: Corpus | str = Corpus.NORMATIVE,
         review_status: str = "PENDING_REVIEW",
     ) -> IngestionResult:
+        prepared = self.prepare(
+            source,
+            original_filename=original_filename,
+            source_reference=source_reference,
+            declared_version=declared_version,
+            declared_date=declared_date,
+            corpus=corpus,
+            review_status=review_status,
+        )
+        document = self.repository.register_document(prepared.document)
+        version, fragments, run, idempotent = self.repository.store_version(
+            prepared.document_version, prepared.fragments, prepared.ingestion_run
+        )
+        snapshot = self.repository.publish_snapshot((version.document_version_id,), Corpus(corpus))
+        visible_fragments = self.repository.snapshot_fragments(snapshot.snapshot_id)
+        return IngestionResult(
+            document=document,
+            document_version=version,
+            fragments=visible_fragments,
+            ingestion_run=run,
+            snapshot=snapshot,
+            idempotent=idempotent,
+        )
+
+    def prepare(
+        self,
+        source: bytes | bytearray | memoryview | str | Path,
+        *,
+        original_filename: str | None = None,
+        source_reference: str | None = None,
+        declared_version: str | None = None,
+        declared_date: date | str | None = None,
+        corpus: Corpus | str = Corpus.NORMATIVE,
+        review_status: str = "PENDING_REVIEW",
+    ) -> PreparedIngestion:
+        """Extract and validate one source without persisting or publishing."""
+
         payload, detected_reference = _read_source(source)
         reference = source_reference or detected_reference
         filename = original_filename or _filename_from_reference(reference)
@@ -66,16 +103,15 @@ class IngestionPipeline:
             original_filename=filename,
             corpus=corpus_value,
         )
-        document = self.repository.register_document(candidate_document)
         version_id = make_document_version_id(
-            document.document_id,
+            candidate_document.document_id,
             content_sha,
             declared_version,
             parsed_date.isoformat() if parsed_date else None,
         )
         version = DocumentVersion(
             document_version_id=version_id,
-            document_id=document.document_id,
+            document_id=candidate_document.document_id,
             content_sha256=content_sha,
             declared_version=declared_version,
             declared_date=parsed_date,
@@ -104,16 +140,11 @@ class IngestionPipeline:
                 )
             ),
         )
-        version, fragments, run, idempotent = self.repository.store_version(version, fragments, run)
-        snapshot = self.repository.publish_snapshot((version.document_version_id,), corpus_value)
-        visible_fragments = self.repository.snapshot_fragments(snapshot.snapshot_id)
-        return IngestionResult(
-            document=document,
+        return PreparedIngestion(
+            document=candidate_document,
             document_version=version,
-            fragments=visible_fragments,
+            fragments=tuple(fragments),
             ingestion_run=run,
-            snapshot=snapshot,
-            idempotent=idempotent,
         )
 
 
