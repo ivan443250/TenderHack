@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Web (React + TypeScript + Vite)
 
 Chat UI for the Portal support case flow, built against `docs/contracts/web-api-v0.md`. The
@@ -44,17 +43,15 @@ pnpm build      # emits dist/
 
 ## Production build
 
-There is no separate production `web` container. `src/support-core/Dockerfile`'s `api` target
-builds this package (`pnpm build`) in its own stage and copies `dist/` into the API's `wwwroot`,
-which is served same-origin (required for the `owner_id` cookie, web-api-v0.md §13) with an SPA
-fallback to `index.html` for client-side routes. The pre-existing manual test console lives at
-`/dev-console/` in that same `wwwroot`.
-=======
-# Web shell
+There is no separate production `web` container. The SPA is served from the API's `wwwroot`
+same-origin (required for the `owner_id` cookie, web-api-v0.md §13) with an SPA fallback to
+`index.html` for client-side routes. Two paths populate `wwwroot`:
 
-React + TypeScript + Vite is presentation-only. `src/api/client.ts` and `src/api/sse.ts` are the browser backend boundaries; the browser does not call Knowledge directly or invent lifecycle state.
+- `dotnet build`/`dotnet run`/`dotnet publish` of `TenderHack.Api` runs `pnpm build` here via the
+  `BuildWebSpa` MSBuild target (incremental: re-runs only when `src/`, `index.html`, `package.json`
+  or the Vite/TS config changed) and copies `dist/` into `wwwroot` (`index.html` + `assets/` are
+  gitignored). Pass `-p:BuildWebSpa=false` to skip, e.g. when node is unavailable.
+- `src/support-core/Dockerfile` builds the package in its own `web-build` stage and copies `dist/`
+  into the image's `wwwroot`, publishing the API with `BuildWebSpa=false`.
 
-The current `App` is still a minimal placeholder, so the user-facing chat/product experience described in `../../docs/product-spec.md` and `../../docs/product-experience.md` remains implementation work. Do not mark those surfaces implemented until real server-driven states/actions render and are covered by the relevant tests.
-
-Run `pnpm install`, `pnpm typecheck`, `pnpm test` and `pnpm build` from this directory. Use `pnpm dev` for local development.
->>>>>>> a123955c1dec92299bae4b778661785baf45a1b7
+The pre-existing manual test console lives at `/dev-console/` in that same `wwwroot`.

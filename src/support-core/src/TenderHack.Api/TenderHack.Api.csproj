@@ -3,9 +3,39 @@
     <RootNamespace>TenderHack.Api</RootNamespace>
     <AssemblyName>TenderHack.Api</AssemblyName>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Build the React SPA (src/web) and drop it into wwwroot on every Api build/publish so a plain
+         `dotnet run` serves the same same-origin UI the Docker image does. Pass -p:BuildWebSpa=false
+         to skip (the Dockerfile does: its own web-build stage supplies wwwroot there). -->
+    <BuildWebSpa Condition="'$(BuildWebSpa)' == ''">true</BuildWebSpa>
+    <WebSpaDir>$(MSBuildProjectDirectory)\..\..\..\web</WebSpaDir>
   </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\TenderHack.Application\TenderHack.Application.csproj" />
     <ProjectReference Include="..\TenderHack.Infrastructure\TenderHack.Infrastructure.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <WebSpaSource Include="$(WebSpaDir)\src\**;$(WebSpaDir)\index.html;$(WebSpaDir)\package.json;$(WebSpaDir)\vite.config.ts;$(WebSpaDir)\tsconfig*.json" />
+  </ItemGroup>
+
+  <Target Name="BuildWebSpa" BeforeTargets="BeforeBuild" Condition="'$(BuildWebSpa)' == 'true'" Inputs="@(WebSpaSource)" Outputs="$(MSBuildProjectDirectory)\wwwroot\index.html">
+    <Exec Command="pnpm build" WorkingDirectory="$(WebSpaDir)" />
+    <ItemGroup>
+      <WebSpaDist Include="$(WebSpaDir)\dist\**" />
+    </ItemGroup>
+    <Copy SourceFiles="@(WebSpaDist)" DestinationFiles="@(WebSpaDist->'$(MSBuildProjectDirectory)\wwwroot\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    <!-- Vite hashes asset names; drop stale hashes left by previous builds. -->
+    <ItemGroup>
+      <WebSpaStale Include="$(MSBuildProjectDirectory)\wwwroot\assets\**" Exclude="@(WebSpaDist->'$(MSBuildProjectDirectory)\wwwroot\%(RecursiveDir)%(Filename)%(Extension)')" />
+    </ItemGroup>
+    <Delete Files="@(WebSpaStale)" />
+  </Target>
+
+  <!-- The generated files are gitignored, so glob them at build time for the publish/output copy. -->
+  <Target Name="IncludeWebSpaContent" AfterTargets="BuildWebSpa" BeforeTargets="BeforeBuild" Condition="'$(BuildWebSpa)' == 'true'">
+    <ItemGroup>
+      <Content Include="wwwroot\index.html;wwwroot\assets\**" Exclude="@(Content)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
 </Project>

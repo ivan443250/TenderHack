@@ -7,3 +7,5 @@ src/web/node_modules/
 src/web/dist/
 src/web/.vite/
 src/knowledge/.venv/
+src/support-core/src/TenderHack.Api/wwwroot/index.html
+src/support-core/src/TenderHack.Api/wwwroot/assets/

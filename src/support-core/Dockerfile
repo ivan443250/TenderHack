@@ -12,7 +12,8 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:2fa828c68761b1b8c23d7662dc134421b9
 WORKDIR /src
 COPY src/support-core/. .
 RUN dotnet restore TenderHack.sln
-RUN dotnet publish src/TenderHack.Api/TenderHack.Api.csproj -c Release -o /out/api --no-restore \
+# BuildWebSpa=false: the web-build stage above already produced the SPA; this stage has no node.
+RUN dotnet publish src/TenderHack.Api/TenderHack.Api.csproj -c Release -o /out/api --no-restore -p:BuildWebSpa=false \
     && dotnet publish src/TenderHack.Worker/TenderHack.Worker.csproj -c Release -o /out/worker --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:6a94333d37514e385650a3c81a55e5350b67253dbe136e9cf17e499c35606a8c AS api
