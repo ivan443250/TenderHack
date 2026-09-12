@@ -24,6 +24,8 @@ coverage.xml
 htmlcov/
 *.egg-info/
 build/
+bin/
+obj/
 
 # Node / Vite
 node_modules/

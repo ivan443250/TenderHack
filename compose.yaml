@@ -1,0 +1,113 @@
+name: tenderhack
+
+services:
+  web:
+    build:
+      context: ./src/web
+      dockerfile: Dockerfile
+    environment:
+      VITE_API_BASE_URL: /api
+      VITE_API_PROXY: http://api:8080
+    ports:
+      - "5173:5173"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ./src/support-core
+      dockerfile: Dockerfile
+      target: api
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Default: ${API_DATABASE_URL:-Host=postgres;Port=5432;Database=${POSTGRES_DB:-tenderhack};Username=api_rw;Password=${API_DB_PASSWORD:-api_dev_only}}
+      Knowledge__BaseUrl: ${KNOWLEDGE_BASE_URL:-http://knowledge:8000}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      knowledge:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/health/live"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+  api-worker:
+    build:
+      context: ./src/support-core
+      dockerfile: Dockerfile
+      target: worker
+    environment:
+      ConnectionStrings__Default: ${API_DATABASE_URL:-Host=postgres;Port=5432;Database=${POSTGRES_DB:-tenderhack};Username=api_rw;Password=${API_DB_PASSWORD:-api_dev_only}}
+      Knowledge__BaseUrl: ${KNOWLEDGE_BASE_URL:-http://knowledge:8000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      knowledge:
+        condition: service_healthy
+
+  knowledge:
+    build:
+      context: ./src/knowledge
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: ${KNOWLEDGE_DATABASE_URL:-postgresql+asyncpg://knowledge_rw:${KNOWLEDGE_DB_PASSWORD:-knowledge_dev_only}@postgres:5432/${POSTGRES_DB:-tenderhack}}
+      KNOWLEDGE_CHECK_DB: ${KNOWLEDGE_CHECK_DB:-true}
+      INFERENCE_BASE_URL: http://inference:8000
+    expose:
+      - "8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live')"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+  knowledge-worker:
+    build:
+      context: ./src/knowledge
+      dockerfile: Dockerfile
+    command: ["tenderhack-knowledge-worker"]
+    environment:
+      DATABASE_URL: ${KNOWLEDGE_DATABASE_URL:-postgresql+asyncpg://knowledge_rw:${KNOWLEDGE_DB_PASSWORD:-knowledge_dev_only}@postgres:5432/${POSTGRES_DB:-tenderhack}}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: pgvector/pgvector:pg16@sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b
+    environment:
+      # These fallbacks are development-only; override via .env for any shared host.
+      POSTGRES_DB: ${POSTGRES_DB:-tenderhack}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      API_DB_PASSWORD: ${API_DB_PASSWORD:-api_dev_only}
+      KNOWLEDGE_DB_PASSWORD: ${KNOWLEDGE_DB_PASSWORD:-knowledge_dev_only}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  inference:
+    profiles: ["inference"]
+    image: vllm/vllm-openai:v0.10.2
+    command: ["--model", "${INFERENCE_MODEL:-/models/Qwen3-4B-Instruct-2507}", "--host", "0.0.0.0"]
+    volumes:
+      - ${MODEL_ARTIFACTS_DIR:-./infra/inference/models}:/models:ro
+    expose:
+      - "8000"
+
+volumes:
+  postgres-data:

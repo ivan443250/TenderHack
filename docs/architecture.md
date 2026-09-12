@@ -19,9 +19,9 @@ Do not add a third backend runtime, a queue or a separate vector DB unless new h
 ## 2. Target repository layout
 
 ```text
-apps/
-  api/                          .NET solution (support core)
-    TenderHack.slnx
+src/
+  support-core/                 .NET solution (support core)
+    TenderHack.sln
     src/
       TenderHack.Domain/        cases, turns, handoff, enums, transitions, policies — no framework refs
       TenderHack.Application/   use-cases, TurnOrchestrator, ports (interfaces), own records
@@ -31,27 +31,31 @@ apps/
     tests/
       TenderHack.Domain.Tests/
       TenderHack.Application.Tests/
-      TenderHack.Api.Tests/     HTTP-level tests with knowledge stub
+      TenderHack.Contract.Tests/ frozen-contract artifact checks
   knowledge/                    Python service (knowledge & inference)
     pyproject.toml
-    app/
+    src/tenderhack_knowledge/
       api/                      FastAPI routes (internal contract v0)
-      knowledge/                ingestion/retrieval/verification
-      inference/                embedder/reranker/generator/verifier adapters
-      moderation_context/       LLM ambiguity check only
-      quality/                  evaluator, issue groups
-      persistence/              kb_*, quality_* tables (incl. pushed quality_cases)
-      settings/
-    worker/                     thin entrypoint using app modules
+      contracts/                typed v0 boundary models
+      understanding/            query understanding boundary
+      retrieval/                retrieval boundary
+      knowledge/                corpus and provenance boundary
+      answerability/            evidence sufficiency boundary
+      inference/                narrow model adapter protocols
+      verification/             claim/source verification boundary
+      ingestion/                source ingestion boundary
+      quality/                  evaluator and issue groups
+      persistence/              knowledge-owned DB session boundary
+      observability/            structured logging
+      settings/                 environment settings
+      worker/                   thin entrypoint
+    migrations/                 Alembic baseline for knowledge-owned jobs
+    tests/                      health and contract-stub smoke tests
   web/
     package.json
     src/
-evals/
-  retrieval/                    Python, against knowledge
-  decisions/                    HTTP against api with knowledge in stub/fixture mode
-  moderation/
-  quality/
-  e2e/
+evals/                          evaluation workspace (data is not committed yet)
+tests/e2e/                      cross-runtime smoke scenarios
 scripts/
 docs/
 ```
@@ -347,7 +351,8 @@ Rules:
 - each runtime has its own DB role (`api_rw`, `knowledge_rw`) with privileges only on its own tables; a runtime's tests may run against a database where the other runtime's tables do not exist;
 - `quality_cases` is `knowledge`'s own copy of the case facts it was sent (§10); duplication of question/answer text is accepted at hackathon scale;
 - `api` never selects from `kb_*`/`quality_*`; source view and analytics data come through `knowledge` HTTP;
-- the only schema shared between runtimes is `pgvector`/`pg_trgm` extension presence, created by the `knowledge` Alembic baseline.
+- runtime schemas are created by the PostgreSQL admin bootstrap (`api` and `knowledge`), and each role's `search_path` is scoped to its own schema;
+- the only shared database capability is `pgvector`/`pg_trgm` extension presence, installed by the PostgreSQL admin bootstrap before either runtime migration.
 
 ### Knowledge versioning
 

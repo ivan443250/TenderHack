@@ -329,34 +329,36 @@ Done only if:
 
 ## 13. Verification commands
 
-The repository currently contains documentation only after the scaffold reset. **Do not invent passing commands.**
+The foundation scaffold now contains executable manifests and deterministic health/stub checks. Product behavior remains intentionally unimplemented; report each command result rather than inferring a pass.
 
-The first scaffold change must add and document actual commands here, expected roughly as:
+Scaffold baseline commands:
 
 ```bash
-# .NET support core (apps/api)
-dotnet restore
-dotnet format --verify-no-changes
-dotnet build -warnaserror
-dotnet test
+# .NET support core (src/support-core)
+dotnet build src/support-core/TenderHack.sln -c Release
+dotnet test src/support-core/TenderHack.sln -c Release
 
-# Python knowledge service (apps/knowledge)
-uv sync --frozen
-uv run ruff check .
-uv run <type-checker> ...
-uv run pytest ...
+# Python knowledge service (src/knowledge)
+uv sync --extra test --project src/knowledge
+uv run --project src/knowledge pytest
 
 # Contract v0
-<documented command to export knowledge OpenAPI and regenerate the C# client; CI fails if generated client is stale>
+# The scaffold test checks that every frozen path/method is exposed.
+uv run --project src/knowledge pytest src/knowledge/tests/test_contract_paths.py
+# Exact FastAPI schema export and NSwag regeneration are intentionally deferred
+# until request models and the generated Infrastructure client are introduced.
 
 # Web
-pnpm install --frozen-lockfile
-pnpm lint
-pnpm test --run
-pnpm build
+pnpm --dir src/web install
+pnpm --dir src/web typecheck
+pnpm --dir src/web test
+pnpm --dir src/web build
 
 # Integration/e2e
-<documented docker/eval commands>
+docker compose config --quiet
+docker compose build web knowledge api api-worker
+docker compose up -d --wait
+docker compose down
 ```
 
 Exact commands must match real manifests/configs before becoming mandatory.

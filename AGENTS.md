@@ -27,6 +27,7 @@
 
 ## 3. Неподвижные архитектурные инварианты
 
+- Физический source layout: `src/support-core`, `src/knowledge`, `src/web`; это layout change, а не новый runtime.
 - Browser ходит только в `.NET api`; `knowledge` наружу не публикуется.
 - Один product orchestrator/state machine находится в `.NET`.
 - `.NET` владеет `Decision`, case/turn state, moderation policy, routing, handoff, feedback и idempotency.

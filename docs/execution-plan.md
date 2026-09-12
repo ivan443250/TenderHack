@@ -40,7 +40,7 @@ Parallel work:
 - load candidate local generator/embedding/reranker;
 - record GPU/CPU/RAM/runtime/model revisions;
 - inspect critical PDF/table extraction;
-- Alembic baseline for `kb_*` tables + extensions.
+- PostgreSQL admin bootstrap for `pgvector`/`pg_trgm`, then Alembic baseline for knowledge-owned tables.
 
 ### Frontend
 

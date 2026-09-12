@@ -26,7 +26,7 @@
 | F. Quality analytics | Python `knowledge-worker` | quality evaluations/issue groups | knowledge-v0 quality endpoints |
 | G. Evals / Ops | cross-cutting | regression/compose/observability | all frozen contracts |
 
-## 3. A — Support Core (`apps/api`)
+## 3. A — Support Core (`src/support-core`)
 
 **Owns:** `Case`, `Turn`, revisions, all state enums, `TurnOrchestrator`, moderation policy (warning-first threshold), routing policy, idempotency, handoff aggregate/outbox, `IngestHandoffStatus` use-case, completion/archive, notifications table + owner SSE stream, owner session cookie, feedback (four signals), HTTP/SSE/authz, support webhook endpoint.
 
@@ -38,7 +38,7 @@
 
 **Ready when:** Domain state tests pass, knowledge stub can drive answer/clarify/handoff/technical-error branches, public API snapshot can restore UI after reload.
 
-## 4. B — Knowledge online (`apps/knowledge`)
+## 4. B — Knowledge online (`src/knowledge`)
 
 **Owns:** understand, exact extraction, retrieval, RRF/dedupe/rerank, answerability evidence assessment, draft, verify, source resolution, model adapters.
 
@@ -62,7 +62,7 @@
 
 **Ready when:** every demo source button can resolve `fragment_id → exact source metadata/text`, and critical cards have condition-change regressions.
 
-## 6. D — Web / Chat (`apps/web`)
+## 6. D — Web / Chat (`src/web`)
 
 **Owns:** presentation only — chat timeline, source drawer/button, progress stages, moderation warning rendering, handoff CTA/status widget (status + stage/specialist rows from server facts), «Завершить обращение» control, completion/feedback widget, case list with «Архив», notification toast/badge/inbox + Web Notifications API integration, analytics screens.
 

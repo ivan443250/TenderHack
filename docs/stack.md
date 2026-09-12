@@ -36,7 +36,7 @@ The previous reviewed spec chose a single Python modular monolith to avoid dupli
 
 Neither runtime is a general-purpose «backend» for the other: `api` never touches models, embeddings, PDF parsing or `kb_*` tables; `knowledge` never touches `cases`, `handoffs`, `Decision` or the browser.
 
-## 3. .NET baseline (`apps/api`)
+## 3. .NET baseline (`src/support-core`)
 
 ```text
 .NET 10 LTS SDK
@@ -59,7 +59,7 @@ Testcontainers.PostgreSql for Infrastructure/Api tests
 
 Not in `api`: MediatR, AutoMapper, generic repository/UoW frameworks, `Result<T>` libraries, ONNX Runtime, tokenizers, pgvector mapping, PDF parsers. If a use-case needs a handler, it is a class with one method; if a mapping is needed, it is a static method.
 
-## 4. Python baseline (`apps/knowledge`)
+## 4. Python baseline (`src/knowledge`)
 
 Target:
 
@@ -122,14 +122,14 @@ PostgreSQL 16 is chosen because the MVP needs:
 - trigram matching;
 - vector retrieval.
 
-Extensions (created by the `knowledge` Alembic baseline):
+Extensions (created by the PostgreSQL admin bootstrap before runtime migrations):
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 ```
 
-Two DB roles: `api_rw` (owner of `api` tables) and `knowledge_rw` (owner of `knowledge` tables). Neither role can read the other's tables; there are no shared views. Table ownership: `architecture.md §8`.
+Two DB roles and schemas: `api_rw` owns the `api` schema; `knowledge_rw` owns the `knowledge` schema. Neither role can read the other's tables; there are no shared views. Table ownership: `architecture.md §8`.
 
 ### Why no separate vector DB initially
 
@@ -281,7 +281,7 @@ inference
 reverse-proxy (optional)
 ```
 
-Multi-stage Dockerfiles: `sdk:10.0` → `aspnet:10.0` for .NET; `uv`-based image for Python. `api` has `depends_on` with healthcheck on `postgres` and `knowledge`; `knowledge` on `postgres` and `inference`.
+Multi-stage Dockerfiles: `sdk:10.0` → `aspnet:10.0` for .NET; the Python image installs the `src/knowledge` package from project metadata (local development uses `uv` and `uv.lock`). `api` has `depends_on` with healthcheck on `postgres` and `knowledge`; `knowledge` depends on `postgres`. The `inference` service is profile-gated and is started explicitly after local model artifacts pass a smoke test.
 
 One `docker compose up --build` (or documented equivalent where models are pre-mounted) should start the controllable environment.
 
@@ -308,7 +308,7 @@ Superseded by ADR-0001. Remains the documented fallback if the boundary rules fa
 
 ### Multi-layer .NET scaffold from commit `1b57aa1`
 
-Not restored. Its domain model (`Ticket`, `Specialist`, operator queue, threshold-based escalation) predates the reviewed spec and conflicts with the orthogonal state model; its `IThresholdProvider`/`IDateTimeProvider`/`Result<T>` layering is the ceremonial style `architecture.md §4` forbids. New `apps/api` is written from the current `architecture.md`, not from that scaffold.
+Not restored. Its domain model (`Ticket`, `Specialist`, operator queue, threshold-based escalation) predates the reviewed spec and conflicts with the orthogonal state model; its `IThresholdProvider`/`IDateTimeProvider`/`Result<T>` layering is the ceremonial style `architecture.md §4` forbids. New `src/support-core` is written from the current `architecture.md`, not from that scaffold.
 
 ### Separate ML microservice with its own orchestration
 

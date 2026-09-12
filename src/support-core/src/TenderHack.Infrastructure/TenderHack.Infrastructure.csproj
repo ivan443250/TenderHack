@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>TenderHack.Infrastructure</RootNamespace>
+    <AssemblyName>TenderHack.Infrastructure</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TenderHack.Application\TenderHack.Application.csproj" />
+  </ItemGroup>
+</Project>

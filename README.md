@@ -6,7 +6,7 @@
 
 `master` намеренно очищен от раннего .NET-шаблона (`1b57aa1`): его доменная модель фиксировала архитектуру до финального ревью требований. Текущая база — **docs-first, agent-first**: сначала зафиксированы формальные ограничения, продуктовые инварианты, архитектура, стек, quality gates и правила работы coding agents; реализация должна строиться поверх них.
 
-Backend разделён на .NET support core и Python knowledge-сервис по [`docs/adr/0001-dotnet-support-core-python-knowledge-service.md`](docs/adr/0001-dotnet-support-core-python-knowledge-service.md). Новый `apps/api` пишется по текущему `architecture.md`, а не восстанавливается из старого scaffold.
+Backend разделён на .NET support core и Python knowledge-сервис по [`docs/adr/0001-dotnet-support-core-python-knowledge-service.md`](docs/adr/0001-dotnet-support-core-python-knowledge-service.md). Новый `src/support-core` пишется по текущему `architecture.md`, а не восстанавливается из старого scaffold.
 
 ## Что строим
 
@@ -62,17 +62,37 @@ Backend разделён на .NET support core и Python knowledge-сервис
 - Нельзя показывать chain-of-thought как «прозрачность»; показываем source, condition, reason code, route и observable event.
 - Для рискованных/неподтвержденных условий безопасный отказ или передача лучше уверенной галлюцинации.
 
-## Планируемая структура после scaffold
+## Repository structure after foundation scaffold
 
 ```text
-apps/
-  api/          .NET solution: Domain / Application / Infrastructure / Api / Worker + tests
+src/
+  support-core/ .NET solution: Domain / Application / Infrastructure / Api / Worker + tests
   knowledge/    Python FastAPI knowledge & inference service + worker entrypoint
   web/          React/Vite UI
 evals/          retrieval, decision, moderation, quality and E2E suites
+tests/e2e/      cross-runtime smoke scenarios
+infra/          Compose and controlled-inference configuration
 scripts/        ingestion/dev/reproducibility helpers
 docs/           repository knowledge system of record (+ docs/adr/)
 ```
+
+Foundation verification commands:
+
+```text
+copy .env.example .env
+dotnet build src/support-core/TenderHack.sln -c Release
+dotnet test src/support-core/TenderHack.sln -c Release
+uv sync --extra test --project src/knowledge
+uv run --project src/knowledge pytest
+pnpm --dir src/web install
+pnpm --dir src/web typecheck
+pnpm --dir src/web test
+pnpm --dir src/web build
+docker compose config
+powershell -ExecutionPolicy Bypass -File scripts/check-structure.ps1
+```
+
+The scaffold exposes health endpoints and deterministic Knowledge v0 stubs only. It does not claim real retrieval, model loading, case state or final UI behavior yet.
 
 Не создавать эти каталоги пустыми ради вида. Первый implementation change должен создать только реально используемый scaffold и одновременно обновить команды в `AGENTS.md`/docs.
 

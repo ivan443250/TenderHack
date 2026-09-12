@@ -82,3 +82,7 @@ Where applicable:
 - `QualityFeedbackPush` with the four signals + `specialist_ref` deserializes; `helpful` ignored by new consumers;
 - `QualityCompletionPush` idempotent by `case_id`;
 - analytics fixtures can be built from turns + feedback + completions alone (no API DB).
+
+## 6. Foundation scaffold status
+
+The committed `knowledge-v0.openapi.yaml` remains the frozen source of truth. The FastAPI scaffold exposes deterministic, contract-shaped responses and tests path/method parity against the frozen artifact. Its generated OpenAPI is not yet claimed to be byte-for-byte equal: request/response schema export, NSwag regeneration, and boundary compatibility fixtures remain follow-up work before replacing stubs.

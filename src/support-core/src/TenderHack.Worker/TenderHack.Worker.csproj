@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>TenderHack.Worker</RootNamespace>
+    <AssemblyName>TenderHack.Worker</AssemblyName>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\TenderHack.Application\TenderHack.Application.csproj" />
+    <ProjectReference Include="..\TenderHack.Infrastructure\TenderHack.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>
