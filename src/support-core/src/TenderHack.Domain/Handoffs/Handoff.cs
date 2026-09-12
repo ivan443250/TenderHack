@@ -26,6 +26,12 @@ public sealed class Handoff
 
     public HandoffTerminalOutcome? Terminal { get; private set; }
 
+    /// <summary>When the adapter acknowledged the submission — the anchor for status-poll TTL (support-adapter-v0.md §6.1).</summary>
+    public DateTimeOffset? AcceptedAt { get; private set; }
+
+    /// <summary>True once status polling has reached `Support:StatusPoll:Ttl` without a terminal fact.</summary>
+    public bool Stale { get; private set; }
+
     /// <summary>Dedupe key for status ingestion; -1 means no status has been applied yet.</summary>
     public long LastExternalRevision { get; private set; } = -1;
 
@@ -46,7 +52,7 @@ public sealed class Handoff
     }
 
     /// <summary>Accepted/SimulatedAccepted is reachable only from a pending submission acknowledged by the adapter.</summary>
-    internal void Acknowledge(bool simulated, string? externalCaseId)
+    internal void Acknowledge(bool simulated, string? externalCaseId, DateTimeOffset now)
     {
         if (Status != HandoffStatus.Pending)
         {
@@ -56,7 +62,12 @@ public sealed class Handoff
         Status = simulated ? HandoffStatus.SimulatedAccepted : HandoffStatus.Accepted;
         IntegrationMode = simulated ? Handoffs.IntegrationMode.Simulated : Handoffs.IntegrationMode.Real;
         ExternalCaseId = externalCaseId;
+        AcceptedAt = now;
+        Stale = false;
     }
+
+    /// <summary>Status polling reached TTL without a terminal fact (support-adapter-v0.md §6.1).</summary>
+    internal void MarkStale() => Stale = true;
 
     internal void MarkFailed()
     {
@@ -98,6 +109,7 @@ public sealed class Handoff
         }
 
         LastExternalRevision = externalRevision;
+        Stale = false; // a fresh fact arrived, whatever channel it came from
 
         if (stage is not null)
         {

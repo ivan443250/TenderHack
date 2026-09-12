@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using TenderHack.Domain.Cases;
+using TenderHack.Domain.Feedback;
 using TenderHack.Domain.Handoffs;
 
 namespace TenderHack.Infrastructure.Persistence.Configurations;
@@ -25,6 +26,9 @@ public sealed class CaseConfiguration : IEntityTypeConfiguration<Case>
         builder.Property(c => c.ModerationWarningCount).IsRequired();
         builder.Property(c => c.CompletionReason).HasConversion<string>();
         builder.Property(c => c.CompletedAt);
+        builder.Property(c => c.FeedbackId).HasConversion(
+            id => id == null ? (Guid?)null : id.Value.Value,
+            value => value == null ? (FeedbackId?)null : new FeedbackId(value.Value));
 
         builder.Ignore(c => c.ActiveTurn);
         builder.Ignore(c => c.LastActivityAt);
@@ -53,6 +57,8 @@ public sealed class CaseConfiguration : IEntityTypeConfiguration<Case>
             handoff.Property(h => h.ExternalCaseId);
             handoff.Property(h => h.Terminal).HasConversion<string>();
             handoff.Property(h => h.LastExternalRevision).IsRequired();
+            handoff.Property(h => h.AcceptedAt);
+            handoff.Property(h => h.Stale).IsRequired();
 
             handoff.OwnsOne(h => h.Stage, stage =>
             {

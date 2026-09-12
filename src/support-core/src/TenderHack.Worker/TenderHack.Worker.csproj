@@ -9,4 +9,9 @@
     <ProjectReference Include="..\TenderHack.Application\TenderHack.Application.csproj" />
     <ProjectReference Include="..\TenderHack.Infrastructure\TenderHack.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 </Project>

@@ -14,6 +14,7 @@ public sealed class FakeKnowledgeService : IKnowledgeService
         new([new ClaimVerification("claim-1", Supported: true, ["frag-1"])]);
     public KnowledgeFailureException? FailAt { get; set; }
     public string FailingStage { get; set; } = string.Empty;
+    public ModerationContextResult ModerationContext { get; set; } = new(ModerationAmbiguity.Uncertain, "stub-v0");
 
     public Task<UnderstandResult> UnderstandAsync(UnderstandRequest request, KnowledgeRequestContext context, CancellationToken ct)
     {
@@ -26,7 +27,7 @@ public sealed class FakeKnowledgeService : IKnowledgeService
     public Task<ModerationContextResult> AssessModerationContextAsync(ModerationContextRequest request, KnowledgeRequestContext context, CancellationToken ct)
     {
         ThrowIfConfiguredToFail(nameof(AssessModerationContextAsync));
-        return Task.FromResult(new ModerationContextResult(ModerationAmbiguity.Uncertain, "stub-v0"));
+        return Task.FromResult(ModerationContext);
     }
 
     public Task<RetrieveResult> RetrieveAsync(RetrieveRequest request, KnowledgeRequestContext context, CancellationToken ct)

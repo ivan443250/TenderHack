@@ -1,4 +1,5 @@
 using TenderHack.Domain.Cases;
+using TenderHack.Domain.Handoffs;
 
 namespace TenderHack.Application.Ports;
 
@@ -11,6 +12,12 @@ public interface ICaseRepository
     Task<Case?> FindAsync(CaseId caseId, CancellationToken ct);
 
     Task<IReadOnlyList<Case>> ListByOwnerAsync(string ownerId, CancellationToken ct);
+
+    /// <summary>Cases whose handoff is accepted, not yet terminal, and not yet marked stale — `handoff-status-sync`'s worklist.</summary>
+    Task<IReadOnlyList<Case>> ListPendingHandoffPollsAsync(CancellationToken ct);
+
+    /// <summary>Looks a case up by its handoff id — the inbound status webhook only carries `handoff_id`, not `case_id`.</summary>
+    Task<Case?> FindByHandoffIdAsync(HandoffId handoffId, CancellationToken ct);
 
     void Add(Case @case);
 }

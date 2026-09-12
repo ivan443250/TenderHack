@@ -1,5 +1,6 @@
 using TenderHack.Application.Ports;
 using TenderHack.Domain.Cases;
+using TenderHack.Domain.Handoffs;
 
 namespace TenderHack.Application.Tests.Fakes;
 
@@ -12,6 +13,14 @@ public sealed class FakeCaseRepository : ICaseRepository
 
     public Task<IReadOnlyList<Case>> ListByOwnerAsync(string ownerId, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<Case>>([.. _cases.Values.Where(c => c.OwnerId == ownerId)]);
+
+    public Task<IReadOnlyList<Case>> ListPendingHandoffPollsAsync(CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<Case>>([.. _cases.Values.Where(c =>
+            c.Handoff is { Terminal: null, Stale: false } handoff
+            && (handoff.Status == HandoffStatus.Accepted || handoff.Status == HandoffStatus.SimulatedAccepted))]);
+
+    public Task<Case?> FindByHandoffIdAsync(HandoffId handoffId, CancellationToken ct) =>
+        Task.FromResult(_cases.Values.FirstOrDefault(c => c.Handoff?.Id == handoffId));
 
     public void Add(Case @case) => _cases[@case.Id] = @case;
 }

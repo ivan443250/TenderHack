@@ -45,6 +45,10 @@ namespace TenderHack.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<Guid?>("FeedbackId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("feedback_id");
+
                     b.Property<int>("ModerationWarningCount")
                         .HasColumnType("integer")
                         .HasColumnName("moderation_warning_count");
@@ -63,6 +67,46 @@ namespace TenderHack.Infrastructure.Persistence.Migrations
                         .HasName("pk_cases");
 
                     b.ToTable("cases", (string)null);
+                });
+
+            modelBuilder.Entity("TenderHack.Domain.Feedback.Feedback", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("case_id");
+
+                    b.Property<string>("CommentText")
+                        .HasColumnType("text")
+                        .HasColumnName("comment_text");
+
+                    b.Property<string>("InformationQualityRating")
+                        .HasColumnType("text")
+                        .HasColumnName("information_quality_rating");
+
+                    b.Property<bool?>("Solved")
+                        .HasColumnType("boolean")
+                        .HasColumnName("solved");
+
+                    b.Property<string>("SpecialistRating")
+                        .HasColumnType("text")
+                        .HasColumnName("specialist_rating");
+
+                    b.Property<DateTimeOffset>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("submitted_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_feedback");
+
+                    b.HasIndex("CaseId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_feedback_case_id");
+
+                    b.ToTable("feedback", (string)null);
                 });
 
             modelBuilder.Entity("TenderHack.Infrastructure.Persistence.CaseEventEntity", b =>
@@ -107,6 +151,60 @@ namespace TenderHack.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_case_events_case_id_id");
 
                     b.ToTable("case_events", (string)null);
+                });
+
+            modelBuilder.Entity("TenderHack.Infrastructure.Persistence.NotificationEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("body");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("case_id");
+
+                    b.Property<string>("IntegrationMode")
+                        .HasColumnType("text")
+                        .HasColumnName("integration_mode");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("OwnerId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("owner_id");
+
+                    b.Property<DateTimeOffset?>("ReadAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("read_at");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("title");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_notifications");
+
+                    b.HasIndex("OwnerId", "Id")
+                        .HasDatabaseName("ix_notifications_owner_id_id");
+
+                    b.ToTable("notifications", (string)null);
                 });
 
             modelBuilder.Entity("TenderHack.Infrastructure.Persistence.OutboxMessageEntity", b =>
@@ -201,6 +299,10 @@ namespace TenderHack.Infrastructure.Persistence.Migrations
                                 .HasColumnType("uuid")
                                 .HasColumnName("id");
 
+                            b1.Property<DateTimeOffset?>("AcceptedAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("accepted_at");
+
                             b1.Property<Guid>("CaseId")
                                 .HasColumnType("uuid")
                                 .HasColumnName("case_id");
@@ -216,6 +318,10 @@ namespace TenderHack.Infrastructure.Persistence.Migrations
                             b1.Property<long>("LastExternalRevision")
                                 .HasColumnType("bigint")
                                 .HasColumnName("last_external_revision");
+
+                            b1.Property<bool>("Stale")
+                                .HasColumnType("boolean")
+                                .HasColumnName("stale");
 
                             b1.Property<string>("Status")
                                 .IsRequired()

@@ -1,11 +1,11 @@
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Options;
 using TenderHack.Api.Endpoints;
 using TenderHack.Api.ExceptionHandling;
-using TenderHack.Api.Moderation;
 using TenderHack.Application.Orchestration;
-using TenderHack.Application.Ports;
 using TenderHack.Application.UseCases;
 using TenderHack.Infrastructure;
+using TenderHack.Infrastructure.Handoff;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,13 +13,22 @@ builder.Services.AddSupportCoreInfrastructure(builder.Configuration);
 
 // Application composition: TenderHack.Application stays framework-free, so its use-cases and
 // orchestrator are wired here in the outermost layer rather than inside Application itself.
+// IModerationRuleEngine/IKnowledgeService/IHandoffAdapter/etc. are registered by AddSupportCoreInfrastructure above.
 builder.Services.AddSingleton(new ModerationOptions());
-builder.Services.AddSingleton<IModerationRuleEngine, PassthroughModerationRuleEngine>();
 builder.Services.AddScoped<TurnOrchestrator>();
 builder.Services.AddScoped<CreateCaseUseCase>();
 builder.Services.AddScoped<SendMessageUseCase>();
 builder.Services.AddScoped<GetCaseSnapshotUseCase>();
 builder.Services.AddScoped<ListCasesUseCase>();
+builder.Services.AddScoped<PrepareHandoffUseCase>();
+builder.Services.AddScoped<ConfirmHandoffUseCase>();
+builder.Services.AddScoped<RetryHandoffUseCase>();
+builder.Services.AddScoped<IngestHandoffStatusUseCase>();
+builder.Services.AddScoped<CaseCompletionPublisher>();
+builder.Services.AddScoped<CompleteCaseUseCase>();
+builder.Services.AddScoped<SubmitFeedbackUseCase>();
+builder.Services.AddScoped<ListNotificationsUseCase>();
+builder.Services.AddScoped<AckNotificationsUseCase>();
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -40,6 +49,12 @@ app.MapGet("/health/ready", () => Results.Ok(new { status = "ready", service = "
 app.MapSessionEndpoints();
 app.MapCaseEndpoints();
 app.MapSourceEndpoints();
+app.MapHandoffEndpoints();
+app.MapCompletionEndpoints();
+app.MapNotificationEndpoints();
+
+var supportOptions = app.Services.GetRequiredService<IOptions<SupportOptions>>().Value;
+app.MapSupportWebhookEndpoints(supportOptions);
 
 app.Run();
 

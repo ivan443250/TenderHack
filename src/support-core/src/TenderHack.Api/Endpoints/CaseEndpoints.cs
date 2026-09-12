@@ -34,23 +34,25 @@ public static class CaseEndpoints
         });
 
         app.MapGet("/api/v0/cases/{caseId}", async (
-            HttpContext context, string caseId, GetCaseSnapshotUseCase useCase, ICaseEventReader events, CancellationToken ct) =>
+            HttpContext context, string caseId, GetCaseSnapshotUseCase useCase, ICaseEventReader events,
+            IFeedbackRepository feedbackRepository, CancellationToken ct) =>
         {
-            if (!TryRequireCaseId(caseId, out var id, out var badRequest))
+            if (!CaseEndpointHelpers.TryRequireCaseId(caseId, out var id, out var badRequest))
             {
                 return badRequest;
             }
 
-            var ownerId = RequireOwner(context);
+            var ownerId = CaseEndpointHelpers.RequireOwner(context);
             var @case = await useCase.ExecuteAsync(id, ownerId, ct);
             var history = await events.ListAsync(id, after: 0, ct);
-            return Results.Ok(CaseMapper.ToSnapshot(@case, history));
+            var feedback = @case.FeedbackId is not null ? await feedbackRepository.FindByCaseIdAsync(id, ct) : null;
+            return Results.Ok(CaseMapper.ToSnapshot(@case, history, feedback));
         });
 
         app.MapPost("/api/v0/cases/{caseId}/messages", async (
             HttpContext context, string caseId, SendMessageRequest request, SendMessageUseCase useCase, CancellationToken ct) =>
         {
-            if (!TryRequireCaseId(caseId, out var id, out var badRequest))
+            if (!CaseEndpointHelpers.TryRequireCaseId(caseId, out var id, out var badRequest))
             {
                 return badRequest;
             }
@@ -60,7 +62,7 @@ public static class CaseEndpoints
                 return Results.ValidationProblem(new Dictionary<string, string[]> { ["text"] = ["Text is required."] });
             }
 
-            var ownerId = RequireOwner(context);
+            var ownerId = CaseEndpointHelpers.RequireOwner(context);
             var outcome = await useCase.ExecuteAsync(id, ownerId, request.Text, ct);
             return Results.Ok(CaseMapper.ToSendMessageResponse(caseId, outcome));
         });
@@ -68,12 +70,12 @@ public static class CaseEndpoints
         app.MapGet("/api/v0/cases/{caseId}/events", async (
             HttpContext context, string caseId, long? after, GetCaseSnapshotUseCase ownershipCheck, ICaseEventReader events, CancellationToken ct) =>
         {
-            if (!TryRequireCaseId(caseId, out var id, out var badRequest))
+            if (!CaseEndpointHelpers.TryRequireCaseId(caseId, out var id, out var badRequest))
             {
                 return badRequest;
             }
 
-            var ownerId = RequireOwner(context);
+            var ownerId = CaseEndpointHelpers.RequireOwner(context);
             await ownershipCheck.ExecuteAsync(id, ownerId, ct); // throws CaseNotFoundException when not owned
             var history = await events.ListAsync(id, after ?? 0, ct);
             return Results.Ok(history.Select(CaseMapper.ToTimelineItem).ToArray());
@@ -87,7 +89,7 @@ public static class CaseEndpoints
                 return Results.BadRequest();
             }
 
-            var ownerId = RequireOwner(context);
+            var ownerId = CaseEndpointHelpers.RequireOwner(context);
             await ownershipCheck.ExecuteAsync(id, ownerId, ct);
 
             var afterEventId = long.TryParse(context.Request.Headers["Last-Event-ID"], out var lastEventId) ? lastEventId : 0;
@@ -114,18 +116,4 @@ public static class CaseEndpoints
         }
     }
 
-    private static string RequireOwner(HttpContext context) =>
-        OwnerSession.TryGet(context) ?? throw new UnauthenticatedException();
-
-    private static bool TryRequireCaseId(string raw, out CaseId id, out IResult badRequest)
-    {
-        if (CaseId.TryParse(raw, out id))
-        {
-            badRequest = Results.Empty;
-            return true;
-        }
-
-        badRequest = Results.BadRequest(new { code = "VALIDATION_ERROR", message = "Invalid case id." });
-        return false;
-    }
 }

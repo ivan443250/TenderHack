@@ -10,4 +10,9 @@ public interface IModerationRuleEngine
     ModerationRuleMatch? Evaluate(string text);
 }
 
-public sealed record ModerationRuleMatch(bool Confirmed, string RuleVersion, IReadOnlyList<string> MatchedTerms);
+/// <summary>
+/// A rule hit. When <see cref="RequiresContextCheck"/> is true the match is ambiguous and the
+/// orchestrator must escalate to `knowledge.AssessModerationContextAsync` before treating it as a
+/// confirmed violation (product-spec.md §14 step 4).
+/// </summary>
+public sealed record ModerationRuleMatch(string RuleId, string RuleVersion, string MatchedTerm, int Start, int End, bool RequiresContextCheck);

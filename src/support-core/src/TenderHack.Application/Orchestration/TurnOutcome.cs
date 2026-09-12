@@ -23,6 +23,9 @@ public sealed record TurnOutcome(
     public static TurnOutcome Answered(TurnId turnId, int revision, int warningCount, string markdown, IReadOnlyList<string> sourceFragmentIds) =>
         new(turnId, revision, Decision.Answer, warningCount, AnswerMarkdown: markdown, SourceFragmentIds: sourceFragmentIds);
 
+    public static TurnOutcome AnsweredWithHandoff(TurnId turnId, int revision, int warningCount, string markdown, IReadOnlyList<string> sourceFragmentIds) =>
+        new(turnId, revision, Decision.AnswerAndHandoff, warningCount, AnswerMarkdown: markdown, SourceFragmentIds: sourceFragmentIds);
+
     public static TurnOutcome Clarify(TurnId turnId, int revision, int warningCount, IReadOnlyList<string> missingConditions) =>
         new(turnId, revision, Decision.Clarify, warningCount, MissingConditions: missingConditions);
 

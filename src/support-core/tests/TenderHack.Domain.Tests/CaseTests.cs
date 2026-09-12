@@ -111,7 +111,7 @@ public sealed class CaseTests
         var sut = NewCase();
         sut.PrepareHandoff();
         sut.ConfirmHandoff();
-        sut.AcknowledgeHandoff(simulated: false, externalCaseId: "ext-1");
+        sut.AcknowledgeHandoff(simulated: false, externalCaseId: "ext-1", Now);
         sut.StartTurn(Now);
         sut.RecordModerationViolation(closeAfterWarnings: 1, Now);
         sut.StartTurn(Now.AddSeconds(1));
@@ -127,7 +127,7 @@ public sealed class CaseTests
         var sut = NewCase();
         sut.PrepareHandoff();
         sut.ConfirmHandoff();
-        sut.AcknowledgeHandoff(simulated: false, externalCaseId: "ext-1");
+        sut.AcknowledgeHandoff(simulated: false, externalCaseId: "ext-1", Now);
         var turn = sut.StartTurn(Now);
 
         var failed = sut.TryFailTurn(turn.Id, turn.Revision);
@@ -145,7 +145,7 @@ public sealed class CaseTests
         sut.PrepareHandoff();
 
         // No Confirm() happened, so acknowledgement must be rejected — accepted only follows a pending submission.
-        Assert.Throws<InvalidHandoffTransitionException>(() => sut.AcknowledgeHandoff(simulated: false, null));
+        Assert.Throws<InvalidHandoffTransitionException>(() => sut.AcknowledgeHandoff(simulated: false, null, Now));
     }
 
     [Fact]
@@ -154,7 +154,7 @@ public sealed class CaseTests
         var sut = NewCase();
         sut.PrepareHandoff();
         sut.ConfirmHandoff();
-        sut.AcknowledgeHandoff(simulated: false, "ext-1");
+        sut.AcknowledgeHandoff(simulated: false, "ext-1", Now);
 
         Assert.Throws<HandoffMismatchException>(() =>
             sut.IngestHandoffStatus(HandoffId.New(), 1, null, null, null, Now));
@@ -166,7 +166,7 @@ public sealed class CaseTests
         var sut = NewCase();
         sut.PrepareHandoff();
         sut.ConfirmHandoff();
-        sut.AcknowledgeHandoff(simulated: false, "ext-1");
+        sut.AcknowledgeHandoff(simulated: false, "ext-1", Now);
         var stage = new HandoffStage("IN_PROGRESS", "В работе");
         sut.IngestHandoffStatus(sut.Handoff!.Id, externalRevision: 1, stage, null, null, Now);
 
@@ -182,7 +182,7 @@ public sealed class CaseTests
         var sut = NewCase();
         sut.PrepareHandoff();
         sut.ConfirmHandoff();
-        sut.AcknowledgeHandoff(simulated: false, "ext-1");
+        sut.AcknowledgeHandoff(simulated: false, "ext-1", Now);
         sut.CompleteByUser(solved: null, Now);
 
         sut.IngestHandoffStatus(sut.Handoff!.Id, externalRevision: 1, null, null, HandoffTerminalOutcome.Resolved, Now.AddMinutes(1));
@@ -208,5 +208,47 @@ public sealed class CaseTests
         sut.CompleteByUser(solved: true, Now);
 
         Assert.Throws<CaseAlreadyCompletedException>(() => sut.CompleteByUser(solved: false, Now.AddSeconds(1)));
+    }
+
+    [Fact]
+    public void AcceptingAHandoffRecordsAcceptedAtAndClearsStale()
+    {
+        var sut = NewCase();
+        sut.PrepareHandoff();
+        sut.ConfirmHandoff();
+
+        sut.AcknowledgeHandoff(simulated: true, "ext-1", Now);
+
+        Assert.Equal(Now, sut.Handoff!.AcceptedAt);
+        Assert.False(sut.Handoff.Stale);
+    }
+
+    [Fact]
+    public void MarkingAHandoffStaleDoesNotChangeConversationOrResolutionStatus()
+    {
+        var sut = NewCase();
+        sut.PrepareHandoff();
+        sut.ConfirmHandoff();
+        sut.AcknowledgeHandoff(simulated: true, "ext-1", Now);
+
+        sut.MarkHandoffStale();
+
+        Assert.True(sut.Handoff!.Stale);
+        Assert.Equal(ConversationStatus.Active, sut.ConversationStatus);
+        Assert.Equal(ResolutionStatus.Unknown, sut.ResolutionStatus);
+    }
+
+    [Fact]
+    public void AFreshStatusFactClearsAPreviouslyStaleFlag()
+    {
+        var sut = NewCase();
+        sut.PrepareHandoff();
+        sut.ConfirmHandoff();
+        sut.AcknowledgeHandoff(simulated: true, "ext-1", Now);
+        sut.MarkHandoffStale();
+
+        sut.IngestHandoffStatus(sut.Handoff!.Id, externalRevision: 1, new HandoffStage("IN_PROGRESS", null), null, null, Now);
+
+        Assert.False(sut.Handoff.Stale);
     }
 }
