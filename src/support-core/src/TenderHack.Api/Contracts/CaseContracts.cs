@@ -65,23 +65,35 @@ public sealed record SubmitFeedbackRequest(
     bool? Solved,
     string? CommentText);
 
+/// <summary>web-api-v0.md §12 — the same shape on `GET /notifications` and on the `notification` SSE stream.</summary>
 public sealed record NotificationResponse(
     string NotificationId,
     string CaseId,
     string Type,
     DateTimeOffset OccurredAt,
     DateTimeOffset? ReadAt,
-    string Title,
-    string Body,
-    string? IntegrationMode);
+    NotificationPayload Payload);
 
-public sealed record AckNotificationsRequest(IReadOnlyList<string> Ids);
+public sealed record NotificationPayload(string Title, string Body, string? IntegrationMode);
 
+public sealed record AckNotificationsRequest(IReadOnlyList<string>? Ids);
+
+/// <summary>web-api-v0.md §4.2 — a `CaseSnapshot.timeline` entry and the `GET /events` catch-up row.</summary>
 public sealed record TimelineItemResponse(
     string ItemId,
     string Type,
     DateTimeOffset OccurredAt,
     string? TurnId,
+    JsonElement Payload);
+
+/// <summary>web-api-v0.md §6 — the `data:` envelope of one `case_event` SSE message.</summary>
+public sealed record CaseEventResponse(
+    string EventId,
+    string CaseId,
+    string? TurnId,
+    int? Revision,
+    string Type,
+    DateTimeOffset OccurredAt,
     JsonElement Payload);
 
 public sealed record SendMessageRequest(string Text, string? ClientMessageId);

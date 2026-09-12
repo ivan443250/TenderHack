@@ -103,6 +103,14 @@ public sealed class Handoff
             throw new HandoffMismatchException(Id, handoffId, CaseId, caseId);
         }
 
+        // Status facts exist only for a submission the adapter has acknowledged: a stage/specialist/
+        // terminal for a prepared-but-unsent or failed handoff would let "prepared" masquerade as
+        // "accepted" (product-spec.md: prepared handoff != accepted handoff).
+        if (Status is not (HandoffStatus.Accepted or HandoffStatus.SimulatedAccepted))
+        {
+            throw new HandoffNotAcceptedException(Id, Status);
+        }
+
         if (externalRevision <= LastExternalRevision)
         {
             return false;

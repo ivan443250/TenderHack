@@ -33,6 +33,7 @@ public sealed class SubmitFeedbackUseCase(
         var now = clock.GetUtcNow();
         var feedback = new Feedback(FeedbackId.New(), caseId, specialistRating, informationQualityRating, solved, commentText, now);
 
+        var resolutionBefore = @case.ResolutionStatus;
         @case.RecordFeedback(feedback.Id, solved);
         feedbackRepository.Add(feedback);
 
@@ -42,6 +43,14 @@ public sealed class SubmitFeedbackUseCase(
             ["information_quality_rating"] = informationQualityRating?.ToString(),
             ["solved"] = solved,
         }), ct);
+
+        // `solved` is the one feedback signal that can move resolution (from UNKNOWN only); the
+        // timeline must show that transition the same way user/support completion does.
+        if (@case.ResolutionStatus != resolutionBefore)
+        {
+            await events.PublishAsync(caseId, new CaseEvent("CASE_RESOLUTION_CHANGED", null, null, now,
+                new Dictionary<string, object?> { ["resolution_status"] = @case.ResolutionStatus.ToString() }), ct);
+        }
 
         var turnId = @case.Turns.Count > 0 ? @case.Turns[^1].Id.ToString() : caseId.ToString();
         outbox.Enqueue(QualityOutboxMessages.Feedback, new QualityFeedbackPush(

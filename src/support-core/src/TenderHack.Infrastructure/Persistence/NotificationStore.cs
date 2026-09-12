@@ -10,7 +10,7 @@ namespace TenderHack.Infrastructure.Persistence;
 /// <see cref="IUnitOfWork.SaveChangesAsync"/>. <see cref="AckAsync"/> is a standalone read-endpoint
 /// operation and commits itself.
 /// </summary>
-public sealed class NotificationStore(TenderHackDbContext db) : INotificationSink, INotificationReader
+public sealed class NotificationStore(TenderHackDbContext db, TimeProvider clock) : INotificationSink, INotificationReader
 {
     public void Enqueue(string ownerId, CaseId caseId, string type, string title, string body, string? integrationMode) =>
         db.Notifications.Add(new NotificationEntity
@@ -18,7 +18,7 @@ public sealed class NotificationStore(TenderHackDbContext db) : INotificationSin
             OwnerId = ownerId,
             CaseId = caseId.Value,
             Type = type,
-            OccurredAt = DateTimeOffset.UtcNow,
+            OccurredAt = clock.GetUtcNow(),
             Title = title,
             Body = body,
             IntegrationMode = integrationMode,
@@ -26,7 +26,7 @@ public sealed class NotificationStore(TenderHackDbContext db) : INotificationSin
 
     public async Task<IReadOnlyList<NotificationEntry>> ListAsync(string ownerId, long after, bool unreadOnly, CancellationToken ct)
     {
-        var query = db.Notifications.Where(n => n.OwnerId == ownerId && n.Id > after);
+        var query = db.Notifications.AsNoTracking().Where(n => n.OwnerId == ownerId && n.Id > after);
         if (unreadOnly)
         {
             query = query.Where(n => n.ReadAt == null);
@@ -44,7 +44,7 @@ public sealed class NotificationStore(TenderHackDbContext db) : INotificationSin
             .Where(n => n.OwnerId == ownerId && notificationIds.Contains(n.Id) && n.ReadAt == null)
             .ToListAsync(ct);
 
-        var now = DateTimeOffset.UtcNow;
+        var now = clock.GetUtcNow();
         foreach (var row in rows)
         {
             row.ReadAt = now;

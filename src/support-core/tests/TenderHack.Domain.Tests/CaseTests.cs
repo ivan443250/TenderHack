@@ -309,4 +309,59 @@ public sealed class CaseTests
 
         Assert.False(sut.Handoff.Stale);
     }
+
+    [Theory]
+    [InlineData(false, false)] // NotRequested: prepared, never confirmed
+    [InlineData(true, false)]  // Pending: confirmed, adapter has not acknowledged yet
+    [InlineData(true, true)]   // Failed
+    public void StatusFactsAreRejectedUntilTheAdapterHasAcknowledgedTheHandoff(bool confirm, bool fail)
+    {
+        // Regression: a stage/terminal fact on an unacknowledged handoff would have closed the case
+        // through CompleteBySupport — "prepared handoff" masquerading as "accepted handoff".
+        var sut = NewCase();
+        sut.PrepareHandoff();
+        if (confirm) sut.ConfirmHandoff();
+        if (fail) sut.FailHandoff();
+
+        Assert.Throws<HandoffNotAcceptedException>(() =>
+            sut.IngestHandoffStatus(sut.Handoff!.Id, externalRevision: 1, null, null, HandoffTerminalOutcome.Resolved, Now));
+        Assert.Equal(ConversationStatus.Active, sut.ConversationStatus);
+        Assert.Null(sut.Handoff!.Terminal);
+    }
+
+    [Fact]
+    public void ActiveTurnIsTheHighestRevisionRegardlessOfLoadOrder()
+    {
+        // Regression: persistence fills the backing list in whatever order rows come back (EF Core
+        // adds no ORDER BY for owned collections, so it is Postgres heap order), and `_turns[^1]`
+        // reported an older revision as active. Simulate an out-of-order load through the backing
+        // field exactly the way the materializer populates it.
+        var sut = NewCase();
+        var first = sut.StartTurn(Now);
+        sut.TryPublishDecision(first.Id, first.Revision, Decision.Answer);
+        var second = sut.StartTurn(Now.AddSeconds(1));
+        sut.TryPublishDecision(second.Id, second.Revision, Decision.Answer);
+
+        var backingList = (List<Turn>)typeof(Case)
+            .GetField("_turns", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .GetValue(sut)!;
+        backingList.Reverse();
+
+        Assert.Same(second, sut.ActiveTurn);
+        Assert.Equal([1, 2], sut.Turns.Select(t => t.Revision));
+        Assert.Equal(3, sut.StartTurn(Now.AddSeconds(2)).Revision);
+    }
+
+    [Fact]
+    public void ACompletedTurnCannotBeFailedOrRepublished()
+    {
+        var sut = NewCase();
+        var turn = sut.StartTurn(Now);
+        sut.TryPublishDecision(turn.Id, turn.Revision, Decision.Answer);
+
+        Assert.False(sut.TryFailTurn(turn.Id, turn.Revision));
+        Assert.False(sut.TryPublishDecision(turn.Id, turn.Revision, Decision.Clarify));
+        Assert.Equal(TurnStatus.Completed, turn.Status);
+        Assert.Equal(Decision.Answer, turn.Decision);
+    }
 }

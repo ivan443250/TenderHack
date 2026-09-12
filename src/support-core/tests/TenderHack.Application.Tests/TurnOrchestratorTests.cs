@@ -13,9 +13,10 @@ public sealed class TurnOrchestratorTests
     private readonly FakeModerationRuleEngine _moderation = new();
     private readonly FakeTurnEventStream _events = new();
     private readonly FakeOutbox _outbox = new();
+    private readonly FakeUnitOfWork _unitOfWork = new();
 
     private TurnOrchestrator CreateSut(int closeAfterWarnings = 1) =>
-        new(_knowledge, _moderation, _events, _outbox, new ModerationOptions(closeAfterWarnings), TimeProvider.System);
+        new(_knowledge, _moderation, _events, _outbox, _unitOfWork, new ModerationOptions(closeAfterWarnings), TimeProvider.System);
 
     private static Case NewCase() => new(CaseId.New(), ownerId: "owner-1", DateTimeOffset.UtcNow);
 
@@ -235,6 +236,59 @@ public sealed class TurnOrchestratorTests
         Assert.Equal(category.ToString(), push.ErrorCategory);
         Assert.NotNull(push.StageTimings.UnderstandMs);
         Assert.Null(push.StageTimings.RetrieveMs);
+    }
+
+    [Fact]
+    public async Task TurnIsPersistedBeforeTheFirstStageRuns()
+    {
+        // Regression: the turn used to be committed only with the final decision, so any crash
+        // between StartTurn and that commit left USER_MESSAGE/TURN_STAGE events pointing at a turn
+        // row that never existed — and nothing for `stale-turn cleanup` to recover.
+        var sut = CreateSut();
+        var @case = NewCase();
+        var savesWhenUnderstandRan = -1;
+        _knowledge.UnderstandOverride = req =>
+        {
+            savesWhenUnderstandRan = _unitOfWork.SaveChangesCallCount;
+            return new UnderstandResult(req.Text, [], [], []);
+        };
+
+        await sut.RunAsync(@case, "вопрос", CancellationToken.None);
+
+        Assert.Equal(1, savesWhenUnderstandRan);
+        Assert.Equal(1, _unitOfWork.SaveChangesCallCount); // the final decision is the caller's commit
+    }
+
+    [Fact]
+    public async Task UnclassifiedFailureFailsThePersistedTurnAndStillPropagates()
+    {
+        // A defect or infrastructure error is not a KnowledgeFailureException: it must surface to the
+        // caller (500), but the QUEUED row from the first commit must not be left hanging until TTL.
+        var sut = CreateSut();
+        var @case = NewCase();
+        _knowledge.FailAt = new InvalidOperationException("bug");
+        _knowledge.FailingStage = nameof(FakeKnowledgeService.RetrieveAsync);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => sut.RunAsync(@case, "вопрос", CancellationToken.None));
+
+        Assert.Equal(TurnStatus.Failed, @case.ActiveTurn!.Status);
+        var error = Assert.Single(_events.Published, e => e.Event.Type == "TECHNICAL_ERROR");
+        Assert.Equal(TurnOrchestrator.InternalErrorCategory, error.Event.Payload["category"]);
+        Assert.Equal(2, _unitOfWork.SaveChangesCallCount); // input commit + best-effort failure commit
+    }
+
+    [Fact]
+    public async Task AmbiguousMatchForwardsTheRuleEngineSpanToKnowledge()
+    {
+        // Regression: the moderation_context request used to carry a fabricated 0..len span.
+        var sut = CreateSut();
+        var @case = NewCase();
+        _moderation.NextResult = new ModerationRuleMatch("PROFANITY_A01", "v1", "дура", 7, 11, RequiresContextCheck: true);
+
+        await sut.RunAsync(@case, "ну ты и дура", CancellationToken.None);
+
+        Assert.Equal(7, _knowledge.LastModerationContextRequest!.Start);
+        Assert.Equal(11, _knowledge.LastModerationContextRequest.End);
     }
 
     [Fact]

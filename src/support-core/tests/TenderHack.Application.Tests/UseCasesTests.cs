@@ -9,6 +9,10 @@ namespace TenderHack.Application.Tests;
 
 public sealed class UseCasesTests
 {
+    private static TurnOrchestrator NewOrchestrator(FakeUnitOfWork unitOfWork) =>
+        new(new FakeKnowledgeService(), new FakeModerationRuleEngine(), new FakeTurnEventStream(), new FakeOutbox(),
+            unitOfWork, new ModerationOptions(), TimeProvider.System);
+
     [Fact]
     public async Task CreateCasePersistsAndReturnsANewCaseForTheOwner()
     {
@@ -28,27 +32,24 @@ public sealed class UseCasesTests
     {
         var repository = new FakeCaseRepository();
         var unitOfWork = new FakeUnitOfWork();
-        var orchestrator = new TurnOrchestrator(
-            new FakeKnowledgeService(), new FakeModerationRuleEngine(), new FakeTurnEventStream(), new FakeOutbox(),
-            new ModerationOptions(), TimeProvider.System);
         var @case = new Case(CaseId.New(), "owner-1", DateTimeOffset.UtcNow);
         repository.Add(@case);
-        var sut = new SendMessageUseCase(repository, unitOfWork, orchestrator);
+        var sut = new SendMessageUseCase(repository, unitOfWork, NewOrchestrator(unitOfWork));
 
         var outcome = await sut.ExecuteAsync(@case.Id, "owner-1", "вопрос", CancellationToken.None);
 
         Assert.Equal(Decision.Answer, outcome.Decision);
-        Assert.Equal(1, unitOfWork.SaveChangesCallCount);
+        // Two commits per turn: the orchestrator persists the QUEUED turn before the first stage,
+        // the use-case persists the final decision.
+        Assert.Equal(2, unitOfWork.SaveChangesCallCount);
     }
 
     [Fact]
     public async Task SendMessageToUnknownCaseThrowsNotFound()
     {
         var repository = new FakeCaseRepository();
-        var orchestrator = new TurnOrchestrator(
-            new FakeKnowledgeService(), new FakeModerationRuleEngine(), new FakeTurnEventStream(), new FakeOutbox(),
-            new ModerationOptions(), TimeProvider.System);
-        var sut = new SendMessageUseCase(repository, new FakeUnitOfWork(), orchestrator);
+        var unitOfWork = new FakeUnitOfWork();
+        var sut = new SendMessageUseCase(repository, unitOfWork, NewOrchestrator(unitOfWork));
 
         await Assert.ThrowsAsync<CaseNotFoundException>(() =>
             sut.ExecuteAsync(CaseId.New(), "owner-1", "вопрос", CancellationToken.None));
@@ -60,10 +61,8 @@ public sealed class UseCasesTests
         var repository = new FakeCaseRepository();
         var @case = new Case(CaseId.New(), "owner-1", DateTimeOffset.UtcNow);
         repository.Add(@case);
-        var orchestrator = new TurnOrchestrator(
-            new FakeKnowledgeService(), new FakeModerationRuleEngine(), new FakeTurnEventStream(), new FakeOutbox(),
-            new ModerationOptions(), TimeProvider.System);
-        var sut = new SendMessageUseCase(repository, new FakeUnitOfWork(), orchestrator);
+        var unitOfWork = new FakeUnitOfWork();
+        var sut = new SendMessageUseCase(repository, unitOfWork, NewOrchestrator(unitOfWork));
 
         await Assert.ThrowsAsync<CaseNotFoundException>(() =>
             sut.ExecuteAsync(@case.Id, "someone-else", "вопрос", CancellationToken.None));

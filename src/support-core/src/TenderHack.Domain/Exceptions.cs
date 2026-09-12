@@ -52,6 +52,14 @@ public sealed class HandoffNotFoundException(CaseId caseId)
     public CaseId CaseId { get; } = caseId;
 }
 
+/// <summary>Status facts (stage/specialist/terminal) are only accepted for an adapter-acknowledged handoff.</summary>
+public sealed class HandoffNotAcceptedException(HandoffId handoffId, HandoffStatus status)
+    : InvalidOperationException($"Handoff {handoffId} is {status}; status facts require an accepted handoff.")
+{
+    public HandoffId HandoffId { get; } = handoffId;
+    public HandoffStatus Status { get; } = status;
+}
+
 /// <summary>A status update cannot target a different handoff/case than it was issued for (architecture.md §6).</summary>
 public sealed class HandoffMismatchException(
     HandoffId expectedHandoffId,

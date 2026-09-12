@@ -21,7 +21,7 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
                 context.CaseId.ToString(),
                 context.TurnId.ToString(),
                 new Generated.UnderstandRequest { Text = request.Text, Prior_turn_summary = request.PriorTurnSummary },
-                ct));
+                ct), ct);
 
         return new AppKnowledge.UnderstandResult(
             response.Normalized_text,
@@ -38,7 +38,7 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
             Rule_id = request.RuleId,
             Version = request.RuleVersion,
             Matched_term = request.MatchedTerm,
-            Matched_span = new Generated.Matched_span { Start = 0, End = request.MatchedTerm.Length },
+            Matched_span = new Generated.Matched_span { Start = request.Start, End = request.End },
         };
 
         var response = await CallAsync(
@@ -47,7 +47,7 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
                 context.CaseId.ToString(),
                 context.TurnId.ToString(),
                 new Generated.ModerationContextRequest { Text = request.Text, Rule_match = ruleMatch },
-                ct));
+                ct), ct);
 
         var ambiguity = response.Ambiguity switch
         {
@@ -77,7 +77,7 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
                         : Generated.Corpus.NORMATIVE,
                     Snapshot_id = request.SnapshotId,
                 },
-                ct));
+                ct), ct);
 
         return new AppKnowledge.RetrieveResult(
             response.Snapshot_id,
@@ -99,7 +99,7 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
                     Snapshot_id = request.SnapshotId,
                     Candidate_fragment_ids = [.. request.CandidateFragmentIds],
                 },
-                ct));
+                ct), ct);
 
         var evidenceSufficiency = response.Evidence_sufficiency switch
         {
@@ -130,7 +130,7 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
                     Evidence_fragment_ids = [.. request.EvidenceFragmentIds],
                     Constraints = new Generated.DraftConstraints(),
                 },
-                ct));
+                ct), ct);
 
         return new AppKnowledge.DraftResult(
             response.Draft_markdown,
@@ -151,7 +151,7 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
                     Claims = [.. request.Claims.Select(c => new Generated.Claim { Claim_id = c.ClaimId, Text = c.Text, Fragment_ids = [.. c.FragmentIds] })],
                     Snapshot_id = request.SnapshotId,
                 },
-                ct));
+                ct), ct);
 
         return new AppKnowledge.VerifyResult(
             [.. response.Results.Select(r => new AppKnowledge.ClaimVerification(r.Claim_id, r.Supported, [.. r.Evidence_fragment_ids]))]);
@@ -160,7 +160,7 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
     public async Task<AppKnowledge.SourceFragment> GetSourceAsync(string fragmentId, CancellationToken ct)
     {
         var traceId = Guid.NewGuid();
-        var response = await CallAsync(() => client.GetSourceAsync(traceId, fragmentId, ct));
+        var response = await CallAsync(() => client.GetSourceAsync(traceId, fragmentId, ct), ct);
 
         return new AppKnowledge.SourceFragment(
             response.Document_id, response.Title, response.Version, response.Page, response.Anchor, response.Text, response.Snapshot_id);
@@ -191,7 +191,7 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
                 Verify_ms = push.StageTimings.VerifyMs,
             },
             Error_category = push.ErrorCategory,
-        }, ct));
+        }, ct), ct);
 
     public Task PushQualityFeedbackAsync(AppKnowledge.QualityFeedbackPush push, CancellationToken ct) =>
         CallAsync(() => client.PushQualityFeedbackAsync(Guid.NewGuid(), new Generated.QualityFeedbackPush
@@ -211,7 +211,7 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
             },
             Solved = push.Solved,
             Comment_text = push.CommentText,
-        }, ct));
+        }, ct), ct);
 
     public Task PushQualityCompletionAsync(AppKnowledge.QualityCompletionPush push, CancellationToken ct) =>
         CallAsync(() => client.PushQualityCompletionAsync(Guid.NewGuid(), new Generated.QualityCompletionPush
@@ -231,17 +231,17 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
             Stage_code = push.StageCode,
             Moderation_warning_count = push.ModerationWarningCount,
             Turn_count = push.TurnCount,
-        }, ct));
+        }, ct), ct);
 
     public async Task<AppKnowledge.QualityEvaluations> GetQualityEvaluationsAsync(string caseId, CancellationToken ct)
     {
-        var response = await CallAsync(() => client.GetQualityEvaluationsAsync(Guid.NewGuid(), caseId, ct));
+        var response = await CallAsync(() => client.GetQualityEvaluationsAsync(Guid.NewGuid(), caseId, ct), ct);
         return new AppKnowledge.QualityEvaluations(response.Case_id, [.. response.Evaluations.Select(ToEvaluation)]);
     }
 
     public async Task<AppKnowledge.IssueGroups> GetIssueGroupsAsync(CancellationToken ct)
     {
-        var response = await CallAsync(() => client.GetIssueGroupsAsync(Guid.NewGuid(), ct));
+        var response = await CallAsync(() => client.GetIssueGroupsAsync(Guid.NewGuid(), ct), ct);
         return new AppKnowledge.IssueGroups([.. response.Groups.Select(ToIssueGroup)]);
     }
 
@@ -323,7 +323,7 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
     /// Single funnel from any failed `knowledge` call to <see cref="AppKnowledge.KnowledgeFailureException"/>
     /// (knowledge-v0.md §3) — the orchestrator must never see a raw HTTP/JSON exception.
     /// </summary>
-    private static async Task<T> CallAsync<T>(Func<Task<T>> call)
+    private static async Task<T> CallAsync<T>(Func<Task<T>> call, CancellationToken ct)
     {
         try
         {
@@ -342,9 +342,12 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
                 : AppKnowledge.KnowledgeFailureCategory.InvalidResponse;
             throw new AppKnowledge.KnowledgeFailureException(category, ex.Message, ex);
         }
-        catch (OperationCanceledException ex) when (!ex.CancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
         {
-            // HttpClient's own timeout, not our caller's cancellation.
+            // Our caller did not cancel, so this is HttpClient's own `Timeout` (a TaskCanceledException
+            // wrapping a TimeoutException). Its token is HttpClient's internal linked CTS — already
+            // cancelled — which is why the decision must be made against the caller's token, never
+            // against `ex.CancellationToken`.
             throw new AppKnowledge.KnowledgeFailureException(AppKnowledge.KnowledgeFailureCategory.Timeout, "knowledge call timed out.", ex);
         }
         catch (HttpRequestException ex)

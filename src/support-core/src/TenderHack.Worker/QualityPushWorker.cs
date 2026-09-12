@@ -25,8 +25,12 @@ public sealed class QualityPushWorker(IServiceScopeFactory scopeFactory, ILogger
             {
                 await ProcessBatchAsync(stoppingToken);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
+                // Filter on *our* token, not on the exception type: an HttpClient timeout surfaces as
+                // a TaskCanceledException, and an `is not OperationCanceledException` filter let one
+                // escape ExecuteAsync — which, under the host's default StopHost policy, took the
+                // whole api-worker process down with it. Only a real shutdown may leave this loop.
                 logger.LogError(ex, "quality-push tick failed");
             }
 
@@ -63,7 +67,7 @@ public sealed class QualityPushWorker(IServiceScopeFactory scopeFactory, ILogger
                 await push(entry.PayloadJson, ct);
                 await outboxReader.MarkDeliveredAsync(entry.Id, ct);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (!ct.IsCancellationRequested)
             {
                 logger.LogWarning(ex, "quality push {MessageType} (outbox row {Id}) failed, will retry", messageType, entry.Id);
                 await outboxReader.RecordAttemptFailureAsync(entry.Id, ex.Message, ct);

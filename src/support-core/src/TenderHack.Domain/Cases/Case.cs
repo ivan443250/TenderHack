@@ -33,9 +33,15 @@ public sealed class Case
 
     public FeedbackId? FeedbackId { get; private set; }
 
-    public IReadOnlyList<Turn> Turns => _turns;
+    /// <summary>
+    /// Always in revision order. The backing list is populated by persistence in whatever order the
+    /// store returns rows (EF Core does not order owned collections), so position in `_turns` is
+    /// never authoritative — only <see cref="Turn.Revision"/> is.
+    /// </summary>
+    public IReadOnlyList<Turn> Turns => [.. _turns.OrderBy(t => t.Revision)];
 
-    public Turn? ActiveTurn => _turns.Count == 0 ? null : _turns[^1];
+    /// <summary>The highest revision — the only turn that may still publish an authoritative decision.</summary>
+    public Turn? ActiveTurn => _turns.Count == 0 ? null : _turns.MaxBy(t => t.Revision);
 
     /// <summary>Most recent thing that happened on this case — for list/sort views, not a persisted column.</summary>
     public DateTimeOffset LastActivityAt
@@ -43,7 +49,7 @@ public sealed class Case
         get
         {
             var latest = CreatedAt;
-            if (_turns.Count > 0 && _turns[^1].CreatedAt > latest) latest = _turns[^1].CreatedAt;
+            if (ActiveTurn is { } active && active.CreatedAt > latest) latest = active.CreatedAt;
             if (CompletedAt is { } completedAt && completedAt > latest) latest = completedAt;
             return latest;
         }
@@ -64,22 +70,25 @@ public sealed class Case
             throw new CaseClosedException(Id);
         }
 
-        ActiveTurn?.Supersede();
+        var previous = ActiveTurn;
+        previous?.Supersede();
 
-        var turn = new Turn(TurnId.New(), _turns.Count + 1, now);
+        // Revision numbers are unique per case (enforced by persistence as well) — a second request
+        // that started from the same snapshot computes the same number and fails to commit.
+        var turn = new Turn(TurnId.New(), (previous?.Revision ?? 0) + 1, now);
         _turns.Add(turn);
         return turn;
     }
 
     /// <summary>
     /// Publishes a decision for the given turn/revision. Returns false without changing state when the
-    /// turn has since been superseded — a stale turn can never publish an authoritative answer.
+    /// turn has since been superseded or already reached a terminal status — a stale turn can never
+    /// publish an authoritative answer, and a finished one is never rewritten.
     /// </summary>
     public bool TryPublishDecision(TurnId turnId, int revision, Decision decision)
     {
-        var current = ActiveTurn;
-        if (current is null || current.Id != turnId || current.Revision != revision
-            || current.Status == TurnStatus.Superseded)
+        var current = FindOpenActiveTurn(turnId, revision);
+        if (current is null)
         {
             return false;
         }
@@ -92,9 +101,8 @@ public sealed class Case
     /// <summary>Same staleness rule as <see cref="TryPublishDecision"/>, for a failed AI turn.</summary>
     public bool TryFailTurn(TurnId turnId, int revision)
     {
-        var current = ActiveTurn;
-        if (current is null || current.Id != turnId || current.Revision != revision
-            || current.Status == TurnStatus.Superseded)
+        var current = FindOpenActiveTurn(turnId, revision);
+        if (current is null)
         {
             return false;
         }
@@ -102,6 +110,16 @@ public sealed class Case
         // Deliberately does not touch Handoff: a failed AI turn must not mutate a prior accepted handoff.
         current.Fail();
         return true;
+    }
+
+    private Turn? FindOpenActiveTurn(TurnId turnId, int revision)
+    {
+        var current = ActiveTurn;
+        return current is { Status: TurnStatus.Queued or TurnStatus.Running }
+            && current.Id == turnId
+            && current.Revision == revision
+            ? current
+            : null;
     }
 
     /// <summary>Applies one confirmed profanity violation under the warning-first policy.</summary>

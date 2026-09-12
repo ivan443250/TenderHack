@@ -1,5 +1,4 @@
 using System.Net.ServerSentEvents;
-using System.Text.Json;
 using TenderHack.Api.Contracts;
 using TenderHack.Application.Exceptions;
 using TenderHack.Application.Ports;
@@ -11,6 +10,9 @@ namespace TenderHack.Api.Endpoints;
 public static class CaseEndpoints
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(700);
+
+    /// <summary>Upper bound for one user message; a support question does not need more, and `knowledge` is not sized for arbitrary bodies.</summary>
+    public const int MaxMessageLength = 4000;
 
     public static void MapCaseEndpoints(this IEndpointRouteBuilder app)
     {
@@ -77,6 +79,13 @@ public static class CaseEndpoints
                 return Results.ValidationProblem(new Dictionary<string, string[]> { ["text"] = ["Text is required."] });
             }
 
+            if (request.Text.Length > MaxMessageLength)
+            {
+                // Boundary input is bounded before it reaches any stage: an unbounded body goes straight
+                // into `knowledge.understand`, and a few hundred KB of text is enough to stall it.
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["text"] = [$"Text must be at most {MaxMessageLength} characters."] });
+            }
+
             var ownerId = CaseEndpointHelpers.RequireOwner(context);
             var outcome = await useCase.ExecuteAsync(id, ownerId, request.Text, ct);
             return Results.Ok(CaseMapper.ToSendMessageResponse(caseId, outcome));
@@ -108,11 +117,15 @@ public static class CaseEndpoints
             await ownershipCheck.ExecuteAsync(id, ownerId, ct);
 
             var afterEventId = long.TryParse(context.Request.Headers["Last-Event-ID"], out var lastEventId) ? lastEventId : 0;
-            return TypedResults.ServerSentEvents(StreamEventsAsync(id, afterEventId, events, ct), eventType: "case_event");
+
+            // No `eventType:` argument on purpose: the SseItem overload has none, and passing one
+            // silently selects the plain-`T` overload, which then JSON-serializes the whole SseItem
+            // (id and event name included) as `data:` — the envelope below is what web-api-v0 §6 defines.
+            return TypedResults.ServerSentEvents(StreamEventsAsync(id, afterEventId, events, ct));
         });
     }
 
-    private static async IAsyncEnumerable<SseItem<string>> StreamEventsAsync(
+    private static async IAsyncEnumerable<SseItem<CaseEventResponse>> StreamEventsAsync(
         CaseId caseId, long afterEventId, ICaseEventReader events, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
@@ -121,7 +134,7 @@ public static class CaseEndpoints
             foreach (var e in batch)
             {
                 afterEventId = e.EventId;
-                yield return new SseItem<string>(JsonSerializer.Serialize(CaseMapper.ToTimelineItem(e)), "case_event")
+                yield return new SseItem<CaseEventResponse>(CaseMapper.ToCaseEvent(caseId, e), "case_event")
                 {
                     EventId = e.EventId.ToString(),
                 };
@@ -130,5 +143,4 @@ public static class CaseEndpoints
             await Task.Delay(PollInterval, ct);
         }
     }
-
 }

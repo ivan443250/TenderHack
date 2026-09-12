@@ -97,6 +97,25 @@ public sealed class CompletionAndFeedbackTests
         Assert.Equal(@case.Id, feedback.CaseId);
         Assert.Same(feedback, Assert.Single(feedbackRepository.Added));
         Assert.Contains(events.Published, e => e.Event.Type == "FEEDBACK_SUBMITTED");
+        // The `solved` signal moved resolution, and the timeline shows it like any other transition.
+        var changed = Assert.Single(events.Published, e => e.Event.Type == "CASE_RESOLUTION_CHANGED");
+        Assert.Equal("Resolved", changed.Event.Payload["resolution_status"]);
+    }
+
+    [Fact]
+    public async Task RatingOnlyFeedbackDoesNotPublishResolutionChanged()
+    {
+        var repository = new FakeCaseRepository();
+        var @case = NewCase();
+        @case.CompleteByUser(null, DateTimeOffset.UtcNow);
+        repository.Add(@case);
+        var events = new FakeTurnEventStream();
+        var sut = new SubmitFeedbackUseCase(repository, new FakeFeedbackRepository(), new FakeUnitOfWork(), events, new FakeOutbox(), TimeProvider.System);
+
+        await sut.ExecuteAsync(@case.Id, "owner-1", FeedbackRating.Positive, null, solved: null, null, CancellationToken.None);
+
+        Assert.Equal(ResolutionStatus.Unknown, @case.ResolutionStatus);
+        Assert.DoesNotContain(events.Published, e => e.Event.Type == "CASE_RESOLUTION_CHANGED");
     }
 
     [Fact]

@@ -58,6 +58,9 @@ public static class CaseMapper
     public static TimelineItemResponse ToTimelineItem(PersistedCaseEvent e) =>
         new(e.EventId.ToString(), e.Type, e.OccurredAt, e.TurnId?.ToString(), JsonDocument.Parse(e.PayloadJson).RootElement);
 
+    public static CaseEventResponse ToCaseEvent(CaseId caseId, PersistedCaseEvent e) =>
+        new(e.EventId.ToString(), caseId.ToString(), e.TurnId?.ToString(), e.Revision, e.Type, e.OccurredAt, JsonDocument.Parse(e.PayloadJson).RootElement);
+
     /// <summary>
     /// Re-derives routing from the case's own last `HANDOFF_OFFER` event rather than trusting the
     /// client — the frontend only ever gets to edit the human-written summary text.

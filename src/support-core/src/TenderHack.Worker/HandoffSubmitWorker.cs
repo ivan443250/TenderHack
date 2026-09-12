@@ -25,7 +25,7 @@ public sealed class HandoffSubmitWorker(IServiceScopeFactory scopeFactory, ILogg
             {
                 await ProcessBatchAsync(stoppingToken);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
                 logger.LogError(ex, "handoff-submit tick failed");
             }
@@ -86,7 +86,7 @@ public sealed class HandoffSubmitWorker(IServiceScopeFactory scopeFactory, ILogg
 
             await outboxReader.MarkDeliveredAsync(entry.Id, ct);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (!ct.IsCancellationRequested)
         {
             @case.FailHandoff();
             await outboxReader.MarkFailedAsync(entry.Id, ex.Message, ct);

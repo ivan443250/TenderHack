@@ -209,6 +209,8 @@ Accepted response:
 
 The browser may optimistically render the user bubble, but final turn/timeline identity comes from server response/event.
 
+Validation: `text` is required (non-blank) and at most 4000 characters; a longer body is a `400` validation error (`errors.text`), never truncated server-side. A concurrent second send for the same case while the first one is still being persisted is a `409 CONCURRENCY_CONFLICT` — the client reloads the snapshot and resends.
+
 ## 6. SSE/event contract
 
 Envelope:

@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TenderHack API — Dev Console</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-row">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <div>
+          <h1>TenderHack API — Dev Console</h1>
+          <p class="muted">Тестовый front для ручной проверки TenderHack.Api. Не для продакшена.</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <label class="field-inline">
+          <span>Base URL</span>
+          <input id="base-url" type="text" placeholder="(этот же origin)" />
+        </label>
+        <button id="btn-health-live" class="btn btn-ghost">GET /health/live</button>
+        <button id="btn-health-ready" class="btn btn-ghost">GET /health/ready</button>
+      </div>
+    </div>
+    <div class="topbar-row topbar-status">
+      <span class="pill" id="active-case-pill">Активный кейс: <strong id="active-case-label">не выбран</strong></span>
+      <span class="muted small" id="cookie-note">
+        Cookie owner_id — HttpOnly, из JS не видна. Успешный ответ на «Создать сессию» или «Создать кейс» = сессия установлена браузером автоматически.
+      </span>
+    </div>
+    <div id="top-result" class="result" hidden></div>
+  </header>
+
+  <main class="grid">
+
+    <!-- SESSION -->
+    <section class="card">
+      <h2>Сессия</h2>
+      <p class="muted">Анонимный владелец кейсов — opaque id в HttpOnly cookie. Без аккаунтов, без паролей.</p>
+      <div class="row">
+        <button id="btn-create-session" class="btn">POST /api/v0/session</button>
+      </div>
+      <div id="result-session" class="result"></div>
+    </section>
+
+    <!-- CASES: create / list -->
+    <section class="card">
+      <h2>Кейсы</h2>
+
+      <div class="subblock">
+        <h3>Создать кейс</h3>
+        <div class="row">
+          <label class="field">
+            <span>Idempotency-Key (опц.)</span>
+            <div class="field-with-btn">
+              <input id="create-case-idem" type="text" placeholder="uuid" />
+              <button class="btn btn-tiny" data-gen-uuid="create-case-idem">UUID</button>
+            </div>
+          </label>
+        </div>
+        <div class="row">
+          <button id="btn-create-case" class="btn btn-primary">POST /api/v0/cases</button>
+        </div>
+        <div id="result-create-case" class="result"></div>
+      </div>
+
+      <div class="subblock">
+        <h3>Список кейсов</h3>
+        <div class="row">
+          <label class="field">
+            <span>status</span>
+            <select id="list-cases-status">
+              <option value="">(все)</option>
+              <option value="archived">archived</option>
+            </select>
+          </label>
+          <button id="btn-list-cases" class="btn">GET /api/v0/cases</button>
+        </div>
+        <div class="row">
+          <label class="field field-grow">
+            <span>Найденные кейсы</span>
+            <select id="cases-select"><option value="">— нет данных, нажмите «список кейсов» —</option></select>
+          </label>
+          <button id="btn-use-selected-case" class="btn btn-ghost">Сделать активным</button>
+        </div>
+        <div id="result-list-cases" class="result"></div>
+      </div>
+    </section>
+
+    <!-- ACTIVE CASE -->
+    <section class="card card-wide">
+      <h2>Активный кейс</h2>
+      <div class="row">
+        <label class="field field-grow">
+          <span>case_id</span>
+          <input id="active-case-input" type="text" placeholder="вставьте case_id или создайте кейс выше" />
+        </label>
+        <button id="btn-set-active-case" class="btn btn-ghost">Установить активным</button>
+      </div>
+
+      <div class="subblock">
+        <h3>Снимок кейса</h3>
+        <div class="row">
+          <button id="btn-get-case" class="btn">GET /api/v0/cases/{caseId}</button>
+        </div>
+        <div id="result-get-case" class="result"></div>
+      </div>
+
+      <div class="subblock">
+        <h3>Отправить сообщение</h3>
+        <div class="row">
+          <label class="field field-grow">
+            <span>text</span>
+            <input id="message-text" type="text" placeholder="Здравствуйте, у меня проблема с..." />
+          </label>
+        </div>
+        <div class="row">
+          <label class="field">
+            <span>client_message_id (опц.)</span>
+            <div class="field-with-btn">
+              <input id="message-client-id" type="text" placeholder="uuid" />
+              <button class="btn btn-tiny" data-gen-uuid="message-client-id">UUID</button>
+            </div>
+          </label>
+          <button id="btn-send-message" class="btn btn-primary">POST .../messages</button>
+        </div>
+        <div id="result-send-message" class="result"></div>
+      </div>
+
+      <div class="subblock">
+        <h3>История событий</h3>
+        <div class="row">
+          <label class="field">
+            <span>after (event id)</span>
+            <input id="events-after" type="number" value="0" min="0" />
+          </label>
+          <button id="btn-get-events" class="btn">GET .../events</button>
+        </div>
+        <div id="result-get-events" class="result"></div>
+      </div>
+
+      <div class="subblock">
+        <h3>Поток событий (SSE)</h3>
+        <div class="row">
+          <button id="btn-toggle-case-stream" class="btn btn-ghost">Подключить .../events/stream</button>
+          <span id="case-stream-status" class="muted small">отключено</span>
+        </div>
+        <div id="case-stream-log" class="stream-log"></div>
+      </div>
+
+      <div class="subblock">
+        <h3>Завершить кейс</h3>
+        <div class="row">
+          <label class="field">
+            <span>solved</span>
+            <select id="complete-solved">
+              <option value="">(не указано)</option>
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </label>
+          <button id="btn-complete-case" class="btn">POST .../complete</button>
+        </div>
+        <div id="result-complete-case" class="result"></div>
+      </div>
+
+      <div class="subblock">
+        <h3>Отправить фидбэк</h3>
+        <div class="row">
+          <label class="field">
+            <span>specialist_rating</span>
+            <select id="fb-specialist">
+              <option value="">(не указано)</option>
+              <option value="POSITIVE">POSITIVE</option>
+              <option value="NEGATIVE">NEGATIVE</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>information_quality_rating</span>
+            <select id="fb-quality">
+              <option value="">(не указано)</option>
+              <option value="POSITIVE">POSITIVE</option>
+              <option value="NEGATIVE">NEGATIVE</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>solved</span>
+            <select id="fb-solved">
+              <option value="">(не указано)</option>
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </label>
+        </div>
+        <div class="row">
+          <label class="field field-grow">
+            <span>comment_text</span>
+            <input id="fb-comment" type="text" placeholder="опционально" />
+          </label>
+        </div>
+        <div class="row">
+          <label class="field">
+            <span>Idempotency-Key (опц.)</span>
+            <div class="field-with-btn">
+              <input id="fb-idem" type="text" placeholder="uuid" />
+              <button class="btn btn-tiny" data-gen-uuid="fb-idem">UUID</button>
+            </div>
+          </label>
+          <button id="btn-submit-feedback" class="btn btn-primary">POST .../feedback</button>
+        </div>
+        <div id="result-feedback" class="result"></div>
+      </div>
+    </section>
+
+    <!-- HANDOFF -->
+    <section class="card">
+      <h2>Handoff (эскалация на специалиста)</h2>
+      <p class="muted">Использует активный кейс, выбранный выше.</p>
+
+      <div class="subblock">
+        <h3>Prepare</h3>
+        <div class="row">
+          <button id="btn-handoff-prepare" class="btn">POST .../handoff/prepare</button>
+        </div>
+        <div id="result-handoff-prepare" class="result"></div>
+      </div>
+
+      <div class="subblock">
+        <h3>Confirm</h3>
+        <div class="row">
+          <label class="field field-grow">
+            <span>summary</span>
+            <input id="handoff-confirm-summary" type="text" placeholder="краткое резюме для специалиста" />
+          </label>
+        </div>
+        <div class="row">
+          <label class="field">
+            <span>Idempotency-Key (опц.)</span>
+            <div class="field-with-btn">
+              <input id="handoff-confirm-idem" type="text" placeholder="uuid" />
+              <button class="btn btn-tiny" data-gen-uuid="handoff-confirm-idem">UUID</button>
+            </div>
+          </label>
+          <button id="btn-handoff-confirm" class="btn btn-primary">POST .../handoff/confirm</button>
+        </div>
+        <div id="result-handoff-confirm" class="result"></div>
+      </div>
+
+      <div class="subblock">
+        <h3>Retry</h3>
+        <div class="row">
+          <label class="field field-grow">
+            <span>summary</span>
+            <input id="handoff-retry-summary" type="text" placeholder="краткое резюме для специалиста" />
+          </label>
+        </div>
+        <div class="row">
+          <label class="field">
+            <span>Idempotency-Key (опц.)</span>
+            <div class="field-with-btn">
+              <input id="handoff-retry-idem" type="text" placeholder="uuid" />
+              <button class="btn btn-tiny" data-gen-uuid="handoff-retry-idem">UUID</button>
+            </div>
+          </label>
+          <button id="btn-handoff-retry" class="btn btn-primary">POST .../handoff/retry</button>
+        </div>
+        <div id="result-handoff-retry" class="result"></div>
+      </div>
+    </section>
+
+    <!-- NOTIFICATIONS -->
+    <section class="card">
+      <h2>Уведомления</h2>
+      <p class="muted">Owner-scoped, не привязаны к одному кейсу.</p>
+
+      <div class="subblock">
+        <h3>Список</h3>
+        <div class="row">
+          <label class="field">
+            <span>after (id)</span>
+            <input id="notif-after" type="number" value="0" min="0" />
+          </label>
+          <label class="field-checkbox">
+            <input id="notif-unread" type="checkbox" />
+            <span>только непрочитанные</span>
+          </label>
+          <button id="btn-list-notifications" class="btn">GET /api/v0/notifications</button>
+        </div>
+        <div id="result-list-notifications" class="result"></div>
+      </div>
+
+      <div class="subblock">
+        <h3>Отметить прочитанными</h3>
+        <div class="row">
+          <label class="field field-grow">
+            <span>ids (через запятую или с новой строки)</span>
+            <input id="notif-ack-ids" type="text" placeholder="123, 124" />
+          </label>
+          <button id="btn-ack-notifications" class="btn">POST /api/v0/notifications/ack</button>
+        </div>
+        <div id="result-ack-notifications" class="result"></div>
+      </div>
+
+      <div class="subblock">
+        <h3>Поток (SSE)</h3>
+        <div class="row">
+          <button id="btn-toggle-notif-stream" class="btn btn-ghost">Подключить /notifications/stream</button>
+          <span id="notif-stream-status" class="muted small">отключено</span>
+        </div>
+        <div id="notif-stream-log" class="stream-log"></div>
+      </div>
+    </section>
+
+    <!-- SOURCES -->
+    <section class="card">
+      <h2>Источники знаний</h2>
+      <div class="row">
+        <label class="field field-grow">
+          <span>fragment_id</span>
+          <input id="source-fragment-id" type="text" placeholder="fragment id" />
+        </label>
+        <button id="btn-get-source" class="btn">GET /api/v0/sources/{fragmentId}</button>
+      </div>
+      <div id="result-source" class="result"></div>
+    </section>
+
+    <!-- ANALYTICS -->
+    <section class="card">
+      <h2>Аналитика</h2>
+
+      <div class="subblock">
+        <h3>Оценки качества по кейсу</h3>
+        <div class="row">
+          <label class="field field-grow">
+            <span>case_id</span>
+            <input id="eval-case-id" type="text" placeholder="по умолчанию — активный кейс" />
+          </label>
+          <button id="btn-get-evaluations" class="btn">GET /api/v0/analytics/evaluations</button>
+        </div>
+        <div id="result-evaluations" class="result"></div>
+      </div>
+
+      <div class="subblock">
+        <h3>Группы проблем</h3>
+        <div class="row">
+          <button id="btn-get-issue-groups" class="btn">GET /api/v0/analytics/issue-groups</button>
+        </div>
+        <div id="result-issue-groups" class="result"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="log-panel">
+    <div class="log-header">
+      <h2>Журнал запросов</h2>
+      <button id="btn-clear-log" class="btn btn-tiny btn-ghost">Очистить</button>
+    </div>
+    <div id="request-log" class="log-list">
+      <p class="muted small">Здесь появится каждый запрос из этой консоли — метод, путь, статус и полный ответ.</p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

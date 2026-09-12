@@ -49,6 +49,12 @@ public sealed class CaseConfiguration : IEntityTypeConfiguration<Case>
             turn.Property(t => t.CreatedAt).IsRequired();
             turn.Property(t => t.Status).HasConversion<string>().IsRequired();
             turn.Property(t => t.Decision).HasConversion<string>();
+
+            // Two requests that loaded the same case snapshot compute the same next revision; the
+            // `xmin` token above cannot catch that (starting a turn only inserts here, it never
+            // updates `cases`), so uniqueness is what turns the loser into a 409 instead of a
+            // second "revision N" row (architecture.md §7: turn publication unique by turn + revision).
+            turn.HasIndex("CaseId", nameof(Turn.Revision)).IsUnique();
         });
 
         builder.OwnsOne(c => c.Handoff, handoff =>

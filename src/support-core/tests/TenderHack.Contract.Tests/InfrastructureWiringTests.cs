@@ -58,4 +58,20 @@ public sealed class InfrastructureWiringTests
         Assert.Contains("case_events", tableNames);
         Assert.Contains("outbox", tableNames);
     }
+
+    [Fact]
+    public void TurnRevisionIsUniquePerCase()
+    {
+        // Regression: two concurrent sends persisted two "revision 3" rows — the `xmin` token on
+        // `cases` cannot see an insert into an owned collection, so the index is the real guard.
+        using var provider = BuildProvider();
+        using var scope = provider.CreateScope();
+
+        var db = scope.ServiceProvider.GetRequiredService<TenderHackDbContext>();
+        var turns = db.Model.GetEntityTypes().Single(e => e.GetTableName() == "turns");
+        var uniqueIndex = turns.GetIndexes().SingleOrDefault(i =>
+            i.IsUnique && i.Properties.Select(p => p.Name).SequenceEqual(["CaseId", "Revision"]));
+
+        Assert.NotNull(uniqueIndex);
+    }
 }

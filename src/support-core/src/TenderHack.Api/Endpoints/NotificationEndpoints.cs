@@ -1,5 +1,4 @@
 using System.Net.ServerSentEvents;
-using System.Text.Json;
 using TenderHack.Api.Contracts;
 using TenderHack.Application.Ports;
 using TenderHack.Application.UseCases;
@@ -25,7 +24,12 @@ public static class NotificationEndpoints
             HttpContext context, AckNotificationsRequest request, AckNotificationsUseCase useCase, CancellationToken ct) =>
         {
             var ownerId = CaseEndpointHelpers.RequireOwner(context);
-            var ids = request.Ids.Select(long.Parse).ToArray();
+
+            if (!TryParseIds(request.Ids, out var ids))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["ids"] = ["Each id must be a numeric notification_id."] });
+            }
+
             await useCase.ExecuteAsync(ownerId, ids, ct);
             return Results.Ok(new { status = "ok" });
         });
@@ -34,11 +38,35 @@ public static class NotificationEndpoints
         {
             var ownerId = CaseEndpointHelpers.RequireOwner(context);
             var afterId = long.TryParse(context.Request.Headers["Last-Event-ID"], out var lastEventId) ? lastEventId : 0;
-            return TypedResults.ServerSentEvents(StreamNotificationsAsync(ownerId, afterId, reader, ct), eventType: "notification");
+
+            // See CaseEndpoints: the SseItem overload takes no `eventType`, the item carries it.
+            return TypedResults.ServerSentEvents(StreamNotificationsAsync(ownerId, afterId, reader, ct));
         });
     }
 
-    private static async IAsyncEnumerable<SseItem<string>> StreamNotificationsAsync(
+    /// <summary>Ids are opaque strings on the wire (web-api-v0 §12) but must parse — a bad one is the caller's 400, not our 500.</summary>
+    private static bool TryParseIds(IReadOnlyList<string>? raw, out long[] ids)
+    {
+        ids = [];
+        if (raw is null)
+        {
+            return false;
+        }
+
+        var parsed = new long[raw.Count];
+        for (var i = 0; i < raw.Count; i++)
+        {
+            if (!long.TryParse(raw[i], out parsed[i]))
+            {
+                return false;
+            }
+        }
+
+        ids = parsed;
+        return true;
+    }
+
+    private static async IAsyncEnumerable<SseItem<NotificationResponse>> StreamNotificationsAsync(
         string ownerId, long afterId, INotificationReader reader, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
@@ -47,7 +75,7 @@ public static class NotificationEndpoints
             foreach (var n in batch)
             {
                 afterId = n.NotificationId;
-                yield return new SseItem<string>(JsonSerializer.Serialize(ToResponse(n)), "notification")
+                yield return new SseItem<NotificationResponse>(ToResponse(n), "notification")
                 {
                     EventId = n.NotificationId.ToString(),
                 };
@@ -58,5 +86,6 @@ public static class NotificationEndpoints
     }
 
     private static NotificationResponse ToResponse(NotificationEntry n) =>
-        new(n.NotificationId.ToString(), n.CaseId.ToString(), n.Type, n.OccurredAt, n.ReadAt, n.Title, n.Body, n.IntegrationMode);
+        new(n.NotificationId.ToString(), n.CaseId.ToString(), n.Type, n.OccurredAt, n.ReadAt,
+            new NotificationPayload(n.Title, n.Body, n.IntegrationMode));
 }
