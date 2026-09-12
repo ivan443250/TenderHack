@@ -202,8 +202,7 @@ public sealed class TurnOrchestrator(
                     // support to act on (product-spec.md §10 ANSWER_AND_HANDOFF).
                     var routing = RoutingPolicy.Evaluate(evidenceInsufficient: false, conditionDependent: false, answerability.RiskFlags);
                     @case.TryPublishDecision(turn.Id, turn.Revision, Decision.AnswerAndHandoff);
-                    await PublishAsync(@case.Id, turn.Id, turn.Revision, "AI_ANSWER", now,
-                        new Dictionary<string, object?> { ["markdown"] = draft.Markdown }, ct);
+                    await PublishAnswerAsync(@case, turn, now, draft.Markdown, answerability.EvidenceFragmentIds, ct);
                     await PublishHandoffOfferAsync(@case, turn, now, routing, ct);
                     EnqueueQualityTurnPush(@case, turn, messageText, Decision.AnswerAndHandoff, timings,
                         draft.Markdown, answerability.EvidenceFragmentIds, retrieve.SnapshotId, routing, errorCategory: null);
@@ -211,8 +210,7 @@ public sealed class TurnOrchestrator(
                 }
 
                 @case.TryPublishDecision(turn.Id, turn.Revision, Decision.Answer);
-                await PublishAsync(@case.Id, turn.Id, turn.Revision, "AI_ANSWER", now,
-                    new Dictionary<string, object?> { ["markdown"] = draft.Markdown }, ct);
+                await PublishAnswerAsync(@case, turn, now, draft.Markdown, answerability.EvidenceFragmentIds, ct);
                 EnqueueQualityTurnPush(@case, turn, messageText, Decision.Answer, timings,
                     draft.Markdown, answerability.EvidenceFragmentIds, retrieve.SnapshotId, routing: null, errorCategory: null);
                 return TurnOutcome.Answered(turn.Id, turn.Revision, @case.ModerationWarningCount, draft.Markdown, answerability.EvidenceFragmentIds);
@@ -274,6 +272,14 @@ public sealed class TurnOrchestrator(
             ServiceNeed: routing?.ServiceNeed.ToString(),
             timings.ToPush(),
             errorCategory));
+
+    /// <summary>The source ids ride on the event too, so a reloaded timeline can still open «источник» — the POST response is not the only carrier.</summary>
+    private Task PublishAnswerAsync(Case @case, Turn turn, DateTimeOffset now, string markdown, IReadOnlyList<string> sourceFragmentIds, CancellationToken ct) =>
+        PublishAsync(@case.Id, turn.Id, turn.Revision, "AI_ANSWER", now, new Dictionary<string, object?>
+        {
+            ["markdown"] = markdown,
+            ["sources"] = sourceFragmentIds,
+        }, ct);
 
     private Task PublishHandoffOfferAsync(Case @case, Turn turn, DateTimeOffset now, RoutingDecision routing, CancellationToken ct) =>
         PublishAsync(@case.Id, turn.Id, turn.Revision, "HANDOFF_OFFER", now, new Dictionary<string, object?>
