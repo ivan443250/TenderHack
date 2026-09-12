@@ -75,30 +75,50 @@ class FakeGenerator:
         self.output = output
         self.prompts: list[str] = []
         self.response_formats: list[Mapping[str, object] | None] = []
+        self.max_tokens: list[int | None] = []
 
     @property
     def metadata(self) -> dict[str, str]:
         return {"model_id": self.model_id, "revision": "fixture"}
 
-    async def draft(self, prompt: str, *, response_format: Mapping[str, object] | None = None) -> str:
+    async def draft(
+        self,
+        prompt: str,
+        *,
+        response_format: Mapping[str, object] | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
         self.prompts.append(prompt)
         self.response_formats.append(response_format)
+        self.max_tokens.append(max_tokens)
         return self.output
 
 
 class UnavailableGenerator(FakeGenerator):
-    async def draft(self, prompt: str, *, response_format: Mapping[str, object] | None = None) -> str:
+    async def draft(
+        self,
+        prompt: str,
+        *,
+        response_format: Mapping[str, object] | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
         self.prompts.append(prompt)
         self.response_formats.append(response_format)
+        self.max_tokens.append(max_tokens)
         raise GeneratorClientError("vLLM request failed at http://inference:8000/v1/completions")
 
 
-def _payload(fragment_ids: list[str], query: str = "Как сформировать УПД, выбрав тип документа?") -> DraftRequest:
+def _payload(
+    fragment_ids: list[str],
+    query: str = "Как сформировать УПД, выбрав тип документа?",
+    *,
+    max_output_tokens: int = 800,
+) -> DraftRequest:
     return DraftRequest(
         query=query,
         snapshot_id=SNAPSHOT_ID,
         evidence_fragment_ids=fragment_ids,
-        constraints=DraftConstraints(max_output_tokens=200, tone="neutral"),
+        constraints=DraftConstraints(max_output_tokens=max_output_tokens, tone="neutral"),
     )
 
 
@@ -114,6 +134,7 @@ async def test_grounded_draft_uses_fake_generator_and_projects_only_frozen_claim
     assert "applies_if" not in result.response.claims[0].model_dump()
     assert result.response.model_version.startswith(f"{DRAFT_PROMPT_VERSION}:fake-generator@fixture")
     assert generator.prompts and DRAFT_PROMPT_VERSION in generator.prompts[0]
+    assert generator.max_tokens == [800]
     assert len(generator.response_formats) == 1
     response_format = generator.response_formats[0]
     assert response_format is not None
@@ -135,6 +156,34 @@ async def test_grounded_draft_uses_fake_generator_and_projects_only_frozen_claim
     assert set(claim_properties) == {"claim_id", "text", "fragment_ids", "applies_if", "requires_human_check"}
     assert claim_items["required"] == ["claim_id", "text", "fragment_ids"]
     assert claim_items["additionalProperties"] is False
+
+
+@pytest.mark.asyncio
+async def test_grounded_draft_passes_explicit_lower_output_budget() -> None:
+    fragment = _fragment("frag-budget", "Выберите тип документа УПД и нажмите кнопку Сформировать.")
+    generator = FakeGenerator(
+        '{"draft_markdown":"Выберите тип документа УПД.","claims":[{"claim_id":"c1","text":"Выберите тип документа УПД.","fragment_ids":["frag-budget"]}]}'
+    )
+    await create_grounded_draft(
+        _payload([fragment.fragment_id], max_output_tokens=300),
+        Repository((fragment,)),
+        generator,
+    )
+    assert generator.max_tokens == [300]
+
+
+@pytest.mark.asyncio
+async def test_grounded_draft_rejects_output_budget_outside_hard_cap() -> None:
+    fragment = _fragment("frag-budget-invalid", "Выберите тип документа УПД.")
+    generator = FakeGenerator('{"draft_markdown":"x","claims":[]}')
+    for value in (0, 801):
+        with pytest.raises(GeneratorModelError, match="between 1 and 800"):
+            await create_grounded_draft(
+                _payload([fragment.fragment_id], max_output_tokens=value),
+                Repository((fragment,)),
+                generator,
+            )
+    assert generator.max_tokens == []
 
 
 @pytest.mark.asyncio

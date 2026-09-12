@@ -31,6 +31,15 @@ class GeneratorModelError(DraftGenerationError):
     """The generator returned an unusable structured response."""
 
 
+MAX_GENERATION_TOKENS = 800
+
+
+def _validate_output_budget(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= MAX_GENERATION_TOKENS:
+        raise GeneratorModelError(f"grounded draft max_output_tokens must be between 1 and {MAX_GENERATION_TOKENS}")
+    return value
+
+
 def _grounded_draft_response_format() -> dict[str, object]:
     """Return the minimal llama.cpp JSON schema for an internal draft.
 
@@ -88,6 +97,7 @@ class GroundedDraftService:
         self.generator_factory = generator_factory
 
     async def generate(self, payload: DraftRequest) -> DraftGenerationResult:
+        max_tokens = _validate_output_budget(payload.constraints.max_output_tokens)
         assessment = await assess_answerability(
             payload.query,
             payload.snapshot_id,
@@ -116,7 +126,11 @@ class GroundedDraftService:
             # Request the smallest structured-output mode supported by the
             # OpenAI-compatible local runtime.  The parser below remains
             # strict: this hint never turns prose into a grounded draft.
-            raw = await generator.draft(prompt, response_format=_grounded_draft_response_format())
+            raw = await generator.draft(
+                prompt,
+                response_format=_grounded_draft_response_format(),
+                max_tokens=max_tokens,
+            )
         except GeneratorClientError as exc:
             if _is_unavailable(exc):
                 raise GeneratorUnavailableError("local generator is unavailable") from exc

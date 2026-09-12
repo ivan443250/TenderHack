@@ -45,7 +45,7 @@ class InferenceSettings(BaseModel):
     generator_temperature: float = Field(default=0.6, ge=0, le=2)
     generator_top_p: float = Field(default=0.95, gt=0, le=1)
     generator_top_k: int = Field(default=20, ge=1, le=200)
-    generator_max_tokens: int = Field(default=512, ge=1, le=8192)
+    generator_max_tokens: int = Field(default=512, ge=1, le=800)
 
     @field_validator("embedding_dimension")
     @classmethod
