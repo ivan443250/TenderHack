@@ -1,4 +1,5 @@
 using TenderHack.Application.Ports;
+using TenderHack.Domain;
 using TenderHack.Domain.Cases;
 using TenderHack.Domain.Handoffs;
 
