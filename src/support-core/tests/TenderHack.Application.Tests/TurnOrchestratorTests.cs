@@ -158,7 +158,8 @@ public sealed class TurnOrchestratorTests
         Assert.Equal("Ответ.", outcome.AnswerMarkdown);
         Assert.Equal(["frag-1"], outcome.SourceFragmentIds);
         Assert.Equal(ResolutionStatus.Unknown, @case.ResolutionStatus);
-        Assert.Contains(_events.Published, e => e.Event.Type == "AI_ANSWER");
+        var answer = Assert.Single(_events.Published, e => e.Event.Type == "AI_ANSWER");
+        Assert.Equal(["frag-1"], Assert.IsAssignableFrom<IReadOnlyList<string>>(answer.Event.Payload["sources"]));
 
         var push = Assert.IsType<QualityTurnPush>(Assert.Single(_outbox.Enqueued).Payload);
         Assert.Equal(QualityOutboxMessages.Turn, _outbox.Enqueued[0].MessageType);
