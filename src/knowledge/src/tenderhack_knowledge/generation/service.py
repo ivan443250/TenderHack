@@ -77,7 +77,10 @@ class GroundedDraftService:
         fragments = await _normative_fragments(self.repository, payload.snapshot_id, payload.evidence_fragment_ids)
         prompt = build_draft_prompt(payload.query, fragments, payload.constraints)
         try:
-            raw = await generator.draft(prompt)
+            # Request the smallest structured-output mode supported by the
+            # OpenAI-compatible local runtime.  The parser below remains
+            # strict: this hint never turns prose into a grounded draft.
+            raw = await generator.draft(prompt, response_format={"type": "json_object"})
         except GeneratorClientError as exc:
             if _is_unavailable(exc):
                 raise GeneratorUnavailableError("local generator is unavailable") from exc

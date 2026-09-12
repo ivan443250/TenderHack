@@ -4,6 +4,7 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+from collections.abc import Mapping
 from typing import Any
 
 import pytest
@@ -73,19 +74,22 @@ class FakeGenerator:
     def __init__(self, output: str) -> None:
         self.output = output
         self.prompts: list[str] = []
+        self.response_formats: list[Mapping[str, object] | None] = []
 
     @property
     def metadata(self) -> dict[str, str]:
         return {"model_id": self.model_id, "revision": "fixture"}
 
-    async def draft(self, prompt: str) -> str:
+    async def draft(self, prompt: str, *, response_format: Mapping[str, object] | None = None) -> str:
         self.prompts.append(prompt)
+        self.response_formats.append(response_format)
         return self.output
 
 
 class UnavailableGenerator(FakeGenerator):
-    async def draft(self, prompt: str) -> str:
+    async def draft(self, prompt: str, *, response_format: Mapping[str, object] | None = None) -> str:
         self.prompts.append(prompt)
+        self.response_formats.append(response_format)
         raise GeneratorClientError("vLLM request failed at http://inference:8000/v1/completions")
 
 
@@ -110,6 +114,7 @@ async def test_grounded_draft_uses_fake_generator_and_projects_only_frozen_claim
     assert "applies_if" not in result.response.claims[0].model_dump()
     assert result.response.model_version.startswith(f"{DRAFT_PROMPT_VERSION}:fake-generator@fixture")
     assert generator.prompts and DRAFT_PROMPT_VERSION in generator.prompts[0]
+    assert generator.response_formats == [{"type": "json_object"}]
 
 
 @pytest.mark.asyncio
@@ -188,6 +193,13 @@ def test_parser_rejects_business_decision_and_duplicate_claim_ids() -> None:
         parse_model_output('{"decision_candidate":"ANSWER","draft_markdown":"x","claims":[]}')
     with pytest.raises(ModelOutputError, match="unique"):
         parse_model_output('{"draft_markdown":"x","claims":[{"claim_id":"x","text":"a","fragment_ids":["f"]},{"claim_id":"x","text":"b","fragment_ids":["f"]}]}')
+
+
+def test_parser_accepts_fenced_json_but_rejects_plain_prose() -> None:
+    parsed = parse_model_output('```json\n{"draft_markdown":"grounded","claims":[]}\n```')
+    assert parsed.draft_markdown == "grounded"
+    with pytest.raises(ModelOutputError, match="invalid JSON"):
+        parse_model_output("Here is the answer in plain prose.")
 
 
 def test_prompt_versions_include_data_boundary_and_no_chain_of_thought() -> None:

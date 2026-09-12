@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import Protocol, Sequence
 
 
@@ -16,7 +17,7 @@ class Reranker(Protocol):
 
 
 class Generator(Protocol):
-    async def draft(self, prompt: str) -> str: ...
+    async def draft(self, prompt: str, *, response_format: Mapping[str, object] | None = None) -> str: ...
 
 
 class Verifier(Protocol):
