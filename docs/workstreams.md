@@ -48,7 +48,7 @@
 
 **Must not:** produce `Decision`, `HandoffStatus`, routing outcome, support status; call `api`; read API-owned tables; retrieve historical resolution as normative evidence.
 
-**Ready when:** all `/v0/...` contract endpoints work in deterministic stub mode, then real retrieval can replace stubs without changing the contract.
+**Ready when:** all `/v0/...` contract endpoints work in deterministic stub mode, then real retrieval can replace stubs without changing the contract. The next runtime milestone is Model Stack v2 real certification: Giga backfill and B1/B2 retrieval measurements, Querit B3 only after artifact verification, Qwen3.8 structured-generation smoke, and latency/memory/offline checks.
 
 ## 5. C — Ingestion / Knowledge Base (`knowledge-worker`)
 

@@ -10,7 +10,7 @@
 | [`product-spec.md`](product-spec.md) | Что строим, P0/P1/non-goals, decision/state semantics, knowledge/routing/quality rules | Любое изменение поведения |
 | [`architecture.md`](architecture.md) | Модули, boundaries, state, persistence, worker, handoff | Backend/API/data/frontend boundaries |
 | [`stack.md`](stack.md) | Зафиксированный стек, версии, модели, rejected alternatives | Новые dependencies/runtime/infrastructure |
-| [`adr/`](adr/) | Architecture decision records; ADR-0001 — граница .NET `api` / Python `knowledge`; ADR-0002 — inbound handoff status sync + in-app notifications | Смена ownership/runtime/service/queue/DB/state dimension |
+| [`adr/`](adr/) | Architecture decision records; ADR-0001 — граница .NET `api` / Python `knowledge`; ADR-0002 — inbound handoff status sync + in-app notifications; ADR-0003 — Model Stack v2 | Смена ownership/runtime/service/queue/DB/state dimension |
 | [`contracts/`](contracts/) | Нормативные интерфейсы между независимо разрабатываемыми блоками | Любая работа на shared boundary |
 | [`open-decisions.md`](open-decisions.md) | Нерешённые policy/contract gaps, которые нельзя выбирать молча | Перед реализацией затронутой неоднозначной области |
 | [`workstreams.md`](workstreams.md) | Владение блоками, allowed scope и правила параллельной разработки | Деление работы между людьми/agents |

@@ -26,11 +26,11 @@ Backend разделён на .NET support core и Python knowledge-сервис
 - **Persistence:** PostgreSQL 16, одна БД, строгое владение таблицами по runtime.
 - **Search:** PostgreSQL FTS + `pg_trgm` + `pgvector`; сначала exact vector search.
 - **Parsing:** `pdfplumber` baseline; Docling/OCR адресно после измерения качества.
-- **Embeddings:** `Qwen3-Embedding-0.6B`, до 1024 dimensions.
-- **Reranker:** `BAAI/bge-reranker-v2-m3`.
-- **Generation:** `Qwen3-4B-Instruct-2507`, local-only.
-- **Inference:** vLLM после hardware smoke-test; один fallback на llama.cpp при несовместимости/нехватке VRAM.
-- **Deployment:** Docker Compose; `web`, `api`, `api-worker`, `knowledge`, `knowledge-worker`, `postgres`, `inference`.
+- **Embeddings:** `ai-sage/Giga-Embeddings-instruct-3B-0826`, normalized 2048 dimensions; query instruction `giga_portal_support_v1`.
+- **Reranker:** `Querit/Querit-4B`; custom adapter, quantized runtime `TBD_UNVERIFIED`; fallback exact + PostgreSQL FTS + Giga dense + RRF.
+- **Generation:** `empero-ai/Qwen3.8-4B-Distill`, `Qwen3.8-4B-Q6_K.gguf`, local-only.
+- **Inference:** recent llama.cpp via separate internal embedding/generator endpoints; no external AI/search API.
+- **Deployment:** Docker Compose; `web`, `api`, `api-worker`, `knowledge`, `knowledge-worker`, `postgres` plus profile-gated local inference services.
 
 Подробности и обоснования: [`docs/stack.md`](docs/stack.md) и [`docs/architecture.md`](docs/architecture.md).
 
@@ -43,7 +43,7 @@ Backend разделён на .NET support core и Python knowledge-сервис
 - [`docs/product-spec.md`](docs/product-spec.md) — продуктовые границы и логика решений;
 - [`docs/architecture.md`](docs/architecture.md) — модули, состояния, data boundaries;
 - [`docs/stack.md`](docs/stack.md) — выбранный стек и rejected alternatives;
-- [`docs/adr/`](docs/adr/) — architecture decision records; ADR-0001 — граница .NET `api` / Python `knowledge`; ADR-0002 — inbound handoff status sync и in-app уведомления;
+- [`docs/adr/`](docs/adr/) — architecture decision records; ADR-0001 — граница .NET `api` / Python `knowledge`; ADR-0002 — inbound handoff status sync и in-app уведомления; ADR-0003 — Model Stack v2;
 - [`docs/contracts/`](docs/contracts/) — замороженные контракты границ (`knowledge-v0`, `web-api-v0`, `support-adapter-v0`);
 - [`docs/open-decisions.md`](docs/open-decisions.md) — нерешённые вопросы, которые нельзя выбирать молча;
 - [`docs/agent-workflow.md`](docs/agent-workflow.md) — обязательный цикл coding agents, subagents и skeptic review;
@@ -92,7 +92,7 @@ docker compose config
 powershell -ExecutionPolicy Bypass -File scripts/check-structure.ps1
 ```
 
-The scaffold exposes health endpoints and deterministic Knowledge v0 stubs only. It does not claim real retrieval, model loading, case state or final UI behavior yet.
+The repository now includes the six-manual ingestion/provenance foundation, lexical and hybrid retrieval, answerability, grounded draft/verification and quality foundations. Real V2 model backfill and runtime certification remain pending; documented target behavior is not a claim that all runtime profiles are currently provisioned.
 
 Не создавать эти каталоги пустыми ради вида. Первый implementation change должен создать только реально используемый scaffold и одновременно обновить команды в `AGENTS.md`/docs.
 

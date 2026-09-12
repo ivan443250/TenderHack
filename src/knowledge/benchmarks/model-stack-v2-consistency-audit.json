@@ -1,0 +1,314 @@
+{
+  "report_version": "model-stack-v2-consistency-audit",
+  "audit_date": "2026-09-12",
+  "status": "PASS_WITH_LIMITATIONS",
+  "starting_head": "422fd04",
+  "active_stack": {
+    "embedding": {
+      "source_model_id": "ai-sage/Giga-Embeddings-instruct-3B-0826",
+      "source_revision": "ed7db5c91b900b39381b27b6e9c0a3d31137cd29",
+      "runtime_repo": "ai-babai/giga-embeddings-0826-3b-gguf",
+      "runtime_file": "giga-embeddings-0826-3b-q8_0.gguf",
+      "runtime_revision": "04c5a2d751ce20908200de2324444a14a81b1d80",
+      "quantization": "Q8_0",
+      "sha256": "429f2d04a968ffe73137fe65c2e458a08236056168b905d208b4d81ecab08c22",
+      "dimension": 2048,
+      "query_instruction_version": "giga_portal_support_v1",
+      "runtime": "llama.cpp /v1/embeddings",
+      "verification_status": "VERIFIED",
+      "conversion_note": "ai-babai is an independent third-party GGUF conversion, not an official ai-sage release."
+    },
+    "reranker": {
+      "source_model_id": "Querit/Querit-4B",
+      "source_revision": "e557bb5ce6555f16b33dbb7d2ca62e8d27c14c13",
+      "adapter": "custom AutoModel score interface",
+      "runtime_artifact": null,
+      "runtime_status": "TBD_UNVERIFIED",
+      "fallback": "exact + PostgreSQL FTS + Giga dense + RRF"
+    },
+    "generator": {
+      "source_model_id": "empero-ai/Qwen3.8-4B-Distill",
+      "source_revision": "c83cb7aa2999d2f35c43e9ae0634a30eb8985a1e",
+      "runtime_repo": "empero-ai/Qwen3.8-4B-Distill-GGUF",
+      "runtime_file": "Qwen3.8-4B-Q6_K.gguf",
+      "runtime_revision": "391fc7d103e3942a408def3e4f51c2f85d464417",
+      "quantization": "Q6_K",
+      "runtime": "recent llama.cpp /v1/chat/completions",
+      "sha256": null,
+      "reasoning_safety": "strip <think> spans; fail closed on malformed or unterminated reasoning",
+      "verification_status": "PARTIALLY_VERIFIED"
+    }
+  },
+  "files_scanned": [
+    "README.md",
+    ".env.example",
+    "compose.yaml",
+    "docs/index.md",
+    "docs/stack.md",
+    "docs/architecture.md",
+    "docs/execution-plan.md",
+    "docs/open-decisions.md",
+    "docs/product-spec.md",
+    "docs/workstreams.md",
+    "docs/references.md",
+    "docs/adr/0003-model-stack-v2.md",
+    "docs/contracts/knowledge-v0.md",
+    "docs/contracts/knowledge-v0.openapi.yaml",
+    "docs/diagrams/architecture-map.html",
+    "docs/diagrams/compose-map.html",
+    "src/knowledge/model-manifest.json",
+    "src/knowledge/migrations/versions/0005_dense_fragment_embeddings.py",
+    "src/knowledge/migrations/versions/0006_condition_cards.py",
+    "src/knowledge/migrations/versions/0007_giga_2048_embeddings.py",
+    "src/knowledge/src/tenderhack_knowledge/inference/**",
+    "src/knowledge/src/tenderhack_knowledge/retrieval/**",
+    "src/knowledge/src/tenderhack_knowledge/persistence/**",
+    "src/knowledge/src/tenderhack_knowledge/contracts/**",
+    "src/knowledge/tests/**",
+    "src/knowledge/benchmarks/**",
+    "infra/inference/README.md"
+  ],
+  "search_scope": "whole repository; old-stack terms and current-stack terms searched before and after fixes",
+  "old_refs_found": [
+    {
+      "path": "README.md",
+      "terms": ["Qwen3-Embedding-0.6B", "BAAI/bge-reranker-v2-m3", "Qwen3-4B-Instruct-2507", "vLLM", "1024"],
+      "classification": "ACTIVE_DOCUMENTATION",
+      "action": "FIXED"
+    },
+    {
+      "path": "infra/inference/README.md",
+      "terms": ["vLLM", "inference service"],
+      "classification": "ACTIVE_DOCUMENTATION",
+      "action": "RETAINED_OUT_OF_SCOPE"
+    },
+    {
+      "path": "docs/adr/0003-model-stack-v2.md",
+      "terms": ["Qwen3 Embedding 0.6B", "BAAI/bge-reranker-v2-m3", "vLLM", "vector(1024)"],
+      "classification": "HISTORICAL_ADR/SPEC",
+      "action": "KEEP_AS_MIGRATION_CONTEXT"
+    },
+    {
+      "path": "src/knowledge/benchmarks/k0-preflight.json",
+      "terms": ["Qwen/Qwen3-Embedding-0.6B", "BAAI/bge-reranker-v2-m3", "Qwen/Qwen3-4B-Instruct-2507", "vLLM"],
+      "classification": "HISTORICAL_BENCHMARK",
+      "action": "KEEP"
+    },
+    {
+      "path": "src/knowledge/benchmarks/k0-inference-capability.json",
+      "terms": ["Qwen/Qwen3-Embedding-0.6B", "BAAI/bge-reranker-v2-m3", "Qwen/Qwen3-4B-Instruct-2507", "vLLM"],
+      "classification": "HISTORICAL_BENCHMARK",
+      "action": "KEEP"
+    },
+    {
+      "path": "src/knowledge/benchmarks/k2b-hybrid-retrieval.json",
+      "terms": ["Qwen/Qwen3-Embedding-0.6B", "BAAI/bge-reranker-v2-m3", "hybrid-rrf-v1", "vector(1024)"],
+      "classification": "HISTORICAL_BENCHMARK",
+      "action": "KEEP"
+    },
+    {
+      "path": "src/knowledge/benchmarks/k2c-retrieval-review.json",
+      "terms": ["hybrid-rrf-v1-no-dense"],
+      "classification": "HISTORICAL_BENCHMARK",
+      "action": "KEEP"
+    },
+    {
+      "path": "src/knowledge/benchmarks/k2d-2026-coverage.json",
+      "terms": ["hybrid-rrf-v1-no-dense"],
+      "classification": "HISTORICAL_BENCHMARK",
+      "action": "KEEP"
+    },
+    {
+      "path": "src/knowledge/benchmarks/k5-k6-grounded-generation.json",
+      "terms": ["VllmGeneratorClient", "Qwen3-4B-Instruct-2507", "vLLM"],
+      "classification": "HISTORICAL_BENCHMARK",
+      "action": "KEEP"
+    },
+    {
+      "path": "src/knowledge/benchmarks/autonomous-run-summary.md",
+      "terms": ["vLLM"],
+      "classification": "HISTORICAL_BENCHMARK",
+      "action": "KEEP"
+    },
+    {
+      "path": "src/knowledge/migrations/versions/0005_dense_fragment_embeddings.py",
+      "terms": ["vector(1024)", "dimension = 1024"],
+      "classification": "TEST_FOR_MIGRATION",
+      "action": "KEEP_IMMUTABLE_MIGRATION"
+    },
+    {
+      "path": "src/knowledge/migrations/versions/0007_giga_2048_embeddings.py",
+      "terms": ["vector(1024)", "dimension = 1024"],
+      "classification": "TEST_FOR_MIGRATION",
+      "action": "KEEP_DOWNGRADE_BRANCH"
+    },
+    {
+      "path": "src/knowledge/src/tenderhack_knowledge/inference/embedding.py",
+      "terms": ["Qwen3EmbeddingAdapter", "Qwen/Qwen3-Embedding-0.6B", "1024"],
+      "classification": "ACTIVE_CODE",
+      "action": "RETAIN_COMPATIBILITY_ALIAS; NOT_SELECTED_BY_ACTIVE_RETRIEVAL"
+    },
+    {
+      "path": "src/knowledge/src/tenderhack_knowledge/inference/reranker.py",
+      "terms": ["BgeRerankerAdapter", "BAAI/bge-reranker-v2-m3"],
+      "classification": "ACTIVE_CODE",
+      "action": "RETAIN_COMPATIBILITY_ALIAS; QUERIT_IS_ACTIVE_ADAPTER"
+    },
+    {
+      "path": "src/knowledge/src/tenderhack_knowledge/inference/generator.py",
+      "terms": ["VllmGeneratorClient", "vLLM"],
+      "classification": "ACTIVE_CODE",
+      "action": "RETAIN_RETIRED_COMPATIBILITY_CLIENT; LocalOpenAIChatGenerator_IS_ACTIVE"
+    },
+    {
+      "path": "src/knowledge/src/tenderhack_knowledge/inference/model_refs.py",
+      "terms": ["Qwen/Qwen3-Embedding-0.6B", "BAAI/bge-reranker-v2-m3", "Qwen/Qwen3-4B-Instruct-2507"],
+      "classification": "ACTIVE_CODE",
+      "action": "RETAIN_EXPLICIT_LEGACY_CONSTANTS_FOR_REPRODUCIBILITY"
+    },
+    {
+      "path": "src/knowledge/src/tenderhack_knowledge/inference/adapters.py",
+      "terms": ["Qwen3EmbeddingAdapter", "BgeRerankerAdapter", "VllmGeneratorClient"],
+      "classification": "ACTIVE_CODE",
+      "action": "RETAIN_COMPATIBILITY_EXPORTS"
+    },
+    {
+      "path": "src/knowledge/src/tenderhack_knowledge/inference/__init__.py",
+      "terms": ["Qwen3EmbeddingAdapter", "BgeRerankerAdapter", "VllmGeneratorClient"],
+      "classification": "ACTIVE_CODE",
+      "action": "RETAIN_COMPATIBILITY_EXPORTS"
+    },
+    {
+      "path": "src/knowledge/src/tenderhack_knowledge/inference/smoke.py",
+      "terms": ["probe_vllm", "vLLM", "allow_model_download"],
+      "classification": "TEST_FOR_MIGRATION",
+      "action": "KEEP_BACKWARD_COMPATIBLE_NON_CONTACTING_SMOKE_FLAGS"
+    },
+    {
+      "path": "src/knowledge/src/tenderhack_knowledge/retrieval/review_k2c.py",
+      "terms": ["hybrid-rrf-v1-no-dense", "Qwen3 vectors"],
+      "classification": "HISTORICAL_BENCHMARK",
+      "action": "KEEP"
+    },
+    {
+      "path": "src/knowledge/src/tenderhack_knowledge/retrieval/coverage_k2d.py",
+      "terms": ["dimension = 1024"],
+      "classification": "HISTORICAL_BENCHMARK",
+      "action": "KEEP_AUDIT_FIXTURE_WITH_DENSE_DISABLED"
+    },
+    {
+      "path": "src/knowledge/tests/test_inference_adapters.py",
+      "terms": ["Qwen3EmbeddingAdapter", "BgeRerankerAdapter", "VllmGeneratorClient", "Qwen3-4B-Instruct-2507"],
+      "classification": "TEST_FOR_MIGRATION",
+      "action": "KEEP_LEGACY_REGRESSION_TESTS"
+    },
+    {
+      "path": "src/knowledge/tests/test_grounded_generation.py",
+      "terms": ["vLLM"],
+      "classification": "TEST_FOR_MIGRATION",
+      "action": "KEEP_FAKE_CLIENT_ERROR_FIXTURE"
+    },
+    {
+      "path": "src/knowledge/tests/test_model_stack_v2.py",
+      "terms": ["Qwen/Qwen3-Embedding-0.6B", "1024"],
+      "classification": "TEST_FOR_MIGRATION",
+      "action": "KEEP_LEGACY_METADATA_REJECTION_REGRESSION"
+    }
+  ],
+  "old_refs_fixed": [
+    "README.md active model/runtime/deployment section",
+    "docs/index.md ADR navigation",
+    "docs/workstreams.md Knowledge runtime milestone"
+  ],
+  "old_refs_retained": [
+    {"path": "src/knowledge/benchmarks/k0-preflight.json", "reason": "HISTORICAL_BENCHMARK"},
+    {"path": "src/knowledge/benchmarks/k0-inference-capability.json", "reason": "HISTORICAL_BENCHMARK"},
+    {"path": "src/knowledge/benchmarks/k2b-hybrid-retrieval.json", "reason": "HISTORICAL_BENCHMARK"},
+    {"path": "src/knowledge/benchmarks/k2c-retrieval-review.json", "reason": "HISTORICAL_BENCHMARK"},
+    {"path": "src/knowledge/benchmarks/k2d-2026-coverage.json", "reason": "HISTORICAL_BENCHMARK"},
+    {"path": "src/knowledge/benchmarks/k5-k6-grounded-generation.json", "reason": "HISTORICAL_BENCHMARK"},
+    {"path": "src/knowledge/benchmarks/autonomous-run-summary.md", "reason": "HISTORICAL_RUN_SUMMARY"},
+    {"path": "docs/adr/0003-model-stack-v2.md", "reason": "HISTORICAL_ADR_CONTEXT"},
+    {"path": "src/knowledge/migrations/versions/0005_dense_fragment_embeddings.py", "reason": "HISTORICAL_SCHEMA_MIGRATION"},
+    {"path": "src/knowledge/migrations/versions/0007_giga_2048_embeddings.py", "reason": "MIGRATION_DOWNGRADE_BRANCH"},
+    {"path": "src/knowledge/src/tenderhack_knowledge/inference/embedding.py", "reason": "COMPATIBILITY_ALIAS"},
+    {"path": "src/knowledge/src/tenderhack_knowledge/inference/reranker.py", "reason": "COMPATIBILITY_ALIAS"},
+    {"path": "src/knowledge/src/tenderhack_knowledge/inference/generator.py", "reason": "COMPATIBILITY_ALIAS"},
+    {"path": "src/knowledge/src/tenderhack_knowledge/inference/model_refs.py", "reason": "EXPLICIT_LEGACY_CONSTANTS"},
+    {"path": "src/knowledge/src/tenderhack_knowledge/inference/smoke.py", "reason": "COMPATIBILITY_PARAMETERS"},
+    {"path": "src/knowledge/benchmarks/model-stack-v2-consistency-audit.json", "reason": "AUDIT_REPORT_CLASSIFICATION_DATA"},
+    {"path": "infra/inference/README.md", "reason": "ACTIVE_STALE_DOC_FORBIDDEN_SCOPE; RETAINED_UNCHANGED"}
+  ],
+  "contracts": {
+    "change_required": false,
+    "reason": "The frozen knowledge-v0 request/response schemas expose only generic model_version/model_versions and retrieval_config_version metadata. They do not expose model_id, embedding dimension, runtime vendor, vLLM-specific or BGE-specific fields. NO CONTRACT CHANGE REQUIRED."
+  },
+  "docs": {
+    "updated": ["README.md", "docs/index.md", "docs/workstreams.md"],
+    "already_consistent": [
+      "docs/stack.md",
+      "docs/architecture.md",
+      "docs/execution-plan.md",
+      "docs/open-decisions.md",
+      "docs/product-spec.md",
+      "docs/references.md",
+      "docs/diagrams/architecture-map.html",
+      "docs/diagrams/compose-map.html",
+      "docs/adr/0003-model-stack-v2.md"
+    ]
+  },
+  "compose_status": "PASS: profile-gated embedding-inference and generator-inference use llama.cpp; no vLLM image, stale generator model, extra gateway, or public inference port",
+  "env_status": "PASS: Giga/2048/instruction, Querit disabled-unverified, Qwen3.8/llama.cpp values match active settings and compose",
+  "model_manifest_status": "PASS_WITH_LIMITATIONS: Giga runtime hash/dimension are pinned; Querit artifact and Qwen3.8 runtime hash remain unverified",
+  "db_schema_status": "PASS: single Alembic head 0007_giga_2048_embeddings; upgrade invalidates 1024 vectors and preserves source/snapshot/provenance/card rows while enforcing vector(2048)",
+  "active_code_checks": {
+    "embedding_dimension": "PASS: active Giga adapter, settings, persistence guard and migration require 2048",
+    "query_instruction": "PASS: Giga query adapter applies giga_portal_support_v1; document embedding remains un-instructed",
+    "retrieval_config": "PASS: active HybridRetriever versions are hybrid-giga2048-*; lexical fallback is explicit",
+    "legacy_adapter_selection": "PASS: old Qwen/BGE classes are compatibility-only and are not selected by settings/routes",
+    "generator_boundary": "PASS: active path is LocalOpenAIChatGenerator over local llama.cpp chat completions; reasoning is sanitized and fail-closed",
+    "external_ai": "PASS: no external LLM/search API in the normal path"
+  },
+  "high_findings": [],
+  "medium_findings": [
+    {
+      "finding": "infra/inference/README.md still says vLLM is the target runtime and describes the old single inference service.",
+      "impact": "Documentation-only risk of deployment confusion.",
+      "status": "UNFIXED_OUT_OF_SCOPE",
+      "required_follow_up": "Update infra/inference/README.md in a separate scope-authorized documentation change."
+    }
+  ],
+  "low_findings": [
+    {
+      "finding": "Legacy smoke flags and compatibility exports retain vLLM/Qwen/BGE names.",
+      "status": "DOCUMENTED_COMPATIBILITY; no active default selects them"
+    }
+  ],
+  "remaining_runtime_certification_items": [
+    "real Giga Q8_0 3899/3899 backfill and B1/B2 retrieval measurements",
+    "trusted Querit quantized artifact, hash and llama.cpp-compatible scoring interface",
+    "Qwen3.8 GGUF exact SHA-256 and structured-output smoke",
+    "target Linux latency, memory and offline runtime certification",
+    "do not assume simultaneous residency of all multi-gigabyte models on a 6 GB GPU"
+  ],
+  "source_of_truth_hierarchy": [
+    "current ADRs",
+    "current repository architecture/stack docs",
+    "active code and model manifest",
+    "historical benchmark reports",
+    "external reviewed Final Implementation Spec for product assumptions"
+  ],
+  "verification": {
+    "uv_lock_check": "PASS: uv lock --check",
+    "pytest": "PASS: uv run pytest -q (95 passed, 7 skipped)",
+    "compileall": "PASS: uv run python -m compileall -q src",
+    "alembic_heads": "PASS: 0007_giga_2048_embeddings (head)",
+    "openapi_semantic_parity": "PASS: uv run pytest tests/test_contract_paths.py -q (1 passed)",
+    "docker_compose_config": "PASS: docker compose config --quiet",
+    "git_diff_check": "PASS: git diff --check",
+    "scope_check": "PASS: changed paths are README.md, docs/index.md, docs/workstreams.md and src/knowledge/benchmarks/model-stack-v2-consistency-audit.json",
+    "real_model_download_or_backfill": "NOT RUN BY SCOPE",
+    "real_postgres_runtime": "NOT RUN; migration and repository regression tests passed"
+  },
+  "next_task": "MODEL STACK V2 REAL CERTIFICATION"
+}
