@@ -17,8 +17,10 @@ services:
   api:
     restart: unless-stopped
     build:
-      context: ./src/support-core
-      dockerfile: Dockerfile
+      # Repo root context: the api image's build also compiles src/web and copies the SPA into
+      # wwwroot (see src/support-core/Dockerfile), so it needs both trees available.
+      context: .
+      dockerfile: src/support-core/Dockerfile
       target: api
     environment:
       ASPNETCORE_URLS: http://+:8080
@@ -40,8 +42,8 @@ services:
   api-worker:
     restart: unless-stopped
     build:
-      context: ./src/support-core
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: src/support-core/Dockerfile
       target: worker
     environment:
       ConnectionStrings__Postgres: ${API_DATABASE_URL:-Host=postgres;Port=5432;Database=${POSTGRES_DB:-tenderhack};Username=api_rw;Password=${API_DB_PASSWORD:-api_dev_only}}

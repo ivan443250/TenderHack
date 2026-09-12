@@ -1,6 +1,16 @@
+# Build context is the repo root (see compose.yaml) so this stage can also read ../web —
+# the built SPA is copied into the api image's wwwroot below.
+FROM node:24-alpine AS web-build
+WORKDIR /web
+COPY src/web/package.json src/web/pnpm-lock.yaml ./
+RUN corepack enable && corepack prepare pnpm@10.15.0 --activate \
+    && pnpm install --frozen-lockfile
+COPY src/web/. .
+RUN pnpm build
+
 FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:2fa828c68761b1b8c23d7662dc134421b9d3b59fe1425fdbc80804e390cdb24d AS build
 WORKDIR /src
-COPY . .
+COPY src/support-core/. .
 RUN dotnet restore TenderHack.sln
 RUN dotnet publish src/TenderHack.Api/TenderHack.Api.csproj -c Release -o /out/api --no-restore \
     && dotnet publish src/TenderHack.Worker/TenderHack.Worker.csproj -c Release -o /out/worker --no-restore
@@ -11,6 +21,9 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build /out/api .
+# Built SPA lands at wwwroot's root; the pre-existing dev console lives under wwwroot/dev-console/
+# (see Program.cs) and is unaffected since it's a different subpath.
+COPY --from=web-build /web/dist ./wwwroot
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "TenderHack.Api.dll"]
 
