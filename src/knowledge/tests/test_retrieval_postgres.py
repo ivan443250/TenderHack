@@ -126,7 +126,7 @@ async def test_real_postgres_dense_embedding_metadata_and_snapshot_boundaries() 
         await engine.dispose()
 
 
-def test_real_retrieve_endpoint_uses_hybrid_engine(monkeypatch) -> None:
+def test_real_retrieve_endpoint_uses_lexical_engine(monkeypatch) -> None:
     url = _database_url()
     if not url:
         pytest.skip("K2_TEST_DATABASE_URL is not configured")
@@ -151,6 +151,7 @@ def test_real_retrieve_endpoint_uses_hybrid_engine(monkeypatch) -> None:
         payload = response.json()
         assert payload["snapshot_id"] == SNAPSHOT_ID
         assert payload["retrieval_config_version"] in {
+            "lexical-v1",
             "hybrid-giga2048-querit-v2",
             "hybrid-giga2048-rrf-v2",
             "hybrid-giga2048-rrf-v2-no-dense",
