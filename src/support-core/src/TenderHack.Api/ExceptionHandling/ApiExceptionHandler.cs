@@ -25,6 +25,8 @@ public sealed class ApiExceptionHandler : IExceptionHandler
             FeedbackAlreadySubmittedException => (StatusCodes.Status409Conflict, "FEEDBACK_ALREADY_SUBMITTED", "Feedback was already submitted for this case."),
             CaseNotCompletedException => (StatusCodes.Status409Conflict, "CASE_NOT_COMPLETED", "This case is not completed yet."),
             InvalidHandoffTransitionException => (StatusCodes.Status409Conflict, "HANDOFF_INVALID_STATE", "The handoff is not in a state that allows this action."),
+            HandoffAlreadyExistsException => (StatusCodes.Status409Conflict, "HANDOFF_ALREADY_EXISTS", "This case already has a handoff."),
+            HandoffNotFoundException => (StatusCodes.Status404NotFound, "HANDOFF_NOT_FOUND", "This case has no handoff yet."),
             IdempotencyConflictException => (StatusCodes.Status409Conflict, "IDEMPOTENCY_KEY_CONFLICT", "Idempotency-Key was already used with a different request body."),
             DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, "CONCURRENCY_CONFLICT", "This case was updated concurrently — reload and retry."),
             KnowledgeFailureException { Category: KnowledgeFailureCategory.Timeout } => (StatusCodes.Status504GatewayTimeout, "KNOWLEDGE_TIMEOUT", "Knowledge service timed out."),

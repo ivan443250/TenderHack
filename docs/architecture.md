@@ -78,9 +78,9 @@ api (.NET)  ── single public boundary
    └── Read-only analytics (proxied, authz here)
    │
    ├────────────► PostgreSQL 16 (api-owned tables)
-   │               cases/messages/turns/case_events
-   │               handoffs/handoff_status_updates/outbox
-   │               feedback/notifications/api_jobs
+   │               cases/turns/case_events/handoffs
+   │               outbox/feedback/notifications
+   │               idempotency_keys
    │
    └── HTTP, contract v0, X-Trace-Id ────► knowledge (Python)
                                              ├── understand / retrieve / answerability
@@ -225,7 +225,7 @@ Owns:
 - adapter idempotency key;
 - outbox delivery (`api-worker`);
 - external ticket ID when real/simulated adapter returns one;
-- **status ingestion after acceptance**: `stage`, `assigned_specialist`, terminal outcome — as adapter facts, stored in `handoff_status_updates` and projected to `HANDOFF_STATUS` case events (§15).
+- **status ingestion after acceptance**: `stage`, `assigned_specialist`, terminal outcome — as adapter facts, deduped by `external_revision` on the `handoffs` row (latest snapshot) and appended to the timeline as a `HANDOFF_STATUS` case event on every genuinely new revision (§15) — the event log, not a separate table, is the durable history of every status update.
 
 Handoff package must be buildable with `knowledge` down.
 
@@ -342,7 +342,7 @@ PostgreSQL 16 is both system of record and initial retrieval engine. One databas
 
 | Owner | Migration tool | Tables |
 |---|---|---|
-| `api` | EF Core migrations | `cases`, `messages`, `turns`, `case_events`, `handoffs`, `handoff_status_updates`, `outbox`, `feedback`, `notifications`, `api_jobs`, `idempotency_keys` |
+| `api` | EF Core migrations | `cases`, `turns`, `handoffs`, `case_events`, `outbox`, `feedback`, `notifications`, `idempotency_keys` |
 | `knowledge` | Alembic | `kb_documents`, `kb_document_versions`, `kb_snapshots`, `kb_fragments`, `kb_condition_cards`, `kb_ingestion_runs`, `quality_cases`, `quality_evaluations`, `issue_groups`, `knowledge_jobs` |
 
 Rules:
@@ -514,10 +514,10 @@ Two worker processes, each built from its runtime's codebase, separate only beca
 
 | Worker | Jobs | Job table |
 |---|---|---|
-| `api-worker` (.NET `BackgroundService`) | outbox delivery, handoff adapter submit retries, `handoff-status-sync` polling of non-terminal accepted handoffs (backoff from `Support:StatusPoll:Initial` to `Support:StatusPoll:Max`, stops at terminal status or `Support:StatusPoll:Ttl`), quality-turn / feedback payload pushes to `knowledge`, stale-turn cleanup | `api_jobs`, `outbox` |
+| `api-worker` (.NET `BackgroundService`) | outbox delivery, handoff adapter submit retries, `handoff-status-sync` polling of every accepted, non-terminal, non-stale handoff on a fixed `Support:StatusPoll:Initial` interval (marked stale past `Support:StatusPoll:Ttl`), quality-turn / feedback payload pushes to `knowledge`, stale-turn cleanup | `outbox` |
 | `knowledge-worker` (Python) | ingest/parse/index, embeddings batches, quality audit, issue-group recomputation | `knowledge_jobs` |
 
-Both start with PostgreSQL job tables / `FOR UPDATE SKIP LOCKED`, lease/heartbeat, explicit attempt/error state. Do not add Redis/Kafka until measured need.
+`knowledge-worker` uses a PostgreSQL job table / `FOR UPDATE SKIP LOCKED`, lease/heartbeat, explicit attempt/error state. `api-worker` intentionally stays simpler at hackathon single-replica scale: independent fixed-interval `BackgroundService` ticks, no separate job/lease table — every write path it drives is naturally idempotent instead (outbox delivery keyed by handoff id, status ingestion deduped by external revision, `xmin` optimistic concurrency on `cases`), so a re-run tick or a crash mid-tick never double-applies. Revisit a leased `api_jobs` table only if `api-worker` needs more than one replica or true per-handoff backoff; do not add Redis/Kafka until measured need.
 
 ## 13. Frontend boundaries
 

@@ -38,6 +38,20 @@ public sealed class InvalidHandoffTransitionException(HandoffId handoffId, Hando
     public HandoffStatus To { get; } = to;
 }
 
+/// <summary>One handoff per case (web-api-v0.md §8) — a second `prepare` cannot bypass the existing one.</summary>
+public sealed class HandoffAlreadyExistsException(CaseId caseId)
+    : InvalidOperationException($"Case {caseId} already has a handoff.")
+{
+    public CaseId CaseId { get; } = caseId;
+}
+
+/// <summary>Confirm/retry/status commands require a prior `prepare` — there is nothing to act on yet.</summary>
+public sealed class HandoffNotFoundException(CaseId caseId)
+    : InvalidOperationException($"Case {caseId} has no handoff.")
+{
+    public CaseId CaseId { get; } = caseId;
+}
+
 /// <summary>A status update cannot target a different handoff/case than it was issued for (architecture.md §6).</summary>
 public sealed class HandoffMismatchException(
     HandoffId expectedHandoffId,
