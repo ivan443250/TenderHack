@@ -1,0 +1,267 @@
+{
+  "benchmark": "ai2-giga-retrieval-certification",
+  "status": "COMPLETE",
+  "timestamp_utc": "2026-09-12T20:45:20.5107704Z",
+  "git_head": "b4d82b38123e8966ff2cf29d32089732535e7f88",
+  "scope": "src/knowledge/**",
+  "corpus": {
+    "corpus": "NORMATIVE",
+    "snapshot_id": "snap_0e979dfef376faff41f7c76416fda457",
+    "documents": 6,
+    "pages": 830,
+    "fragments": 3899,
+    "document_versions": 6,
+    "source_files": [
+      {
+        "filename": "Инструкция по электронному актированию.pdf",
+        "sha256": "d14f883b14f8f117842541900300901404b37d43cdddf13c3e3266cfbd9155b3",
+        "pages": 93,
+        "fragments": 567,
+        "document_version_id": "ver_500943380ccb418a8df30b509e9ec4f0"
+      },
+      {
+        "filename": "Инструкция по формированию YML.pdf",
+        "sha256": "753fc58d5c7ae3b15932ef658d88f4eb2886273af2e3067389c5aa0934bd9a9c",
+        "pages": 39,
+        "fragments": 298,
+        "document_version_id": "ver_eaf6f826ac609c35c6663ac43c372c1c"
+      },
+      {
+        "filename": "Инструкция по работе с Порталом для поставщика.pdf",
+        "sha256": "3c52c3633b6bc84e99ca1a23336536e9408ba83b28f160ee5c02738a2f754c6b",
+        "pages": 370,
+        "fragments": 1439,
+        "document_version_id": "ver_b07b7d3f277e77945a397c4b3af9bc9f"
+      },
+      {
+        "filename": "Инструкция по созданию оферты и СТЕ.pdf",
+        "sha256": "ce50227cb1bb29b9145dd0fb52181c353c03bb11e00a0ab467cf544914b20159",
+        "pages": 65,
+        "fragments": 360,
+        "document_version_id": "ver_1d25303e9029726204bc99413b66135b"
+      },
+      {
+        "filename": "Инструкция по работе с машиночитаемыми доверенностями.pdf",
+        "sha256": "755870a7454fd166146bfd64a7c50009fc834340798d28ff9cee3132265272b9",
+        "pages": 7,
+        "fragments": 15,
+        "document_version_id": "ver_4918b5db1bc006fafc56db9876bc5104"
+      },
+      {
+        "filename": "Инструкция по работе с Порталом для заказчика.pdf",
+        "sha256": "7355b2c39b4aa4fbac758f64aeab0bdfd4a8219cc483dd5ca52e28eacb59fcde",
+        "pages": 256,
+        "fragments": 1220,
+        "document_version_id": "ver_844eb9c8fe9160d2ba46836d7b88a73e"
+      }
+    ],
+    "bootstrap": {
+      "first_snapshot_id": "snap_0e979dfef376faff41f7c76416fda457",
+      "first_versions_new": true,
+      "repeat_snapshot_id": "snap_0e979dfef376faff41f7c76416fda457",
+      "repeat_versions_idempotent": true,
+      "duplicate_count": 0,
+      "historical_fragments_included": 0
+    }
+  },
+  "database": {
+    "engine": "PostgreSQL 16 + pgvector",
+    "schema": "knowledge",
+    "snapshot_id": "snap_0e979dfef376faff41f7c76416fda457",
+    "alembic_head": "0008_quality_analytics",
+    "alembic_single_head": true,
+    "snapshot_rows": 1,
+    "document_rows": 6,
+    "document_version_rows": 6,
+    "fragment_rows": 3899,
+    "snapshot_fragment_memberships": 3899,
+    "condition_card_rows": 20,
+    "embedding_rows": 3899,
+    "embedding_vector_type": "vector(2048)",
+    "embedding_missing": 0,
+    "embedding_duplicate_fragment_ids": 0,
+    "embedding_non_finite": 0,
+    "embedding_distinct_model_ids": 1,
+    "embedding_distinct_revisions": 1,
+    "embedding_distinct_dimensions": 1,
+    "snapshot_review_status": "PENDING_REVIEW",
+    "ownership": "knowledge-owned schema; no historical corpus used"
+  },
+  "embedding": {
+    "model_id": "ai-sage/Giga-Embeddings-instruct-3B-0826",
+    "model_revision": "ed7db5c91b900b39381b27b6e9c0a3d31137cd29",
+    "dimension": 2048,
+    "runtime": "llama.cpp /v1/embeddings",
+    "runtime_repo": "ai-babai/giga-embeddings-0826-3b-gguf",
+    "runtime_file": "giga-embeddings-0826-3b-q8_0.gguf",
+    "runtime_revision": "04c5a2d751ce20908200de2324444a14a81b1d80",
+    "query_instruction_version": "giga_portal_support_v1",
+    "document_convention": "raw fragment text without query prefix",
+    "query_convention": "Instruct: <frozen instruction>\\nQuery: <user query>",
+    "vectors_normalized": true,
+    "weights_downloaded_on_host": false
+  },
+  "runpod": {
+    "base_url": "https://zvb5mxzhcd0x05-8080.proxy.runpod.net",
+    "purpose": "Giga embeddings only",
+    "bearer_used": true,
+    "token_logged": false,
+    "backfill": {
+      "batch_size": 16,
+      "batches": 244,
+      "fragments_processed": 3899,
+      "matching_dimension": 3899,
+      "matching_metadata": 3899,
+      "non_finite": 0,
+      "identity_preserved": true,
+      "timed_idempotent_run_seconds": 314.624,
+      "repeat_run_verified": true,
+      "provider_failures": 0
+    }
+  },
+  "gold_set": {
+    "path": "src/knowledge/evals/k2a-gold.json",
+    "query_count": 44,
+    "labels_changed": false,
+    "label_source": "manual source/page review of the six organizer PDFs"
+  },
+  "retrieval_config": {
+    "lexical": "lexical-v1 exact + PostgreSQL FTS + weak pg_trgm",
+    "hybrid": "hybrid-giga2048-rrf-v2",
+    "channels": ["exact", "fts", "dense"],
+    "rrf_k": 60,
+    "channel_limit": 30,
+    "final_limit": 10,
+    "dedupe_key": "fragment_id",
+    "reranker_used": false,
+    "learned_fusion": false,
+    "topic_hard_filter": false,
+    "lexical_fallback_during_hybrid": false
+  },
+  "metrics": {
+    "lexical_baseline": {
+      "query_count": 44,
+      "recall_at_5": 0.6136,
+      "recall_at_10": 0.75,
+      "mrr": 0.4018,
+      "exact_code_hit_at_10": 0.6875,
+      "typo_subset_recall_at_10": 1.0,
+      "latency_ms": {"p50": 289.698, "p95": 345.193, "mean": 291.346}
+    },
+    "hybrid_giga": {
+      "query_count": 44,
+      "recall_at_5": 0.5909,
+      "recall_at_10": 0.6591,
+      "mrr": 0.4121,
+      "exact_code_hit_at_10": 0.6875,
+      "typo_subset_recall_at_10": 0.0,
+      "latency_ms": {"p50": 750.671, "p95": 1201.173, "mean": 844.811},
+      "config_versions": ["hybrid-giga2048-rrf-v2"]
+    },
+    "delta_hybrid_minus_lexical": {
+      "recall_at_5": -0.0227,
+      "recall_at_10": -0.0909,
+      "mrr": 0.0103,
+      "exact_code_hit_at_10": 0.0,
+      "typo_subset_recall_at_10": -1.0,
+      "latency_p50_ms": 460.973,
+      "latency_p95_ms": 855.98
+    }
+  },
+  "failure_analysis": {
+    "hybrid_misses_at_10": [
+      {"query_id": "act-03", "category": "parser/chunk"},
+      {"query_id": "act-05", "category": "exact-code preservation/ranking"},
+      {"query_id": "act-07", "category": "parser/chunk"},
+      {"query_id": "yml-06", "category": "parser/chunk"},
+      {"query_id": "supplier-01", "category": "lexical/dense miss"},
+      {"query_id": "supplier-02", "category": "lexical/dense miss"},
+      {"query_id": "supplier-04", "category": "lexical/dense miss"},
+      {"query_id": "supplier-05", "category": "lexical/dense miss"},
+      {"query_id": "supplier-08", "category": "lexical/dense miss"},
+      {"query_id": "supplier-09", "category": "lexical/dense miss"},
+      {"query_id": "offer-01", "category": "parser/chunk"},
+      {"query_id": "offer-06", "category": "ranking/fusion"},
+      {"query_id": "mcd-05", "category": "parser/chunk"},
+      {"query_id": "customer-02", "category": "ranking/fusion"},
+      {"query_id": "customer-07", "category": "ranking/fusion"}
+    ],
+    "lexical_only_misses_at_10": ["act-03", "act-07", "yml-06", "supplier-01", "supplier-02", "supplier-04", "supplier-05", "supplier-08", "supplier-09", "offer-01", "mcd-05"],
+    "observations": [
+      "Hybrid loses four queries that lexical retrieved within top 10 (act-05, offer-06, customer-02, customer-07).",
+      "Exact-code aggregate is unchanged, but act-05 is a per-query exact-code regression.",
+      "Typo subset falls from 1.0 to 0.0.",
+      "Hybrid latency is materially higher than lexical baseline.",
+      "RRF scores are ranking signals only, not confidence or probability."
+    ]
+  },
+  "per_query_comparison": [
+    {"query_id":"act-01","lexical_best_rank":1,"hybrid_best_rank":1,"delta_rank":0,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"act-02","lexical_best_rank":3,"hybrid_best_rank":3,"delta_rank":0,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"act-03","lexical_best_rank":null,"hybrid_best_rank":null,"delta_rank":null,"lexical_hit_at_5":false,"lexical_hit_at_10":false,"hybrid_hit_at_5":false,"hybrid_hit_at_10":false},
+    {"query_id":"act-04","lexical_best_rank":8,"hybrid_best_rank":1,"delta_rank":7,"lexical_hit_at_5":false,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"act-05","lexical_best_rank":3,"hybrid_best_rank":null,"delta_rank":null,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":false,"hybrid_hit_at_10":false},
+    {"query_id":"act-06","lexical_best_rank":2,"hybrid_best_rank":1,"delta_rank":1,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"act-07","lexical_best_rank":29,"hybrid_best_rank":null,"delta_rank":null,"lexical_hit_at_5":false,"lexical_hit_at_10":false,"hybrid_hit_at_5":false,"hybrid_hit_at_10":false},
+    {"query_id":"yml-01","lexical_best_rank":1,"hybrid_best_rank":1,"delta_rank":0,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"yml-02","lexical_best_rank":1,"hybrid_best_rank":1,"delta_rank":0,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"yml-03","lexical_best_rank":1,"hybrid_best_rank":5,"delta_rank":-4,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"yml-04","lexical_best_rank":2,"hybrid_best_rank":1,"delta_rank":1,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"yml-05","lexical_best_rank":3,"hybrid_best_rank":4,"delta_rank":-1,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"yml-06","lexical_best_rank":null,"hybrid_best_rank":null,"delta_rank":null,"lexical_hit_at_5":false,"lexical_hit_at_10":false,"hybrid_hit_at_5":false,"hybrid_hit_at_10":false},
+    {"query_id":"yml-07","lexical_best_rank":4,"hybrid_best_rank":6,"delta_rank":-2,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":false,"hybrid_hit_at_10":true},
+    {"query_id":"supplier-01","lexical_best_rank":null,"hybrid_best_rank":null,"delta_rank":null,"lexical_hit_at_5":false,"lexical_hit_at_10":false,"hybrid_hit_at_5":false,"hybrid_hit_at_10":false},
+    {"query_id":"supplier-02","lexical_best_rank":null,"hybrid_best_rank":null,"delta_rank":null,"lexical_hit_at_5":false,"lexical_hit_at_10":false,"hybrid_hit_at_5":false,"hybrid_hit_at_10":false},
+    {"query_id":"supplier-03","lexical_best_rank":2,"hybrid_best_rank":3,"delta_rank":-1,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"supplier-04","lexical_best_rank":null,"hybrid_best_rank":null,"delta_rank":null,"lexical_hit_at_5":false,"lexical_hit_at_10":false,"hybrid_hit_at_5":false,"hybrid_hit_at_10":false},
+    {"query_id":"supplier-05","lexical_best_rank":null,"hybrid_best_rank":null,"delta_rank":null,"lexical_hit_at_5":false,"lexical_hit_at_10":false,"hybrid_hit_at_5":false,"hybrid_hit_at_10":false},
+    {"query_id":"supplier-06","lexical_best_rank":1,"hybrid_best_rank":1,"delta_rank":0,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"supplier-07","lexical_best_rank":4,"hybrid_best_rank":4,"delta_rank":0,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"supplier-08","lexical_best_rank":null,"hybrid_best_rank":null,"delta_rank":null,"lexical_hit_at_5":false,"lexical_hit_at_10":false,"hybrid_hit_at_5":false,"hybrid_hit_at_10":false},
+    {"query_id":"supplier-09","lexical_best_rank":null,"hybrid_best_rank":null,"delta_rank":null,"lexical_hit_at_5":false,"lexical_hit_at_10":false,"hybrid_hit_at_5":false,"hybrid_hit_at_10":false},
+    {"query_id":"offer-01","lexical_best_rank":null,"hybrid_best_rank":null,"delta_rank":null,"lexical_hit_at_5":false,"lexical_hit_at_10":false,"hybrid_hit_at_5":false,"hybrid_hit_at_10":false},
+    {"query_id":"offer-02","lexical_best_rank":4,"hybrid_best_rank":3,"delta_rank":1,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"offer-03","lexical_best_rank":1,"hybrid_best_rank":2,"delta_rank":-1,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"offer-04","lexical_best_rank":1,"hybrid_best_rank":1,"delta_rank":0,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"offer-05","lexical_best_rank":6,"hybrid_best_rank":4,"delta_rank":2,"lexical_hit_at_5":false,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"offer-06","lexical_best_rank":1,"hybrid_best_rank":null,"delta_rank":null,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":false,"hybrid_hit_at_10":false},
+    {"query_id":"offer-07","lexical_best_rank":4,"hybrid_best_rank":2,"delta_rank":2,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"offer-08","lexical_best_rank":3,"hybrid_best_rank":1,"delta_rank":2,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"mcd-01","lexical_best_rank":1,"hybrid_best_rank":1,"delta_rank":0,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"mcd-02","lexical_best_rank":1,"hybrid_best_rank":1,"delta_rank":0,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"mcd-03","lexical_best_rank":2,"hybrid_best_rank":1,"delta_rank":1,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"mcd-04","lexical_best_rank":3,"hybrid_best_rank":7,"delta_rank":-4,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":false,"hybrid_hit_at_10":true},
+    {"query_id":"mcd-05","lexical_best_rank":null,"hybrid_best_rank":null,"delta_rank":null,"lexical_hit_at_5":false,"lexical_hit_at_10":false,"hybrid_hit_at_5":false,"hybrid_hit_at_10":false},
+    {"query_id":"customer-01","lexical_best_rank":7,"hybrid_best_rank":4,"delta_rank":3,"lexical_hit_at_5":false,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"customer-02","lexical_best_rank":9,"hybrid_best_rank":null,"delta_rank":null,"lexical_hit_at_5":false,"lexical_hit_at_10":true,"hybrid_hit_at_5":false,"hybrid_hit_at_10":false},
+    {"query_id":"customer-03","lexical_best_rank":3,"hybrid_best_rank":2,"delta_rank":1,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"customer-04","lexical_best_rank":1,"hybrid_best_rank":1,"delta_rank":0,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"customer-05","lexical_best_rank":6,"hybrid_best_rank":8,"delta_rank":-2,"lexical_hit_at_5":false,"lexical_hit_at_10":true,"hybrid_hit_at_5":false,"hybrid_hit_at_10":true},
+    {"query_id":"customer-06","lexical_best_rank":3,"hybrid_best_rank":2,"delta_rank":1,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true},
+    {"query_id":"customer-07","lexical_best_rank":10,"hybrid_best_rank":null,"delta_rank":null,"lexical_hit_at_5":false,"lexical_hit_at_10":true,"hybrid_hit_at_5":false,"hybrid_hit_at_10":false},
+    {"query_id":"customer-08","lexical_best_rank":2,"hybrid_best_rank":2,"delta_rank":0,"lexical_hit_at_5":true,"lexical_hit_at_10":true,"hybrid_hit_at_5":true,"hybrid_hit_at_10":true}
+  ],
+  "verdict": {
+    "value": "GIGA_DROP",
+    "reason": "Real Giga dense+RRF hybrid degraded Recall@10, eliminated the typo subset and introduced per-query exact-code regression while adding substantial latency.",
+    "target_recall_at_10": 0.9,
+    "target_met": false,
+    "critical_path_recommendation": "Keep the certified Giga model/backfill as a derived artifact, but do not promote this hybrid retrieval configuration to the critical path. Investigate exact-code protection and fusion/ranking before another certification."
+  },
+  "verification": {
+    "uv_lock_check": "PASS",
+    "knowledge_pytest": "PASS (full suite from src/knowledge; 8 skipped, warnings only; bearer env cleared only for legacy fake-client isolation)",
+    "openapi_semantic_parity": "PASS (tests/test_contract_paths.py and tests/test_contract_requests.py)",
+    "real_postgres": "PASS (Alembic 0008, bootstrap, SQL invariants, lexical and hybrid retrieval against running DB)",
+    "gold_set_unchanged": true,
+    "git_diff_check": "PASS",
+    "scope_check": "PASS (only src/knowledge/benchmarks/ai2-giga-retrieval-certification.json changed)"
+  },
+  "limitations": [
+    "The six snapshots remain PENDING_REVIEW; no semantic promotion was performed.",
+    "The hybrid run intentionally disabled the unverified Querit reranker; this is a Giga dense+RRF measurement only.",
+    "No parser/chunker or retrieval tuning was performed after observing misses.",
+    "RunPod A40 was used only for embeddings; the report does not certify generator or reranker quality.",
+    "One initial pytest invocation from repository root collected unrelated infra tests; the authoritative Knowledge suite was rerun from src/knowledge and passed."
+  ]
+}
