@@ -26,7 +26,7 @@ Status: **ACTIVE**. Создан 2026-09-12 по итогам сверки `docs
 
 Реализовано и покрыто тестами: `Case`/`Turn`/`Handoff` aggregate с явными переходами; warning-first moderation с deterministic rules + context-check; `TurnOrchestrator` (moderate → human-request → understand → retrieve → answerability → draft → verify → decision) с per-stage `case_events`; `IngestHandoffStatus` (poll + HMAC webhook), demo adapter со `staged` скриптом; completion (user/support/moderation), feedback (4 сигнала), notifications (inbox + owner SSE + ack), idempotency keys, `xmin`/unique-revision concurrency, outbox + 4 воркера, quality pushes (`turns`/`feedback`/`completions`), analytics proxy, owner cookie, EF migrations, Compose.
 
-`dotnet test src/support-core/TenderHack.sln -c Release` — 224 passed (Domain 128, Application 61, Contract 14, Api.Tests 21 — требует Docker/Testcontainers) на текущей ветке после Фаз 0–4 (см. Progress ниже; открытыми остаются только явно помеченные known-debt пункты C3/C5-remainder/E2/E3/E4 и остаток D2 — `TenderHack.Worker.Tests`).
+`dotnet test src/support-core/TenderHack.sln -c Release` — 225 passed (Domain 128, Application 61, Contract 14, Api.Tests 22 — требует Docker/Testcontainers; включает `MigrationUpgradeTests` — миграция поверх базы с существующими дублями уведомлений) на текущей ветке после Фаз 0–4 (см. Progress ниже; открытыми остаются только явно помеченные known-debt пункты C3/C5-remainder/E2/E3/E4 и остаток D2 — `TenderHack.Worker.Tests`).
 
 ## Найденные gaps (с evidence)
 

@@ -22,6 +22,22 @@ export function ButtonPrimary({ icon, children, className = "", disabled, ...res
   );
 }
 
+/** Chat/Specialist CTA (Figma 292:1492): secondary post-answer action for explicit human handoff.
+ * Brand-subtle (tinted fill + brand border) so it stays visible without competing with Send. */
+export function SpecialistCta({ icon, children = "Позвать специалиста", className = "", disabled, ...rest }: ButtonPrimaryProps) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      className={`inline-flex h-[45px] items-center justify-center gap-2 whitespace-nowrap rounded-[30px] border border-[var(--action-primary)] bg-[#fff0f1] px-4 text-xs font-medium text-[var(--action-primary)] transition-colors hover:bg-[#ffe4e6] disabled:opacity-42 ${className}`}
+      {...rest}
+    >
+      {icon}
+      {children}
+    </button>
+  );
+}
+
 export function ButtonSecondary({ icon, children, className = "", disabled, ...rest }: ButtonPrimaryProps) {
   return (
     <button

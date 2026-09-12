@@ -67,15 +67,13 @@ function renderItem(item: TimelineItem, snapshot: CaseSnapshot, api: ApiClient, 
       return <NoConfirmedAnswerNotice key={item.item_id} />;
 
     case "MODERATION_WARNING":
-      return <ModerationWarningNotice key={item.item_id} count={Number(payload.moderation_warning_count ?? snapshot.moderation_warning_count)} />;
+      return <ModerationWarningNotice key={item.item_id} />;
 
     case "CONVERSATION_CLOSED":
-      return (
-        <ConversationClosedNotice
-          key={item.item_id}
-          reason={snapshot.completion_reason === "MODERATION" ? "moderation" : snapshot.completion_reason === "SUPPORT" ? "support" : "user"}
-        />
-      );
+      // A moderation close is shown by the ModerationBlockedNotice in the composer slot (ChatScreen),
+      // not repeated in the timeline.
+      if (snapshot.completion_reason === "MODERATION") return null;
+      return <ConversationClosedNotice key={item.item_id} reason={snapshot.completion_reason === "SUPPORT" ? "support" : "user"} />;
 
     case "TECHNICAL_ERROR":
       return <TechnicalErrorNotice key={item.item_id} />;

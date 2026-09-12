@@ -1,3 +1,6 @@
+import moderationAlert from "../../assets/moderation-alert.svg";
+import moderationLock from "../../assets/moderation-lock.svg";
+
 export function UserMessage({ text }: { text: string }) {
   return (
     <div className="flex items-start rounded-[30px] bg-[var(--surface-default)] p-2.5 self-end">
@@ -51,21 +54,39 @@ export function NoConfirmedAnswerNotice() {
   );
 }
 
-export function ModerationWarningNotice({ count }: { count: number }) {
+/** Chat/Moderation Warning (Figma 321:1486): warning-first policy, product-spec.md §14. */
+export function ModerationWarningNotice() {
   return (
-    <div className="w-full max-w-[512px] rounded-[18px] border border-[#f5c7cc] bg-[#fff6f7] p-3.5 text-sm text-[var(--content-primary)]">
-      Сообщение нарушает правила общения (предупреждение {count}). Повторное нарушение закроет обращение.
+    <div className="flex w-full max-w-[512px] items-center gap-3 rounded-[18px] border border-[#f0c9cc] bg-[#fff7f7] p-3.5">
+      <img src={moderationAlert} alt="" className="size-7 shrink-0" />
+      <div className="flex min-w-0 flex-col gap-1">
+        <p className="text-[13px] font-semibold leading-[18px] text-[var(--content-primary)]">Пожалуйста, без нецензурной лексики</p>
+        <p className="text-xs leading-[17px] text-[var(--content-secondary)]">
+          Я продолжу диалог, но при повторном нарушении чат будет заблокирован.
+        </p>
+      </div>
     </div>
   );
 }
 
-export function ConversationClosedNotice({ reason }: { reason: "moderation" | "user" | "support" }) {
-  const text =
-    reason === "moderation"
-      ? "Обращение закрыто модерацией из-за повторного нарушения правил."
-      : reason === "support"
-        ? "Обращение завершено поддержкой."
-        : "Вы завершили это обращение.";
+/** Chat/Moderation Blocked Notice (Figma 321:1494): sits where the composer was once the chat is
+ * closed by moderation — the only next step is a new chat. */
+export function ModerationBlockedNotice({ className = "" }: { className?: string }) {
+  return (
+    <div className={`flex h-[58px] w-full max-w-[705px] items-center gap-2.5 rounded-[30px] border border-[#efc5c8] bg-[#fff6f6] px-[18px] py-2 ${className}`}>
+      <img src={moderationLock} alt="" className="size-[22px] shrink-0" />
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <p className="text-xs font-semibold leading-4 text-[var(--action-primary)]">Чат заблокирован</p>
+        <p className="text-[10px] leading-[14px] text-[var(--content-secondary)]">
+          Повторное нарушение правил общения. Создайте новый чат, чтобы продолжить.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export function ConversationClosedNotice({ reason }: { reason: "user" | "support" }) {
+  const text = reason === "support" ? "Обращение завершено поддержкой." : "Вы завершили это обращение.";
   return <div className="w-full max-w-[512px] rounded-[18px] bg-[var(--surface-subtle)] p-3.5 text-sm text-[var(--content-secondary)]">{text}</div>;
 }
 

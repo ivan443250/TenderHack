@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { ButtonSecondary, ButtonPrimary } from "../../design-system/Button";
+import { ButtonPrimary, SpecialistCta } from "../../design-system/Button";
 import { TextField } from "../../design-system/TextField";
 import { HeadsetIcon } from "../../design-system/icons";
 import type { HandoffView } from "../../api/types";
@@ -23,17 +23,13 @@ export function HandoffCard({ handoff, onPrepare, onConfirm, onRetry }: HandoffC
 
   if (status === "NOT_REQUESTED" && !preparing) {
     return (
-      <div className="flex w-full max-w-[512px] flex-col items-start rounded-[18px] border border-[var(--border-default)] bg-white p-3.5">
-        <ButtonSecondary
-          icon={<HeadsetIcon className="size-[18px]" />}
-          onClick={async () => {
-            setPreparing(true);
-            await onPrepare();
-          }}
-        >
-          Передать специалисту
-        </ButtonSecondary>
-      </div>
+      <SpecialistCta
+        icon={<HeadsetIcon className="size-[18px]" />}
+        onClick={async () => {
+          setPreparing(true);
+          await onPrepare();
+        }}
+      />
     );
   }
 

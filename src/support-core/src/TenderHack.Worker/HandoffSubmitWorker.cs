@@ -46,18 +46,19 @@ public sealed class HandoffSubmitWorker(IServiceScopeFactory scopeFactory, ILogg
         var adapter = scope.ServiceProvider.GetRequiredService<IHandoffAdapter>();
         var clock = scope.ServiceProvider.GetRequiredService<TimeProvider>();
         var submissionPublisher = scope.ServiceProvider.GetRequiredService<HandoffSubmissionPublisher>();
+        var events = scope.ServiceProvider.GetRequiredService<ICaseEventReader>();
         var maxAttempts = scope.ServiceProvider.GetRequiredService<IOptions<SupportOptions>>().Value.Submit.MaxAttempts;
 
         var pending = await outboxReader.ListPendingAsync(HandoffOutboxMessages.Submit, batchSize: 10, ct);
 
         foreach (var entry in pending)
         {
-            await ProcessEntryAsync(entry, cases, outboxReader, unitOfWork, adapter, submissionPublisher, clock, maxAttempts, ct);
+            await ProcessEntryAsync(entry, cases, events, outboxReader, unitOfWork, adapter, submissionPublisher, clock, maxAttempts, ct);
         }
     }
 
     private async Task ProcessEntryAsync(
-        OutboxEntry entry, ICaseRepository cases, IOutboxReader outboxReader, IUnitOfWork unitOfWork,
+        OutboxEntry entry, ICaseRepository cases, ICaseEventReader events, IOutboxReader outboxReader, IUnitOfWork unitOfWork,
         IHandoffAdapter adapter, HandoffSubmissionPublisher submissionPublisher, TimeProvider clock, int maxAttempts, CancellationToken ct)
     {
         var payload = JsonSerializer.Deserialize<HandoffSubmitPayload>(entry.PayloadJson)
@@ -80,7 +81,9 @@ public sealed class HandoffSubmitWorker(IServiceScopeFactory scopeFactory, ILogg
             // Everything beyond the id is read straight off the loaded aggregate — the package was
             // assembled once at `prepare` time from persisted case state alone (support-adapter-v0.md
             // §2), and `ConfirmedSummary` is the user's own final edited text (set by confirm/retry).
-            var package = handoff.Package ?? throw new InvalidOperationException($"Handoff {handoffId} has no prepared package.");
+            // A handoff persisted before `package_json` existed has no stored package; rebuild it from
+            // the same persisted history `prepare` would have used instead of failing the submission.
+            var package = handoff.Package ?? HandoffPackageBuilder.Build(@case, await events.ListAsync(caseId, after: 0, ct));
             var request = new HandoffRequest(
                 caseId,
                 handoffId,

@@ -4,6 +4,7 @@ import { ButtonPrimary } from "../../design-system/Button";
 import { PillChoice } from "../../design-system/Chip";
 import { TextField } from "../../design-system/TextField";
 import type { CaseSnapshot, FeedbackRating } from "../../api/types";
+import { FeedbackThanks } from "./FeedbackThanks";
 
 type ResolutionFeedbackProps = {
   snapshot: CaseSnapshot;
@@ -27,11 +28,7 @@ export function ResolutionFeedback({ snapshot, onComplete, onSubmitFeedback }: R
   const [busy, setBusy] = useState(false);
 
   if (snapshot.feedback) {
-    return (
-      <div className="w-full max-w-[512px] rounded-[18px] border border-[var(--border-default)] bg-white p-4 text-xs text-[var(--content-secondary)]">
-        Спасибо, отзыв получен.
-      </div>
-    );
+    return <FeedbackThanks />;
   }
 
   const showSolvedControl = snapshot.resolution_status === "UNKNOWN";

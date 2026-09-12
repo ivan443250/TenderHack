@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 
 import { IconButton } from "../../design-system/IconButton";
+import { PortalLogo, PortalMark } from "../../design-system/Brand";
 import { EditIcon, HelpIcon, SearchIcon, SettingsIcon, SidebarToggleIcon, DotIcon } from "../../design-system/icons";
 import type { CaseListItem } from "../../api/types";
 
@@ -33,6 +34,9 @@ export function Sidebar({ recentCases, archivedCases, activeCaseId, collapsed, o
   if (collapsed) {
     return (
       <div className="flex h-full w-[60px] shrink-0 flex-col items-center gap-3 rounded-r-xl bg-[var(--surface-default)] py-3">
+        <Link to="/" aria-label="На главную">
+          <PortalMark />
+        </Link>
         <IconButton icon={<SidebarToggleIcon className="size-[18px]" />} label="Развернуть меню" onClick={onToggleCollapsed} />
         <IconButton icon={<EditIcon className="size-5" />} label="Новый чат" onClick={() => navigate("/")} />
       </div>
@@ -42,8 +46,8 @@ export function Sidebar({ recentCases, archivedCases, activeCaseId, collapsed, o
   return (
     <nav className="flex h-full w-[213px] shrink-0 flex-col gap-1.5 rounded-r-xl bg-[var(--surface-default)] px-2.5 py-3">
       <div className="flex h-[52px] items-center gap-1.5">
-        <Link to="/" className="flex h-[46px] w-[137px] items-center text-sm font-bold text-[var(--action-primary)]">
-          ПОРТАЛ ПОСТАВЩИКОВ
+        <Link to="/" className="flex h-[46px] w-[137px] items-center" aria-label="На главную">
+          <PortalLogo />
         </Link>
         <div className="flex-1" />
         <IconButton icon={<SidebarToggleIcon className="size-[18px]" />} label="Свернуть меню" onClick={onToggleCollapsed} />

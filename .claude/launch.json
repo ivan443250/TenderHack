@@ -6,6 +6,12 @@
       "runtimeExecutable": "C:\\Windows\\System32\\cmd.exe",
       "runtimeArgs": ["/d", "/c", "set PATH=C:\\PROGRA~1\\nodejs\\;%PATH% && node C:\\Users\\Gresh\\AppData\\Roaming\\npm\\node_modules\\pnpm\\bin\\pnpm.cjs --dir src/web dev"],
       "port": 5173
+    },
+    {
+      "name": "web-dev-5174",
+      "runtimeExecutable": "C:\\Windows\\System32\\cmd.exe",
+      "runtimeArgs": ["/d", "/c", "set PATH=C:\\PROGRA~1\\nodejs\\;%PATH% && node C:\\Users\\Gresh\\AppData\\Roaming\\npm\\node_modules\\pnpm\\bin\\pnpm.cjs --dir src/web dev --port 5174 --strictPort"],
+      "port": 5174
     }
   ]
 }

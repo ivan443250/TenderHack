@@ -5,6 +5,7 @@ import type { ApiClient } from "../../api/client";
 import type { SourceDetail } from "../../api/types";
 import { useCaseSession } from "../../state/caseStore";
 import { Composer } from "./Composer";
+import { ModerationBlockedNotice } from "./Messages";
 import { MessageList } from "./MessageList";
 import { ContextPanel } from "./ContextPanel";
 import { RequestStatusStepper } from "./RequestStatusStepper";
@@ -80,6 +81,11 @@ export function ChatScreen({ api }: { api: ApiClient }) {
         {snapshot.conversation_status === "ACTIVE" && (
           <div className="flex shrink-0 justify-center border-t border-[var(--border-default)] px-8 py-4">
             <Composer context="conversation" onSubmit={session.sendMessage} />
+          </div>
+        )}
+        {snapshot.conversation_status === "CLOSED_MODERATION" && (
+          <div className="flex shrink-0 justify-center border-t border-[var(--border-default)] px-8 py-4">
+            <ModerationBlockedNotice />
           </div>
         )}
       </div>
