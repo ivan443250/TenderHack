@@ -1,0 +1,185 @@
+{
+  "status": "COMPLETE_WITH_BLOCKERS",
+  "captured_on": "2026-09-12",
+  "scope": "K0A inference hardware and runtime preflight only; no model download, adapter implementation, or K0B work",
+  "hardware": {
+    "os": {
+      "name": "Windows 11 Pro",
+      "version": "10.0.26200",
+      "build": "26200",
+      "architecture": "x64"
+    },
+    "cpu": {
+      "model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "cores": 8,
+      "logical_processors": 16,
+      "max_clock_mhz": 3201
+    },
+    "memory": {
+      "physical_bytes": 16476839936,
+      "physical_gib_approx": 15.35,
+      "modules": "2 x Samsung 8 GB, 3200 MT/s"
+    },
+    "nvidia": {
+      "present": true,
+      "name": "NVIDIA GeForce RTX 3060 Laptop GPU",
+      "driver_version": "581.83",
+      "vram_total_mib": 6144,
+      "vram_free_mib": 5996,
+      "vram_used_mib": 0,
+      "compute_capability": "8.6",
+      "measurement_source": "nvidia-smi"
+    },
+    "integrated_gpu": {
+      "present": true,
+      "name": "AMD Radeon(TM) Graphics",
+      "vram_reported_by_wmi": "512 MB; WMI value is not treated as dedicated VRAM"
+    },
+    "python": {
+      "project_runtime": "Python 3.12.14 via uv",
+      "py_launcher_version": "Python 3.12.10",
+      "bare_python_command_available": false,
+      "torch_installed_in_project": false,
+      "torch_version": null,
+      "cuda_available_in_project": null,
+      "cuda_device_count_in_project": null
+    },
+    "cuda_toolkit": {
+      "nvcc_available": false,
+      "version": null
+    },
+    "wsl": {
+      "available": true,
+      "default_distribution": "docker-desktop",
+      "default_version": 2,
+      "listed_distributions": [
+        {
+          "name": "docker-desktop",
+          "state": "Stopped",
+          "version": 2
+        }
+      ],
+      "general_linux_distribution_available": false,
+      "gpu_visibility": null,
+      "evidence": "WSL reports only the stopped Docker Desktop utility distribution; no regular Linux distribution was available for a GPU smoke test."
+    },
+    "docker": {
+      "available": true,
+      "version": "29.7.2",
+      "server_os": "linux",
+      "architecture": "x86_64",
+      "daemon_cpus": 16,
+      "daemon_memory_bytes": 7977205760,
+      "nvidia_runtime_registered": true,
+      "gpus_all_flag_accepted": true,
+      "container_device_nodes_visible": false,
+      "torch_in_current_knowledge_image": false,
+      "evidence": "The knowledge image accepted --gpus all and exposed NVIDIA_VISIBLE_DEVICES=all, but no /dev/nvidia* nodes were visible and the image has no torch; usable CUDA was not proven."
+    }
+  },
+  "vllm": {
+    "feasibility": "VLLM_TARGET_LINUX_ONLY",
+    "evidence": [
+      {
+        "fact": "Official vLLM installation guidance supports Linux and states that vLLM does not support Windows natively; Windows requires a compatible Linux environment such as WSL.",
+        "source": "https://docs.vllm.ai/en/stable/getting_started/installation/gpu/"
+      },
+      {
+        "fact": "The RTX 3060 Laptop GPU reports compute capability 8.6, above the official NVIDIA compute capability 7.5+ requirement; this is a hardware threshold only, not proof that the current host can run vLLM.",
+        "source": "https://docs.vllm.ai/en/stable/getting_started/installation/gpu/"
+      },
+      {
+        "fact": "Native Windows is therefore not a supported local vLLM path, and the available WSL/Docker setup did not provide a verified CUDA device inside the knowledge image.",
+        "source": "local preflight commands"
+      }
+    ],
+    "current_host_certification": "not_certified",
+    "target_runtime": "Linux host with NVIDIA CUDA and verified GPU device visibility",
+    "fallback_policy": "Keep llama.cpp as a later fallback decision only after a documented vLLM suitability failure; do not silently switch runtimes during K0A."
+  },
+  "models": {
+    "embedding": {
+      "repo_id": "Qwen/Qwen3-Embedding-0.6B",
+      "revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+      "role": "embedding",
+      "parameter_count": "0.6B",
+      "weight_size_observed": "1.19 GB model.safetensors on an earlier Hugging Face tree revision; current revision pin was resolved during K0C review",
+      "context_length": "32k",
+      "embedding_dimension_max": 1024,
+      "architecture": "Qwen3 text embedding model",
+      "runtime_requirements_from_card": [
+        "transformers>=4.51.0",
+        "SentenceTransformers usage is documented"
+      ],
+      "fit_assessment": "Likely fits the 6 GiB GPU by checkpoint size alone, but CUDA load and throughput are unverified because torch is absent from the current project environment.",
+      "source_urls": [
+        "https://huggingface.co/Qwen/Qwen3-Embedding-0.6B"
+      ]
+    },
+    "reranker": {
+      "repo_id": "BAAI/bge-reranker-v2-m3",
+      "revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+      "role": "reranker",
+      "parameter_count": "0.6B",
+      "weight_size_observed": "2.27 GB model.safetensors; 2.29 GB repository on the Hugging Face tree",
+      "architecture": "XLMRobertaForSequenceClassification",
+      "config_dtype": "float32",
+      "max_position_embeddings": 8194,
+      "documented_example_max_length": 512,
+      "runtime_options_from_card": [
+        "FlagEmbedding",
+        "Transformers with torch"
+      ],
+      "fit_assessment": "Likely fits the 6 GiB GPU alone, but actual load, precision choice, and concurrent-memory behavior are unverified.",
+      "source_urls": [
+        "https://huggingface.co/BAAI/bge-reranker-v2-m3"
+      ]
+    },
+    "generator": {
+      "repo_id": "Qwen/Qwen3-4B-Instruct-2507",
+      "revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+      "role": "generator",
+      "parameter_count": "4B",
+      "architecture": "Qwen3 causal language model",
+      "documented_serving": "vllm serve Qwen/Qwen3-4B-Instruct-2507 with an OpenAI-compatible endpoint",
+      "target_precision": "BF16 base checkpoint",
+      "bf16_vram_assessment": "Approximately 9 GB for the original BF16 4B model according to the Qwen model-card material; this exceeds the measured 6 GiB laptop GPU before KV-cache and runtime overhead.",
+      "fit_assessment": "Does not fit the measured 6 GiB GPU as the selected BF16 target. A quantized model would be a separate explicit model decision and is not selected by this preflight.",
+      "source_urls": [
+        "https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507"
+      ]
+    }
+  },
+  "recommended_execution": {
+    "embedding": "Retain Qwen/Qwen3-Embedding-0.6B as the target; validate on a controlled Linux/CUDA host before adding an adapter.",
+    "reranker": "Retain BAAI/bge-reranker-v2-m3 as the target; validate memory and latency on the same controlled Linux/CUDA host.",
+    "generator": "Run Qwen/Qwen3-4B-Instruct-2507 through vLLM only on a controlled Linux NVIDIA host with sufficient VRAM; do not load the BF16 target on this 6 GiB laptop and do not switch to a quantized alternative in K0A."
+  },
+  "dependency_plan": [
+    {
+      "area": "embedding",
+      "plan": "Add heavyweight torch/transformers/SentenceTransformers dependencies only to an isolated inference profile after the Linux smoke test; keep the baseline knowledge service importable without model weights."
+    },
+    {
+      "area": "reranker",
+      "plan": "Choose either FlagEmbedding or a direct Transformers adapter after an isolated benchmark; do not install both into the baseline service by default."
+    },
+    {
+      "area": "generator",
+      "plan": "Run vLLM as the separately provisioned inference runtime and connect through its OpenAI-compatible HTTP endpoint; the knowledge service should not download generator weights during ordinary startup."
+    },
+    {
+      "area": "reproducibility",
+      "plan": "Pin model revisions, runtime versions, CUDA image, and quantization only in the next implementation step after hardware is selected; this artifact intentionally records no cache or weight path."
+    }
+  ],
+  "blockers": [
+    "Official vLLM support is Linux-oriented and native Windows is unsupported.",
+    "No regular WSL2 Linux distribution is installed; only the stopped docker-desktop utility distribution is listed.",
+    "Docker GPU allocation was accepted, but no NVIDIA device nodes or torch were visible in the current knowledge image, so usable CUDA was not verified.",
+    "The laptop exposes 6 GiB VRAM, below the approximately 9 GiB BF16 fit estimate for the selected 4B generator, before runtime overhead.",
+    "The current project environment has no torch and the host has no nvcc; no model load or throughput benchmark is therefore meaningful yet.",
+    "No model weights or caches were downloaded during K0A."
+  ],
+  "next_allowed": false
+}

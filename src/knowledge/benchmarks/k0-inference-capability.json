@@ -1,0 +1,91 @@
+{
+  "status": "PASS_WITH_LIMITATIONS",
+  "captured_on": "2026-09-12T01:19:26Z",
+  "command": "tenderhack-knowledge-inference-smoke",
+  "heavyweight_execution": false,
+  "models": {
+    "embedding": {
+      "model_id": "Qwen/Qwen3-Embedding-0.6B",
+      "revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+      "device": "auto",
+      "dtype": "auto",
+      "status": "BLOCKED_OPT_IN_REQUIRED",
+      "actual_samples": {
+        "single_query": 0,
+        "batch": 0,
+        "long_support_request": 0
+      },
+      "load_time_ms": null,
+      "latency_ms": {},
+      "memory_observations": {
+        "before": null,
+        "after": null
+      },
+      "schema_failures": [],
+      "limitations": [
+        "Pass --allow-model-download to load local weights."
+      ]
+    },
+    "reranker": {
+      "model_id": "BAAI/bge-reranker-v2-m3",
+      "revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+      "device": "auto",
+      "dtype": "auto",
+      "status": "BLOCKED_OPT_IN_REQUIRED",
+      "actual_samples": {
+        "sanity_query": 0,
+        "candidates": 0
+      },
+      "load_time_ms": null,
+      "latency_ms": {},
+      "memory_observations": {
+        "before": null,
+        "after": null
+      },
+      "schema_failures": [],
+      "limitations": [
+        "Pass --allow-model-download to load local weights."
+      ]
+    },
+    "generator": {
+      "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+      "revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+      "runtime": "vLLM OpenAI-compatible HTTP",
+      "device": "remote-local-runtime",
+      "dtype": "runtime-defined",
+      "status": "BLOCKED_ENVIRONMENT",
+      "actual_samples": {
+        "short_prompt": 0,
+        "long_evidence_prompt": 0,
+        "structured_output": 0
+      },
+      "load_time_ms": null,
+      "latency_ms": {
+        "short_prompt": null,
+        "long_evidence_prompt": null
+      },
+      "memory_observations": {
+        "before": null,
+        "after": null
+      },
+      "schema_failures": [],
+      "vllm_status": "blocked_environment",
+      "limitations": [
+        "K0A classified vLLM as target-Linux-only; pass --probe-vllm on a reachable local runtime to execute HTTP smoke."
+      ]
+    }
+  },
+  "library_versions": {
+    "python": "3.12.14",
+    "torch": null,
+    "transformers": null,
+    "sentence-transformers": null,
+    "vllm": null,
+    "httpx": "0.28.1"
+  },
+  "vllm_status": "blocked_environment",
+  "limitations": [
+    "This smoke checks adapter capability and transport/schema invariants only; it does not measure retrieval or answer quality.",
+    "No cloud LLM or external search API is used."
+  ]
+}

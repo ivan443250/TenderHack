@@ -23,10 +23,16 @@ test = [
   "pytest>=8.3,<9",
   "pytest-asyncio>=0.25,<1",
 ]
+inference = [
+  "sentence-transformers>=3.4,<6",
+  "torch>=2.4,<3",
+  "transformers>=4.51,<5",
+]
 
 [project.scripts]
 tenderhack-knowledge = "tenderhack_knowledge.main:run"
 tenderhack-knowledge-worker = "tenderhack_knowledge.worker.main:run"
+tenderhack-knowledge-inference-smoke = "tenderhack_knowledge.inference.smoke:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tenderhack_knowledge"]

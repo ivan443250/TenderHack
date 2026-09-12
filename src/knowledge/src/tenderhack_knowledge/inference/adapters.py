@@ -1,4 +1,4 @@
-"""Narrow local model adapter protocols and opt-in inference adapters."""
+"""Convenient import surface for the selected inference adapters."""
 
 from .embedding import Qwen3EmbeddingAdapter
 from .errors import (
