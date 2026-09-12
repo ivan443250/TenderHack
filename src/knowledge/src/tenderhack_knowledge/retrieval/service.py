@@ -7,7 +7,7 @@ from typing import Literal
 
 from tenderhack_knowledge.contracts.v0 import Candidate, CandidateScores, Corpus, RetrieveRequest
 from tenderhack_knowledge.ingestion.repository import CorpusBoundaryError, UnknownSnapshotError
-from tenderhack_knowledge.persistence.repository import PostgresKnowledgeRepository
+from tenderhack_knowledge.persistence.repository import PostgresKnowledgeRepository, TRIGRAM_MIN_SCORE
 from tenderhack_knowledge.understanding import normalize_query
 
 
@@ -90,7 +90,7 @@ class LexicalRetriever:
                 channels.append("exact")
             if fts > 0:
                 channels.append("fts")
-            if trigram >= 0.28 and trigram_enabled:
+            if trigram >= TRIGRAM_MIN_SCORE and trigram_enabled:
                 channels.append("trigram")
             records.append(
                 RetrievalRecord(candidate=candidates[-1], channels=tuple(channels), text=str(row["text"] or ""))

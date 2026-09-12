@@ -39,6 +39,11 @@ from tenderhack_knowledge.inference.errors import (
 
 metadata = sa.MetaData()
 
+# Keep weak typo recovery useful without presenting an unrelated short query
+# as evidence.  The threshold is deliberately above the observed unrelated
+# Russian probe (0.35) and below the measured misspelled gold query (0.615).
+TRIGRAM_MIN_SCORE = 0.40
+
 kb_documents = sa.Table(
     "kb_documents",
     metadata,
@@ -364,7 +369,7 @@ class PostgresKnowledgeRepository:
         if use_fts:
             channels.extend((russian_match, simple_match))
         if allow_trigram and normalized_query:
-            channels.append(trigram_score >= 0.28)
+            channels.append(trigram_score >= TRIGRAM_MIN_SCORE)
         if not channels:
             return ()
 
