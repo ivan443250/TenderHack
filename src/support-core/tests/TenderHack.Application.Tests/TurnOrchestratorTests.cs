@@ -211,24 +211,28 @@ public sealed class TurnOrchestratorTests
         Assert.DoesNotContain(_events.Published, e => e.Event.Type == "AI_ANSWER");
     }
 
-    [Fact]
-    public async Task KnowledgeFailureProducesTechnicalErrorNotNoAnswer()
+    [Theory]
+    [InlineData(KnowledgeFailureCategory.Timeout)]
+    [InlineData(KnowledgeFailureCategory.Unavailable)]
+    [InlineData(KnowledgeFailureCategory.InvalidResponse)]
+    [InlineData(KnowledgeFailureCategory.ModelError)]
+    public async Task KnowledgeFailureProducesTechnicalErrorNotNoAnswer(KnowledgeFailureCategory category)
     {
         var sut = CreateSut();
         var @case = NewCase();
-        _knowledge.FailAt = new KnowledgeFailureException(KnowledgeFailureCategory.Timeout, "boom");
+        _knowledge.FailAt = new KnowledgeFailureException(category, "boom");
         _knowledge.FailingStage = nameof(FakeKnowledgeService.RetrieveAsync);
 
         var outcome = await sut.RunAsync(@case, "вопрос", CancellationToken.None);
 
         Assert.Equal(Decision.TechnicalError, outcome.Decision);
-        Assert.Equal(KnowledgeFailureCategory.Timeout, outcome.FailureCategory);
+        Assert.Equal(category, outcome.FailureCategory);
         Assert.Equal(TurnStatus.Failed, @case.ActiveTurn!.Status);
         Assert.Contains(_events.Published, e => e.Event.Type == "TECHNICAL_ERROR");
 
         var push = Assert.IsType<QualityTurnPush>(Assert.Single(_outbox.Enqueued).Payload);
         Assert.Equal("TechnicalError", push.Decision);
-        Assert.Equal("Timeout", push.ErrorCategory);
+        Assert.Equal(category.ToString(), push.ErrorCategory);
         Assert.NotNull(push.StageTimings.UnderstandMs);
         Assert.Null(push.StageTimings.RetrieveMs);
     }

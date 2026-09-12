@@ -19,6 +19,13 @@ public interface ICaseRepository
     /// <summary>Looks a case up by its handoff id — the inbound status webhook only carries `handoff_id`, not `case_id`.</summary>
     Task<Case?> FindByHandoffIdAsync(HandoffId handoffId, CancellationToken ct);
 
+    /// <summary>
+    /// Cases whose active turn has been stuck `Queued`/`Running` since before <paramref name="olderThan"/> —
+    /// almost always a process crash mid-turn. Only one turn per case can be in that state at a time
+    /// (starting a new one always supersedes the previous), so matching any such turn is safe.
+    /// </summary>
+    Task<IReadOnlyList<Case>> ListStaleActiveTurnCasesAsync(DateTimeOffset olderThan, CancellationToken ct);
+
     void Add(Case @case);
 }
 

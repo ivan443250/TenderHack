@@ -30,10 +30,12 @@ public static class CaseMapper
             LastEventId: (events.Count > 0 ? events[^1].EventId : 0).ToString(),
             @case.CompletedAt,
             @case.CompletionReason,
-            feedback is { } f
-                ? new FeedbackView(f.SpecialistRating, f.InformationQualityRating, f.Solved, f.CommentText, f.SubmittedAt)
-                : null);
+            ToFeedbackView(feedback));
     }
+
+    public static FeedbackView? ToFeedbackView(TenderHack.Domain.Feedback.Feedback? feedback) => feedback is { } f
+        ? new FeedbackView(f.SpecialistRating, f.InformationQualityRating, f.Solved, f.CommentText, f.SubmittedAt)
+        : null;
 
     public static HandoffView? ToHandoffView(TenderHack.Domain.Handoffs.Handoff? handoff)
     {

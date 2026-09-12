@@ -25,7 +25,7 @@ public static class CompletionEndpoints
 
         app.MapPost("/api/v0/cases/{caseId}/feedback", async (
             HttpContext context, string caseId, SubmitFeedbackRequest request,
-            SubmitFeedbackUseCase useCase, CancellationToken ct) =>
+            SubmitFeedbackUseCase useCase, IFeedbackRepository feedbackRepository, IIdempotencyStore idempotency, CancellationToken ct) =>
         {
             if (!CaseEndpointHelpers.TryRequireCaseId(caseId, out var id, out var badRequest))
             {
@@ -33,11 +33,25 @@ public static class CompletionEndpoints
             }
 
             var ownerId = CaseEndpointHelpers.RequireOwner(context);
+            var key = IdempotencyHelper.GetKey(context);
+
+            // web-api-v0.md §9.3: "the same Idempotency-Key returns the stored one" instead of a 409.
+            var cachedId = await IdempotencyHelper.CheckAsync(idempotency, ownerId, IdempotencyScopes.SubmitFeedback, key, request, ct);
+            if (cachedId is not null)
+            {
+                var existing = await feedbackRepository.FindByCaseIdAsync(id, ct);
+                return Results.Ok(CaseMapper.ToFeedbackView(existing));
+            }
+
             var feedback = await useCase.ExecuteAsync(
                 id, ownerId, request.SpecialistRating, request.InformationQualityRating, request.Solved, request.CommentText, ct);
 
-            return Results.Ok(new FeedbackView(
-                feedback.SpecialistRating, feedback.InformationQualityRating, feedback.Solved, feedback.CommentText, feedback.SubmittedAt));
+            if (key is not null)
+            {
+                await idempotency.SaveAsync(ownerId, IdempotencyScopes.SubmitFeedback, key, IdempotencyHelper.HashPayload(request), feedback.Id.ToString(), ct);
+            }
+
+            return Results.Ok(CaseMapper.ToFeedbackView(feedback));
         });
     }
 }

@@ -22,6 +22,12 @@ public sealed class FakeCaseRepository : ICaseRepository
     public Task<Case?> FindByHandoffIdAsync(HandoffId handoffId, CancellationToken ct) =>
         Task.FromResult(_cases.Values.FirstOrDefault(c => c.Handoff?.Id == handoffId));
 
+    public Task<IReadOnlyList<Case>> ListStaleActiveTurnCasesAsync(DateTimeOffset olderThan, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<Case>>([.. _cases.Values.Where(c =>
+            c.ActiveTurn is { } turn
+            && (turn.Status == TurnStatus.Queued || turn.Status == TurnStatus.Running)
+            && turn.CreatedAt < olderThan)]);
+
     public void Add(Case @case) => _cases[@case.Id] = @case;
 }
 
