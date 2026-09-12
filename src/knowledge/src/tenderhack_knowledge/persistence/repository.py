@@ -7,7 +7,7 @@ fragment rows so an older snapshot cannot be rewritten by a later publish.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 
 import sqlalchemy as sa
@@ -30,6 +30,10 @@ from tenderhack_knowledge.ingestion.repository import (
     CorpusBoundaryError,
     UnknownFragmentError,
     UnknownSnapshotError,
+)
+from tenderhack_knowledge.inference.errors import (
+    EmbeddingRevisionMismatchError,
+    EmbeddingUnavailableError,
 )
 
 
@@ -95,6 +99,19 @@ kb_snapshot_fragments = sa.Table(
     metadata,
     sa.Column("snapshot_id", sa.String(128), nullable=False),
     sa.Column("fragment_id", sa.String(128), nullable=False),
+)
+kb_fragment_embeddings = sa.Table(
+    "kb_fragment_embeddings",
+    metadata,
+    sa.Column("fragment_id", sa.String(128), primary_key=True),
+    sa.Column("model_id", sa.Text(), nullable=False),
+    sa.Column("model_revision", sa.Text(), nullable=False),
+    sa.Column("dimension", sa.Integer(), nullable=False),
+    # The deployed column is pgvector vector(1024).  Text here keeps the
+    # lightweight package importable without the optional pgvector SQLAlchemy
+    # extension; writes/searches cast explicitly in SQL below.
+    sa.Column("embedding", sa.Text(), nullable=False),
+    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
 )
 kb_ingestion_runs = sa.Table(
     "kb_ingestion_runs",
@@ -374,6 +391,215 @@ class PostgresKnowledgeRepository:
             result = await connection.execute(statement)
             return tuple(result.mappings())
 
+    async def store_embeddings(
+        self,
+        snapshot_id: str,
+        embeddings: Mapping[str, Sequence[float]],
+        *,
+        model_id: str,
+        model_revision: str,
+        dimension: int = 1024,
+    ) -> int:
+        """Insert or deterministically re-run embeddings for snapshot members.
+
+        A fragment has one active embedding row.  Re-running with the same
+        model metadata is idempotent; attempting to overwrite it with another
+        revision is rejected so a mixed vector space cannot be searched by
+        accident.
+        """
+
+        _validate_embedding_metadata(model_id, model_revision, dimension)
+        values = {str(fragment_id): tuple(vector) for fragment_id, vector in embeddings.items()}
+        for fragment_id, vector in values.items():
+            _validate_vector(vector, dimension)
+        async with self.engine.begin() as connection:
+            snapshot_exists = await self._one(
+                connection,
+                select(kb_snapshots.c.snapshot_id).where(kb_snapshots.c.snapshot_id == snapshot_id),
+            )
+            if snapshot_exists is None:
+                raise UnknownSnapshotError(snapshot_id)
+            if values:
+                member_rows = await connection.execute(
+                    select(kb_snapshot_fragments.c.fragment_id).where(
+                        kb_snapshot_fragments.c.snapshot_id == snapshot_id,
+                        kb_snapshot_fragments.c.fragment_id.in_(tuple(values)),
+                    )
+                )
+                members = {row.fragment_id for row in member_rows}
+                missing = sorted(set(values) - members)
+                if missing:
+                    raise ValueError(f"embedding fragments are outside snapshot: {', '.join(missing[:3])}")
+            existing_rows = await connection.execute(
+                select(kb_fragment_embeddings).where(
+                    kb_fragment_embeddings.c.fragment_id.in_(tuple(values))
+                )
+                if values
+                else select(kb_fragment_embeddings).where(sa.false())
+            )
+            existing = {row.fragment_id: row for row in existing_rows.mappings()}
+            for fragment_id, row in existing.items():
+                metadata = (row.model_id, row.model_revision, int(row.dimension))
+                requested = (model_id, model_revision, dimension)
+                if metadata != requested:
+                    raise EmbeddingRevisionMismatchError(
+                        f"fragment {fragment_id} stores {metadata}, requested {requested}"
+                    )
+            now = datetime.now().astimezone()
+            for fragment_id, vector in values.items():
+                statement = sa.text(
+                    """
+                    INSERT INTO kb_fragment_embeddings
+                        (fragment_id, model_id, model_revision, dimension, embedding, created_at)
+                    VALUES
+                        (:fragment_id, :model_id, :model_revision, :dimension,
+                         CAST(:embedding AS vector), :created_at)
+                    ON CONFLICT (fragment_id) DO UPDATE SET
+                        embedding = EXCLUDED.embedding,
+                        created_at = EXCLUDED.created_at
+                    """
+                )
+                await connection.execute(
+                    statement,
+                    {
+                        "fragment_id": fragment_id,
+                        "model_id": model_id,
+                        "model_revision": model_revision,
+                        "dimension": dimension,
+                        "embedding": _vector_literal(vector),
+                        "created_at": now,
+                    },
+                )
+        return len(values)
+
+    async def embedding_stats(
+        self,
+        snapshot_id: str,
+        *,
+        model_id: str,
+        model_revision: str,
+        dimension: int = 1024,
+    ) -> dict[str, int | bool]:
+        """Return count/dimension/identity checks for a snapshot embedding set."""
+
+        _validate_embedding_metadata(model_id, model_revision, dimension)
+        async with self.engine.connect() as connection:
+            if await self._one(
+                connection, select(kb_snapshots.c.snapshot_id).where(kb_snapshots.c.snapshot_id == snapshot_id)
+            ) is None:
+                raise UnknownSnapshotError(snapshot_id)
+            row = await self._one(
+                connection,
+                sa.text(
+                    """
+                    SELECT
+                        count(*) AS snapshot_fragments,
+                        count(e.fragment_id) AS embeddings,
+                        count(*) FILTER (WHERE e.dimension = :dimension) AS matching_dimension,
+                        count(*) FILTER (
+                            WHERE e.model_id = :model_id AND e.model_revision = :model_revision
+                              AND e.dimension = :dimension
+                        ) AS matching_metadata,
+                        count(*) FILTER (WHERE e.embedding::text ILIKE '%NaN%') AS non_finite
+                    FROM kb_snapshot_fragments m
+                    LEFT JOIN kb_fragment_embeddings e ON e.fragment_id = m.fragment_id
+                    WHERE m.snapshot_id = :snapshot_id
+                    """
+                ).bindparams(
+                    snapshot_id=snapshot_id,
+                    model_id=model_id,
+                    model_revision=model_revision,
+                    dimension=dimension,
+                ),
+            )
+            if row is None:
+                raise UnknownSnapshotError(snapshot_id)
+            return {
+                "snapshot_fragments": int(row.snapshot_fragments),
+                "embeddings": int(row.embeddings),
+                "matching_dimension": int(row.matching_dimension),
+                "matching_metadata": int(row.matching_metadata),
+                "non_finite": int(row.non_finite),
+                "identity_preserved": int(row.embeddings) == int(row.snapshot_fragments),
+            }
+
+    async def dense_search(
+        self,
+        snapshot_id: str,
+        query_embedding: Sequence[float],
+        *,
+        model_id: str,
+        model_revision: str,
+        dimension: int = 1024,
+        limit: int = 30,
+    ) -> tuple[dict[str, object], ...]:
+        """Exact cosine-distance scan constrained to one immutable snapshot."""
+
+        _validate_embedding_metadata(model_id, model_revision, dimension)
+        _validate_vector(query_embedding, dimension)
+        safe_limit = max(1, min(int(limit), 100))
+        async with self.engine.connect() as connection:
+            if await self._one(
+                connection, select(kb_snapshots.c.snapshot_id).where(kb_snapshots.c.snapshot_id == snapshot_id)
+            ) is None:
+                raise UnknownSnapshotError(snapshot_id)
+            metadata_row = await self._one(
+                connection,
+                sa.text(
+                    """
+                    SELECT count(*) AS total,
+                           count(*) FILTER (
+                               WHERE e.model_id = :model_id
+                                 AND e.model_revision = :model_revision
+                                 AND e.dimension = :dimension
+                           ) AS matching
+                    FROM kb_snapshot_fragments m
+                    JOIN kb_fragment_embeddings e ON e.fragment_id = m.fragment_id
+                    WHERE m.snapshot_id = :snapshot_id
+                    """
+                ).bindparams(
+                    snapshot_id=snapshot_id,
+                    model_id=model_id,
+                    model_revision=model_revision,
+                    dimension=dimension,
+                ),
+            )
+            if metadata_row is None:
+                raise UnknownSnapshotError(snapshot_id)
+            if int(metadata_row.total) == 0:
+                raise EmbeddingUnavailableError(f"no embeddings for snapshot {snapshot_id}")
+            if int(metadata_row.matching) != int(metadata_row.total):
+                raise EmbeddingRevisionMismatchError(
+                    f"snapshot {snapshot_id} contains embeddings from another model revision"
+                )
+            result = await connection.execute(
+                sa.text(
+                    """
+                    SELECT f.fragment_id, v.document_id, f.page_start,
+                           f.source_anchor, f.text,
+                           1 - (e.embedding <=> CAST(:query_embedding AS vector)) AS dense_score
+                    FROM kb_snapshot_fragments m
+                    JOIN kb_fragments f ON f.fragment_id = m.fragment_id
+                    JOIN kb_document_versions v ON v.document_version_id = f.document_version_id
+                    JOIN kb_fragment_embeddings e ON e.fragment_id = f.fragment_id
+                    WHERE m.snapshot_id = :snapshot_id
+                      AND e.model_id = :model_id
+                      AND e.model_revision = :model_revision
+                      AND e.dimension = :dimension
+                    ORDER BY dense_score DESC, f.fragment_id ASC
+                    LIMIT :limit
+                    """
+                ).bindparams(
+                    snapshot_id=snapshot_id,
+                    model_id=model_id,
+                    model_revision=model_revision,
+                    dimension=dimension,
+                    query_embedding=_vector_literal(query_embedding),
+                    limit=safe_limit,
+                )
+            )
+            return tuple(result.mappings())
+
     async def resolve_source(self, fragment_id: str, snapshot_id: str | None = None) -> SourceResolution:
         async with self.engine.connect() as connection:
             effective_snapshot_id = snapshot_id
@@ -521,6 +747,27 @@ def _escape_like(value: str) -> str:
     """Escape user-controlled LIKE wildcards before building an exact predicate."""
 
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _validate_embedding_metadata(model_id: str, model_revision: str, dimension: int) -> None:
+    if not model_id or not model_revision:
+        raise ValueError("embedding model_id and model_revision are required")
+    if int(dimension) != 1024:
+        raise ValueError("only 1024-dimensional embeddings are supported")
+
+
+def _validate_vector(vector: Sequence[float], dimension: int = 1024) -> None:
+    import math
+
+    if len(vector) != int(dimension):
+        raise ValueError(f"embedding has dimension {len(vector)}; expected {dimension}")
+    if any(not math.isfinite(float(value)) for value in vector):
+        raise ValueError("embedding contains a non-finite value")
+
+
+def _vector_literal(vector: Sequence[float]) -> str:
+    _validate_vector(vector, len(vector))
+    return "[" + ",".join(format(float(value), ".9g") for value in vector) + "]"
 
 
 def _fragment_from_row(row: object) -> KnowledgeFragment:

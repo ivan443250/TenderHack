@@ -21,6 +21,7 @@ class RetrievalRecord:
 
     candidate: Candidate
     channels: tuple[Literal["exact", "fts", "trigram"], ...]
+    text: str = ""
 
 
 @dataclass(frozen=True)
@@ -91,7 +92,9 @@ class LexicalRetriever:
                 channels.append("fts")
             if trigram >= 0.28 and trigram_enabled:
                 channels.append("trigram")
-            records.append(RetrievalRecord(candidate=candidates[-1], channels=tuple(channels)))
+            records.append(
+                RetrievalRecord(candidate=candidates[-1], channels=tuple(channels), text=str(row["text"] or ""))
+            )
         return RetrievalResult(snapshot_id=snapshot.snapshot_id, candidates=tuple(candidates), records=tuple(records))
 
     async def _resolve_snapshot(self, payload: RetrieveRequest):

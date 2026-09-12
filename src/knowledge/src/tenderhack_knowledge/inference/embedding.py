@@ -21,7 +21,14 @@ from .model_refs import EMBEDDING_MODEL_ID, EMBEDDING_REVISION
 ModelFactory = Callable[..., object]
 
 
-def _default_model_factory(model_id: str, revision: str | None, device: str, dtype: str) -> object:
+def _default_model_factory(
+    model_id: str,
+    revision: str | None,
+    device: str,
+    dtype: str,
+    *,
+    local_files_only: bool = False,
+) -> object:
     try:
         module = importlib.import_module("sentence_transformers")
     except ImportError as exc:  # pragma: no cover - exercised in capability smoke
@@ -37,6 +44,8 @@ def _default_model_factory(model_id: str, revision: str | None, device: str, dty
         kwargs["device"] = device
     if dtype != "auto":
         kwargs["model_kwargs"] = {"torch_dtype": dtype}
+    if local_files_only:
+        kwargs["local_files_only"] = True
     try:
         return module.SentenceTransformer(model_id, **kwargs)
     except Exception as exc:  # pragma: no cover - depends on optional runtime
@@ -57,6 +66,7 @@ class Qwen3EmbeddingAdapter:
         device: str = "auto",
         dtype: str = "auto",
         batch_size: int = 8,
+        local_files_only: bool = False,
         model_factory: ModelFactory | None = None,
     ) -> None:
         if batch_size < 1:
@@ -66,7 +76,13 @@ class Qwen3EmbeddingAdapter:
         self.device = device
         self.dtype = dtype
         self.batch_size = batch_size
-        self._model_factory = model_factory or _default_model_factory
+        self.local_files_only = local_files_only
+        if model_factory is None:
+            self._model_factory = lambda model, rev, selected_device, selected_dtype: _default_model_factory(
+                model, rev, selected_device, selected_dtype, local_files_only=local_files_only
+            )
+        else:
+            self._model_factory = model_factory
         self._model: object | None = None
         self._load_lock = threading.Lock()
 
@@ -84,6 +100,7 @@ class Qwen3EmbeddingAdapter:
             "device": self.device,
             "dtype": self.dtype,
             "dimension": self.dimension,
+            "local_files_only": self.local_files_only,
             "loaded": self.loaded,
         }
 
@@ -106,6 +123,29 @@ class Qwen3EmbeddingAdapter:
         return self._model
 
     async def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        """Embed document text using the model's document convention.
+
+        ``embed`` is retained for backwards compatibility with the K0 adapter
+        and is deliberately document-oriented.  Retrieval code should use
+        :meth:`embed_query` for the user query and :meth:`embed_documents` for
+        persisted fragments so Qwen3's asymmetric query/document prompts are
+        not accidentally mixed.
+        """
+
+        return await self._embed(texts, role="document")
+
+    async def embed_query(self, text: str) -> list[float]:
+        """Encode one query with Qwen3's official query instruction."""
+
+        rows = await self._embed([text], role="query")
+        return rows[0]
+
+    async def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
+        """Encode persisted fragments with Qwen3's document instruction."""
+
+        return await self._embed(texts, role="document")
+
+    async def _embed(self, texts: Sequence[str], *, role: str) -> list[list[float]]:
         values = list(texts)
         if not values:
             return []
@@ -113,14 +153,27 @@ class Qwen3EmbeddingAdapter:
             raise TypeError("embedding input must contain only strings")
         model = await asyncio.to_thread(self.load)
         try:
-            encoded = await asyncio.to_thread(
-                getattr(model, "encode"),
-                values,
-                batch_size=self.batch_size,
-                convert_to_numpy=True,
-                show_progress_bar=False,
-                normalize_embeddings=False,
-            )
+            kwargs = {
+                "batch_size": self.batch_size,
+                "convert_to_numpy": True,
+                "show_progress_bar": False,
+                "normalize_embeddings": False,
+            }
+            role_method = getattr(model, f"encode_{role}", None)
+            if callable(role_method):
+                encoded = await asyncio.to_thread(role_method, values, **kwargs)
+            else:
+                # Older SentenceTransformers versions expose only ``encode``;
+                # Qwen3 documents the prompt_name convention for that API.
+                kwargs["prompt_name"] = role
+                try:
+                    encoded = await asyncio.to_thread(getattr(model, "encode"), values, **kwargs)
+                except TypeError:
+                    # Keep compatibility with a minimal local test/runtime
+                    # wrapper that does not expose prompt_name.  The official
+                    # Qwen3 adapter path uses encode_query/encode_document.
+                    kwargs.pop("prompt_name", None)
+                    encoded = await asyncio.to_thread(getattr(model, "encode"), values, **kwargs)
         except Exception as exc:  # pragma: no cover - depends on optional runtime
             raise AdapterOutputError("Embedding model failed while encoding input") from exc
 

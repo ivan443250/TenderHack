@@ -1,0 +1,111 @@
+{
+  "benchmark": "k2b-hybrid-retrieval",
+  "status": "PASS_WITH_LIMITATIONS",
+  "start_head": "6ae7793",
+  "migration": {
+    "revision": "0005_dense_fragment_embeddings",
+    "status": "head",
+    "index_policy": "exact pgvector scan; no HNSW or IVFFlat"
+  },
+  "corpus": {
+    "snapshot_id": "snap_0e979dfef376faff41f7c76416fda457",
+    "corpus": "NORMATIVE",
+    "documents": 6,
+    "pages": 830,
+    "fragments": 3899,
+    "source_files": 6
+  },
+  "gold_set": {
+    "path": "src/knowledge/evals/k2a-gold.json",
+    "queries": 44,
+    "label_source": "manual source/page review of the six organizer PDFs; labels were not changed"
+  },
+  "models": {
+    "embedding": {
+      "model_id": "Qwen/Qwen3-Embedding-0.6B",
+      "revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+      "dimension": 1024,
+      "query_document_convention": "embed_query for user query; embed_documents for persisted fragments",
+      "execution": "BLOCKED",
+      "blocker": "sentence_transformers, torch and transformers are not installed in the current uv environment; no model weights were downloaded"
+    },
+    "reranker": {
+      "model_id": "BAAI/bge-reranker-v2-m3",
+      "revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+      "pair_max_length": 512,
+      "score_semantics": "raw relevance score; not a probability or answer confidence",
+      "execution": "BLOCKED_BY_EMBEDDING_PRECONDITION"
+    }
+  },
+  "levels": {
+    "B1_lexical_baseline": {
+      "status": "MEASURED",
+      "recall_at_5": 0.6136,
+      "recall_at_10": 0.75,
+      "mrr": 0.4018,
+      "typo_recall_at_10": 1.0,
+      "exact_code_hit_at_10": 0.6875,
+      "latency_ms": {
+        "sample_count": 44,
+        "p50": 309.151,
+        "p95": 381.683,
+        "mean": 319.6
+      },
+      "note": "Measured in this K2B run against the running disposable PostgreSQL corpus; the previously recorded K2A report remains unchanged."
+    },
+    "B2_rrf": {
+      "status": "NOT_MEASURED",
+      "blocker": "Qwen3 embeddings are not backfilled: expected 3899, found 0",
+      "metrics": {"recall_at_5": null, "recall_at_10": null, "mrr": null, "typo_recall_at_10": null, "exact_code_hit_at_10": null},
+      "latency_ms": {"sample_count": 0, "p50": null, "p95": null}
+    },
+    "B3_rrf_reranker": {
+      "status": "NOT_MEASURED",
+      "blocker": "Qwen3 embeddings are not backfilled; reranker evaluation cannot start without the dense candidate set",
+      "metrics": {"recall_at_5": null, "recall_at_10": null, "mrr": null, "typo_recall_at_10": null, "exact_code_hit_at_10": null},
+      "latency_ms": {"sample_count": 0, "p50": null, "p95": null}
+    }
+  },
+  "rrf": {
+    "config_version": "hybrid-rrf-v1",
+    "k": 60,
+    "channels": ["exact", "fts", "dense"],
+    "dedupe_key": "fragment_id",
+    "learned_fusion": false
+  },
+  "failure_analysis_b1_recall_at_10": [
+    {"query_id": "act-03", "category": "parser/chunk issue", "evidence": "Sparse extracted page loses code context."},
+    {"query_id": "act-07", "category": "parser/chunk issue", "evidence": "Table row loses the user-facing status wording."},
+    {"query_id": "yml-06", "category": "parser/chunk issue", "evidence": "Table/header context is split across fragments."},
+    {"query_id": "supplier-01", "category": "lexical miss", "evidence": "Short terminology query has weak overlap with the source fragment."},
+    {"query_id": "supplier-02", "category": "lexical miss", "evidence": "Generic software wording is not distinctive in FTS."},
+    {"query_id": "supplier-04", "category": "lexical miss", "evidence": "Offer registry uses a different formulation."},
+    {"query_id": "supplier-05", "category": "lexical miss", "evidence": "Deletion procedure has low lexical overlap."},
+    {"query_id": "supplier-08", "category": "lexical miss", "evidence": "Contact details are distributed across a sparse fragment."},
+    {"query_id": "supplier-09", "category": "lexical miss", "evidence": "Error wording differs from the concise query."},
+    {"query_id": "offer-01", "category": "parser/chunk issue", "evidence": "Offer/STE context is table-heavy and split by extraction."},
+    {"query_id": "mcd-05", "category": "parser/chunk issue", "evidence": "MCD signing instruction is table-like and split by extraction."}
+  ],
+  "persistence_verification": {
+    "table": "kb_fragment_embeddings",
+    "column": "embedding vector(1024)",
+    "metadata_columns": ["model_id", "model_revision", "dimension"],
+    "real_backfill": "BLOCKED_BEFORE_WRITE",
+    "fake_sql_path_smoke": "PASS (3899/3899, dimension 1024, finite vectors, fragment identity preserved; synthetic rows were removed)"
+  },
+  "verification": {
+    "uv_lock_check": "PASS",
+    "pytest": "PASS (44 passed, 4 skipped offline; opt-in database tests skipped)",
+    "alembic_upgrade_head": "PASS (0005_dense_fragment_embeddings)",
+    "real_embedding_backfill": "BLOCKED (optional inference dependencies unavailable)",
+    "real_hybrid_eval": "NOT_MEASURED (same blocker)",
+    "openapi_semantic_parity": "PASS",
+    "git_diff_check": "PASS",
+    "scope": "src/knowledge/** only"
+  },
+  "limitations": [
+    "Dense and reranker quality/latency are not measured on this Windows host because K0 inference dependencies and local weights are unavailable.",
+    "B1 numbers are retrieval metrics only, not answer correctness.",
+    "The route exposes hybrid-rrf-v1 when local models are available and an explicit hybrid-rrf-v1-no-dense version when it degrades to lexical evidence."
+  ]
+}

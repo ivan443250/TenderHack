@@ -25,6 +25,20 @@ class FakeEmbeddingModel:
         return [[float(index) for index in range(self.dimension)] for _ in texts]
 
 
+class PromptAwareEmbeddingModel(FakeEmbeddingModel):
+    def __init__(self) -> None:
+        super().__init__()
+        self.roles: list[str] = []
+
+    def encode_query(self, texts: list[str], **kwargs: object) -> list[list[float]]:
+        self.roles.append("query")
+        return self.encode(texts, **kwargs)
+
+    def encode_document(self, texts: list[str], **kwargs: object) -> list[list[float]]:
+        self.roles.append("document")
+        return self.encode(texts, **kwargs)
+
+
 @pytest.mark.asyncio
 async def test_embedding_is_lazy_and_preserves_batch_shape() -> None:
     created: list[FakeEmbeddingModel] = []
@@ -45,6 +59,15 @@ async def test_embedding_is_lazy_and_preserves_batch_shape() -> None:
     assert all(len(row) == 1024 for row in result)
     assert adapter.loaded is True
     assert len(created) == 1
+
+
+@pytest.mark.asyncio
+async def test_qwen_embedding_uses_query_and_document_conventions() -> None:
+    model = PromptAwareEmbeddingModel()
+    adapter = Qwen3EmbeddingAdapter(model_factory=lambda *_: model)
+    await adapter.embed_query("query")
+    await adapter.embed_documents(["document"])
+    assert model.roles == ["query", "document"]
 
 
 @pytest.mark.asyncio

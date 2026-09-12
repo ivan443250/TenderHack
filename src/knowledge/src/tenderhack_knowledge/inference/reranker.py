@@ -30,6 +30,8 @@ def _default_components_factory(
     revision: str | None,
     device: str,
     dtype: str,
+    *,
+    local_files_only: bool = False,
 ) -> _RerankerBundle:
     try:
         torch = importlib.import_module("torch")
@@ -51,7 +53,12 @@ def _default_components_factory(
         except AttributeError as exc:
             raise ModelLoadError(f"Unsupported torch dtype: {dtype}") from exc
     try:
-        tokenizer = transformers.AutoTokenizer.from_pretrained(model_id, **({"revision": revision} if revision else {}))
+        tokenizer_kwargs = {"revision": revision} if revision else {}
+        if local_files_only:
+            tokenizer_kwargs["local_files_only"] = True
+        tokenizer = transformers.AutoTokenizer.from_pretrained(model_id, **tokenizer_kwargs)
+        if local_files_only:
+            kwargs["local_files_only"] = True
         model = transformers.AutoModelForSequenceClassification.from_pretrained(model_id, **kwargs)
         to = getattr(model, "to", None)
         if callable(to):
@@ -78,6 +85,7 @@ class BgeRerankerAdapter:
         dtype: str = "auto",
         batch_size: int = 8,
         max_length: int = 512,
+        local_files_only: bool = False,
         components_factory: ComponentsFactory | None = None,
     ) -> None:
         if batch_size < 1:
@@ -90,7 +98,17 @@ class BgeRerankerAdapter:
         self.dtype = dtype
         self.batch_size = batch_size
         self.max_length = max_length
-        self._components_factory = components_factory or _default_components_factory
+        self.local_files_only = local_files_only
+        if components_factory is None:
+            self._components_factory = lambda model, rev, selected_device, selected_dtype: _default_components_factory(
+                model,
+                rev,
+                selected_device,
+                selected_dtype,
+                local_files_only=local_files_only,
+            )
+        else:
+            self._components_factory = components_factory
         self._bundle: _RerankerBundle | None = None
         self._load_lock = threading.Lock()
 
@@ -108,6 +126,7 @@ class BgeRerankerAdapter:
             "batch_size": self.batch_size,
             "max_length": self.max_length,
             "score_semantics": "raw model score; not a probability",
+            "local_files_only": self.local_files_only,
             "loaded": self.loaded,
         }
 

@@ -35,7 +35,7 @@ from tenderhack_knowledge.ingestion.ids import normalize_source_name
 from tenderhack_knowledge.ingestion.repository import CorpusBoundaryError, UnknownFragmentError, UnknownSnapshotError
 from tenderhack_knowledge.persistence.db import create_engine
 from tenderhack_knowledge.persistence.repository import PostgresKnowledgeRepository
-from tenderhack_knowledge.retrieval import LexicalRetriever
+from tenderhack_knowledge.retrieval import HybridRetriever
 from tenderhack_knowledge.understanding import understand_query
 
 router = APIRouter()
@@ -148,11 +148,9 @@ async def retrieve(
 
     understanding = understand_query(payload.query)
     exact_codes = list(dict.fromkeys([*payload.exact_codes, *understanding.exact_codes]))
-    critical_exact = {"exact_code", "numeric_identifier", "document_abbreviation"}
-    allow_trigram = not any(entity.type in critical_exact for entity in understanding.entities)
     request = payload.model_copy(update={"exact_codes": exact_codes})
     try:
-        result = await LexicalRetriever(repository).retrieve(request, allow_trigram=allow_trigram)
+        result = await HybridRetriever(repository).retrieve(request, final_limit=10)
     except UnknownSnapshotError as exc:
         from tenderhack_knowledge.contracts.v0 import ErrorCode
 
@@ -167,11 +165,11 @@ async def retrieve(
             status_code=422,
             detail={"code": ErrorCode.VALIDATION_ERROR.value, "message": str(exc)},
         ) from exc
-    except Exception as exc:  # pragma: no cover - depends on external DB
-        raise _internal_error("unable to retrieve lexical candidates") from exc
+    except Exception as exc:  # pragma: no cover - depends on external DB/inference runtime
+        raise _internal_error("unable to retrieve hybrid candidates") from exc
     return RetrieveResponse(
         snapshot_id=result.snapshot_id,
-        retrieval_config_version=LexicalRetriever.config_version,
+        retrieval_config_version=result.config_version,
         candidates=list(result.candidates),
     )
 
