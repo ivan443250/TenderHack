@@ -158,11 +158,26 @@ UI may combine events into richer widgets, but must not change their meaning.
       "page": 17,
       "label": "Открыть источник"
     }
-  ]
+  ],
+  "snapshot_id": "...",
+  "model_version": "...",
+  "retrieval_config_version": "...",
+  "applicability": {
+    "entities": [
+      { "type": "role", "value": "поставщик", "provenance": "user_explicit" }
+    ],
+    "missing_conditions": ["..."],
+    "risk_flags": ["..."],
+    "evidence_fragment_ids": ["..."]
+  }
 }
 ```
 
 A source button appears only when `fragment_id` is persisted for the published answer. Browser opens it through API proxy, never through a fabricated URL.
+
+`snapshot_id`/`model_version`/`retrieval_config_version` are additive fields (2026-09-12, architecture.md §8 "Knowledge versioning") — technical trace detail, not shown as end-user UI (§1). They are recorded on the persisted `AI_ANSWER` timeline event; `POST /messages`'s own synchronous `answer.sources` reply carries `{fragment_id, title, page, label}` per source (`title` falls back to `document_id` when `knowledge` did not supply one — `Candidate.title` in `knowledge-v0` is additive/optional).
+
+`applicability` is an additive field on the persisted `AI_ANSWER` timeline event (2026-09-13, product-experience.md §5 "Applicability Card") — the "why this applies to you" panel, built entirely from facts that already passed the Answerability Gate, not a re-derived confidence score. `entities` echoes `TurnContext`'s known slots (`type`/`value`/`provenance`, `provenance ∈ user_explicit | trusted_portal_context | inferred | unknown`, matching `ContextSlotProvenance` in `TenderHack.Domain`); `missing_conditions`, `risk_flags` and `evidence_fragment_ids` are passed through verbatim from `knowledge.assess_answerability`'s response. Not present on `POST /messages`'s synchronous reply — read it from the timeline.
 
 ### 4.4. Handoff view
 

@@ -107,7 +107,8 @@ public sealed record RetryHandoffRequest(string Summary);
 
 public sealed record AnswerView(string Markdown, IReadOnlyList<SourceRefView> Sources);
 
-public sealed record SourceRefView(string FragmentId);
+/// <summary>web-api-v0.md §4.3. `Label` is a fixed, server-composed user-facing string — the browser never invents one.</summary>
+public sealed record SourceRefView(string FragmentId, string Title, int? Page, string Label);
 
 public sealed record SendMessageResponse(
     string CaseId,

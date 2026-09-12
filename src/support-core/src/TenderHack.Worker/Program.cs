@@ -12,6 +12,7 @@ builder.Services.AddSupportCoreInfrastructure(builder.Configuration);
 // Same reasoning as the Api's composition root: TenderHack.Application stays framework-free, so
 // the use-case the poll worker drives is wired here.
 builder.Services.AddScoped<CaseCompletionPublisher>();
+builder.Services.AddScoped<HandoffSubmissionPublisher>();
 builder.Services.AddScoped<IngestHandoffStatusUseCase>();
 builder.Services.AddScoped<CleanUpStaleTurnsUseCase>();
 

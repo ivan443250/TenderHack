@@ -33,6 +33,14 @@ public sealed class Case
 
     public FeedbackId? FeedbackId { get; private set; }
 
+    /// <summary>Continuity across turns within one still-open clarification scenario (product-spec.md §7, §11).</summary>
+    public TurnContext TurnContext { get; private set; } = TurnContext.Empty;
+
+    /// <summary>Third consecutive `CLARIFY` in the same scenario becomes `HANDOFF_OFFER` instead (product-spec.md §11: "не более двух последовательных clarifications").</summary>
+    public const int MaxConsecutiveClarifications = 2;
+
+    public bool ClarificationLimitReached => TurnContext.ConsecutiveClarifications >= MaxConsecutiveClarifications;
+
     /// <summary>
     /// Always in revision order. The backing list is populated by persistence in whatever order the
     /// store returns rows (EF Core does not order owned collections), so position in `_turns` is
@@ -169,20 +177,36 @@ public sealed class Case
     /// </summary>
     public void CompleteBySupport(HandoffTerminalOutcome terminal, DateTimeOffset now)
     {
-        if (ConversationStatus == ConversationStatus.Active)
+        var wasActive = ConversationStatus == ConversationStatus.Active;
+        if (wasActive)
         {
             ConversationStatus = ConversationStatus.ClosedSupport;
             CompletionReason = Cases.CompletionReason.Support;
             CompletedAt = now;
         }
 
-        ResolutionStatus = terminal switch
+        // CANCELLED carries no resolution fact of its own (support-adapter-v0.md §6.3: "ResolutionStatus
+        // unchanged (UNKNOWN unless user set it)") — it must never overwrite whatever the user/support
+        // side already established, including leaving a freshly-active case at UNKNOWN.
+        if (terminal == HandoffTerminalOutcome.Cancelled)
+        {
+            return;
+        }
+
+        var resolved = terminal switch
         {
             HandoffTerminalOutcome.Resolved => ResolutionStatus.Resolved,
             HandoffTerminalOutcome.ClosedUnresolved => ResolutionStatus.Unresolved,
-            HandoffTerminalOutcome.Cancelled => ResolutionStatus.Unresolved,
             _ => throw new ArgumentOutOfRangeException(nameof(terminal), terminal, null),
         };
+
+        // A case already closed (by the user or an earlier support fact) keeps its resolution; a
+        // later terminal fact may only fill in an UNKNOWN, never overwrite an explicit answer
+        // (support-adapter-v0.md §6.3: "updates ... ResolutionStatus only if it was UNKNOWN").
+        if (wasActive || ResolutionStatus == ResolutionStatus.Unknown)
+        {
+            ResolutionStatus = resolved;
+        }
     }
 
     /// <summary>
@@ -224,7 +248,7 @@ public sealed class Case
         }
     }
 
-    public Handoff PrepareHandoff()
+    public Handoff PrepareHandoff(HandoffPackage package)
     {
         if (ConversationStatus != ConversationStatus.Active)
         {
@@ -236,13 +260,13 @@ public sealed class Case
             throw new HandoffAlreadyExistsException(Id);
         }
 
-        Handoff = new Handoff(HandoffId.New(), Id);
+        Handoff = new Handoff(HandoffId.New(), Id, package);
         return Handoff;
     }
 
-    public void ConfirmHandoff()
+    public void ConfirmHandoff(string summary)
     {
-        RequireHandoff().Confirm();
+        RequireHandoff().Confirm(summary);
     }
 
     public void AcknowledgeHandoff(bool simulated, string? externalCaseId, DateTimeOffset now)
@@ -255,9 +279,9 @@ public sealed class Case
         RequireHandoff().MarkFailed();
     }
 
-    public void RetryHandoff()
+    public void RetryHandoff(string summary)
     {
-        RequireHandoff().Retry();
+        RequireHandoff().Retry(summary);
     }
 
     /// <summary>Status polling reached TTL without a terminal fact — UI shows «статус не обновляется».</summary>
@@ -288,6 +312,37 @@ public sealed class Case
             CompleteBySupport(outcome, now);
         }
 
+        return true;
+    }
+
+    /// <summary>Merges freshly-understood slots into known continuity for this case (product-spec.md §7: "не спрашивать уже известное").</summary>
+    public void ObserveUnderstanding(string questionText, IEnumerable<ContextSlot> slots) =>
+        TurnContext = TurnContext.WithObservedQuestion(questionText, slots);
+
+    /// <summary>Records that this turn asked a clarifying question — advances the consecutive-clarification counter.</summary>
+    public void RecordClarification(IReadOnlyList<string> missingConditions) =>
+        TurnContext = TurnContext.WithClarification(missingConditions);
+
+    /// <summary>The clarification scenario is over (an actual `ANSWER`/`HANDOFF_OFFER`/`ANSWER_AND_HANDOFF` was published) — a new one starts clean.</summary>
+    public void ResetClarificationLoop() =>
+        TurnContext = TurnContext.WithClarificationLoopReset();
+
+    /// <summary>
+    /// If a clarification is currently outstanding, records the user's "не знаю" against it so it is
+    /// never asked again in this case (product-spec.md §11) and returns the declined conditions for
+    /// the caller to route to handoff with. Returns false (nothing declined) when there was no
+    /// pending clarification to decline.
+    /// </summary>
+    public bool TryDeclineCurrentClarification(out IReadOnlyList<string> declinedConditions)
+    {
+        if (!TurnContext.HasPendingClarification)
+        {
+            declinedConditions = [];
+            return false;
+        }
+
+        declinedConditions = TurnContext.LastMissingConditions;
+        TurnContext = TurnContext.WithDeclinedCurrentClarification();
         return true;
     }
 

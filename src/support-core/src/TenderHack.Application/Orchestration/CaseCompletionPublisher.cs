@@ -20,7 +20,7 @@ public sealed class CaseCompletionPublisher(ITurnEventStream events, INotificati
                 new Dictionary<string, object?> { ["resolution_status"] = @case.ResolutionStatus.ToString() }), ct);
         }
 
-        await events.PublishAsync(@case.Id, new CaseEvent("CASE_COMPLETED", null, null, now,
+        var completedEventId = await events.PublishAsync(@case.Id, new CaseEvent("CASE_COMPLETED", null, null, now,
             new Dictionary<string, object?>
             {
                 ["completion_reason"] = @case.CompletionReason?.ToString(),
@@ -28,7 +28,7 @@ public sealed class CaseCompletionPublisher(ITurnEventStream events, INotificati
             }), ct);
 
         notifications.Enqueue(@case.OwnerId, @case.Id, "CASE_COMPLETED", "Обращение завершено",
-            BuildCompletionBody(@case), integrationMode: null);
+            BuildCompletionBody(@case), integrationMode: null, completedEventId);
 
         outbox.Enqueue(QualityOutboxMessages.Completion, new QualityCompletionPush(
             @case.Id.ToString(),
@@ -48,9 +48,9 @@ public sealed class CaseCompletionPublisher(ITurnEventStream events, INotificati
             return;
         }
 
-        await events.PublishAsync(@case.Id, new CaseEvent("FEEDBACK_REQUESTED", null, null, now, new Dictionary<string, object?>()), ct);
+        var feedbackRequestedEventId = await events.PublishAsync(@case.Id, new CaseEvent("FEEDBACK_REQUESTED", null, null, now, new Dictionary<string, object?>()), ct);
         notifications.Enqueue(@case.OwnerId, @case.Id, "FEEDBACK_REQUESTED", "Оцените обращение",
-            "Расскажите, помогло ли решение — это займёт меньше минуты.", integrationMode: null);
+            "Расскажите, помогло ли решение — это займёт меньше минуты.", integrationMode: null, feedbackRequestedEventId);
     }
 
     private static string BuildCompletionBody(Case @case) => @case.CompletionReason switch

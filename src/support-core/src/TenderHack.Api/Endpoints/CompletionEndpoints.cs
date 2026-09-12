@@ -10,7 +10,7 @@ public static class CompletionEndpoints
     {
         app.MapPost("/api/v0/cases/{caseId}/complete", async (
             HttpContext context, string caseId, CompleteCaseRequest request,
-            CompleteCaseUseCase useCase, ICaseEventReader events, CancellationToken ct) =>
+            CompleteCaseUseCase useCase, GetCaseSnapshotUseCase getSnapshot, IIdempotencyStore idempotency, ICaseEventReader events, CancellationToken ct) =>
         {
             if (!CaseEndpointHelpers.TryRequireCaseId(caseId, out var id, out var badRequest))
             {
@@ -18,7 +18,21 @@ public static class CompletionEndpoints
             }
 
             var ownerId = CaseEndpointHelpers.RequireOwner(context);
+
+            // architecture.md §7: a retried `complete` must not surface `CASE_CLOSED` — a repeat of
+            // the same logical request replays the (already-terminal, so still-accurate) snapshot.
+            if (await CaseEndpointHelpers.TryReplayWithSnapshotAsync(context, id, ownerId, IdempotencyScopes.CompleteCase, request, idempotency, getSnapshot, events, ct) is { } replay)
+            {
+                return replay;
+            }
+
             var @case = await useCase.ExecuteAsync(id, ownerId, request.Solved, ct);
+
+            if (IdempotencyHelper.GetKey(context) is { } key)
+            {
+                await idempotency.SaveAsync(ownerId, IdempotencyScopes.CompleteCase, key, IdempotencyHelper.HashPayload(request), id.ToString(), ct);
+            }
+
             var history = await events.ListAsync(id, after: 0, ct);
             return Results.Ok(CaseMapper.ToSnapshot(@case, history));
         });

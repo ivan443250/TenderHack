@@ -11,7 +11,8 @@ public sealed class UseCasesTests
 {
     private static TurnOrchestrator NewOrchestrator(FakeUnitOfWork unitOfWork) =>
         new(new FakeKnowledgeService(), new FakeModerationRuleEngine(), new FakeTurnEventStream(), new FakeOutbox(),
-            unitOfWork, new ModerationOptions(), TimeProvider.System);
+            unitOfWork, new ModerationOptions(), TimeProvider.System,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<TurnOrchestrator>.Instance);
 
     [Fact]
     public async Task CreateCasePersistsAndReturnsANewCaseForTheOwner()

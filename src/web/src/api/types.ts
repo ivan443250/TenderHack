@@ -69,9 +69,16 @@ export type FeedbackView = {
   submitted_at: string;
 };
 
+export type AnswerSource = {
+  fragment_id: string;
+  title: string;
+  page: number | null;
+  label: string;
+};
+
 export type AnswerPayload = {
   markdown: string;
-  sources: string[];
+  sources: AnswerSource[];
 };
 
 export type TimelineItem = {

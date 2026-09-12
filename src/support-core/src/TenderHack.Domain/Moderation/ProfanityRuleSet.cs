@@ -47,13 +47,18 @@ public static partial class ProfanityRuleSet
     [GeneratedRegex(@"\bсук[аи][а-яё]*\b", RegexOptions.IgnoreCase)]
     private static partial Regex SukaRegex();
 
-    [GeneratedRegex(@"\bдур[а-яё]*\b", RegexOptions.IgnoreCase)]
+    /// <summary>
+    /// Excludes "дурман"/"дурманящий" — an unrelated dictionary word ("herb"/"stupor"), not a form
+    /// of "дура" (quality.md §6 "substrings inside benign words" regression).
+    /// </summary>
+    [GeneratedRegex(@"\bдур(?!ман)[а-яё]*\b", RegexOptions.IgnoreCase)]
     private static partial Regex DuraRegex();
 
     [GeneratedRegex(@"\bидиот[а-яё]*\b", RegexOptions.IgnoreCase)]
     private static partial Regex IdiotRegex();
 
-    [GeneratedRegex(@"\bтуп[а-яё]*\b", RegexOptions.IgnoreCase)]
+    /// <summary>Excludes "тупик"/"тупиковый" ("dead end") — an unrelated word, not a form of "тупой" (quality.md §6).</summary>
+    [GeneratedRegex(@"\bтуп(?!ик)[а-яё]*\b", RegexOptions.IgnoreCase)]
     private static partial Regex TupoyRegex();
 }
 

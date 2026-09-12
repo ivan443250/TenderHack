@@ -33,30 +33,49 @@ public sealed class FakeKnowledgeService : IKnowledgeService
     }
 
     public RetrieveRequest? LastRetrieveRequest { get; private set; }
+    public List<RetrieveRequest> RetrieveRequests { get; } = [];
+
+    /// <summary>When set, returned by the first call only; subsequent calls fall back to the default candidate (B4's expand-once retry needs two distinguishable responses).</summary>
+    public RetrieveResult? FirstRetrieveResult { get; set; }
 
     public Task<RetrieveResult> RetrieveAsync(RetrieveRequest request, KnowledgeRequestContext context, CancellationToken ct)
     {
         ThrowIfConfiguredToFail(nameof(RetrieveAsync));
         LastRetrieveRequest = request;
-        return Task.FromResult(new RetrieveResult("snapshot-1", "stub-v0", [new RetrievalCandidate("frag-1", "doc-1", 1, null)]));
+        RetrieveRequests.Add(request);
+        var result = RetrieveRequests.Count == 1 && FirstRetrieveResult is { } first
+            ? first
+            : new RetrieveResult("snapshot-1", "stub-v0", [new RetrievalCandidate("frag-1", "doc-1", 1, null)]);
+        return Task.FromResult(result);
     }
+
+    /// <summary>When set, dequeued one result per call (B4's expand-once retry needs "insufficient then sufficient"); falls back to <see cref="Answerability"/> once exhausted or unset.</summary>
+    public Queue<AnswerabilityResult>? AnswerabilitySequence { get; set; }
 
     public Task<AnswerabilityResult> AssessAnswerabilityAsync(AnswerabilityRequest request, KnowledgeRequestContext context, CancellationToken ct)
     {
         ThrowIfConfiguredToFail(nameof(AssessAnswerabilityAsync));
-        return Task.FromResult(Answerability);
+        var result = AnswerabilitySequence is { Count: > 0 } queue ? queue.Dequeue() : Answerability;
+        return Task.FromResult(result);
     }
+
+    public List<DraftRequest> DraftRequests { get; } = [];
 
     public Task<DraftResult> DraftAsync(DraftRequest request, KnowledgeRequestContext context, CancellationToken ct)
     {
         ThrowIfConfiguredToFail(nameof(DraftAsync));
+        DraftRequests.Add(request);
         return Task.FromResult(Draft);
     }
+
+    /// <summary>When set, dequeued one result per call (B3's extractive-retry test needs "fail then succeed"); falls back to <see cref="Verify"/> once exhausted or unset.</summary>
+    public Queue<VerifyResult>? VerifySequence { get; set; }
 
     public Task<VerifyResult> VerifyAsync(VerifyRequest request, KnowledgeRequestContext context, CancellationToken ct)
     {
         ThrowIfConfiguredToFail(nameof(VerifyAsync));
-        return Task.FromResult(Verify);
+        var result = VerifySequence is { Count: > 0 } queue ? queue.Dequeue() : Verify;
+        return Task.FromResult(result);
     }
 
     public Task<SourceFragment> GetSourceAsync(string fragmentId, CancellationToken ct)

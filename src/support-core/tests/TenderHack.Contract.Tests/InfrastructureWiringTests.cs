@@ -21,7 +21,7 @@ public sealed class InfrastructureWiringTests
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Postgres"] = "Host=localhost;Database=tenderhack_test;Username=test;Password=test",
-                ["Knowledge:BaseAddress"] = "http://knowledge.invalid",
+                ["Knowledge:BaseUrl"] = "http://knowledge.invalid",
             })
             .Build();
 

@@ -13,18 +13,56 @@ public sealed class HandoffUseCasesTests
 {
     private static Case NewCase(string ownerId = "owner-1") => new(CaseId.New(), ownerId, DateTimeOffset.UtcNow);
 
+    private static HandoffPackage NewPackage() => new(
+        DraftSummary: "Резюме обращения",
+        UserReportedContext: [],
+        VerifiedPortalContext: [],
+        AlreadyTried: [],
+        UnknownFields: [],
+        SourcesChecked: [],
+        HandoffReason: ["INSUFFICIENT_EVIDENCE"],
+        RelevantMessageIds: [],
+        Channel: HandoffPackage.PortalChatChannel,
+        DispatchQueue: "l2-general",
+        EngineeringReviewSuggested: false);
+
     [Fact]
     public async Task PrepareCreatesAHandoffWithoutSubmittingIt()
     {
         var repository = new FakeCaseRepository();
         var @case = NewCase();
         repository.Add(@case);
-        var sut = new PrepareHandoffUseCase(repository, new FakeUnitOfWork());
+        var sut = new PrepareHandoffUseCase(repository, new FakeCaseEventReader(), new FakeUnitOfWork());
 
         var result = await sut.ExecuteAsync(@case.Id, "owner-1", CancellationToken.None);
 
         Assert.NotNull(result.Handoff);
         Assert.Equal(HandoffStatus.NotRequested, result.Handoff!.Status);
+        Assert.NotNull(result.Handoff.Package);
+    }
+
+    [Fact]
+    public async Task PrepareAssemblesThePackageFromPersistedCaseHistoryAlone()
+    {
+        // support-adapter-v0.md §2: the package must be buildable without any knowledge call —
+        // this test only ever touches ICaseRepository/ICaseEventReader.
+        var repository = new FakeCaseRepository();
+        var @case = NewCase();
+        @case.ObserveUnderstanding("вопрос", [new ContextSlot("role", "поставщик", ContextSlotProvenance.UserExplicit)]);
+        repository.Add(@case);
+        var eventReader = new FakeCaseEventReader();
+        eventReader.Add("USER_MESSAGE", """{"text":"как исправить УПД?"}""");
+        eventReader.Add("HANDOFF_OFFER", """{"dispatch_queue":"l2-general","reason_codes":["INSUFFICIENT_EVIDENCE"],"engineering_review_suggested":false}""");
+        var sut = new PrepareHandoffUseCase(repository, eventReader, new FakeUnitOfWork());
+
+        var result = await sut.ExecuteAsync(@case.Id, "owner-1", CancellationToken.None);
+
+        var package = result.Handoff!.Package!;
+        Assert.Equal("l2-general", package.DispatchQueue);
+        Assert.Equal(["INSUFFICIENT_EVIDENCE"], package.HandoffReason);
+        Assert.Contains(package.UserReportedContext, s => s.Type == "role" && s.Value == "поставщик");
+        Assert.Contains("как исправить УПД?", package.DraftSummary);
+        Assert.Equal(HandoffPackage.PortalChatChannel, package.Channel);
     }
 
     [Fact]
@@ -33,7 +71,7 @@ public sealed class HandoffUseCasesTests
         var repository = new FakeCaseRepository();
         var @case = NewCase();
         repository.Add(@case);
-        var sut = new PrepareHandoffUseCase(repository, new FakeUnitOfWork());
+        var sut = new PrepareHandoffUseCase(repository, new FakeCaseEventReader(), new FakeUnitOfWork());
 
         await Assert.ThrowsAsync<CaseNotFoundException>(() => sut.ExecuteAsync(@case.Id, "someone-else", CancellationToken.None));
     }
@@ -43,19 +81,20 @@ public sealed class HandoffUseCasesTests
     {
         var repository = new FakeCaseRepository();
         var @case = NewCase();
-        @case.PrepareHandoff();
+        @case.PrepareHandoff(NewPackage());
         repository.Add(@case);
         var outbox = new FakeOutbox();
         var unitOfWork = new FakeUnitOfWork();
         var sut = new ConfirmHandoffUseCase(repository, unitOfWork, outbox);
 
-        var result = await sut.ExecuteAsync(@case.Id, "owner-1", "Резюме обращения", "l2-general", ["INSUFFICIENT_EVIDENCE"], false, CancellationToken.None);
+        var result = await sut.ExecuteAsync(@case.Id, "owner-1", "Резюме обращения", CancellationToken.None);
 
         Assert.Equal(HandoffStatus.Pending, result.Handoff!.Status);
+        Assert.Equal("Резюме обращения", result.Handoff.ConfirmedSummary);
         Assert.Single(outbox.Enqueued);
         Assert.Equal(HandoffOutboxMessages.Submit, outbox.Enqueued[0].MessageType);
         var payload = Assert.IsType<HandoffSubmitPayload>(outbox.Enqueued[0].Payload);
-        Assert.Equal("Резюме обращения", payload.Summary);
+        Assert.Equal(@case.Handoff!.Id.ToString(), payload.HandoffId);
         Assert.Equal(1, unitOfWork.SaveChangesCallCount);
     }
 
@@ -64,17 +103,18 @@ public sealed class HandoffUseCasesTests
     {
         var repository = new FakeCaseRepository();
         var @case = NewCase();
-        @case.PrepareHandoff();
+        @case.PrepareHandoff(NewPackage());
         var originalHandoffId = @case.Handoff!.Id;
-        @case.ConfirmHandoff();
+        @case.ConfirmHandoff("Резюме");
         @case.FailHandoff();
         repository.Add(@case);
         var outbox = new FakeOutbox();
         var sut = new RetryHandoffUseCase(repository, new FakeUnitOfWork(), outbox);
 
-        var result = await sut.ExecuteAsync(@case.Id, "owner-1", "Резюме", "l1-general", [], false, CancellationToken.None);
+        var result = await sut.ExecuteAsync(@case.Id, "owner-1", "Обновлённое резюме", CancellationToken.None);
 
         Assert.Equal(HandoffStatus.Pending, result.Handoff!.Status);
+        Assert.Equal("Обновлённое резюме", result.Handoff.ConfirmedSummary);
         var payload = Assert.IsType<HandoffSubmitPayload>(outbox.Enqueued[0].Payload);
         Assert.Equal(originalHandoffId.ToString(), payload.HandoffId);
     }
@@ -88,8 +128,8 @@ public sealed class HandoffUseCasesTests
     {
         var repository = new FakeCaseRepository();
         var @case = NewCase();
-        @case.PrepareHandoff();
-        @case.ConfirmHandoff();
+        @case.PrepareHandoff(NewPackage());
+        @case.ConfirmHandoff("Резюме");
         @case.AcknowledgeHandoff(simulated: true, "ext-1", DateTimeOffset.UtcNow);
         repository.Add(@case);
         var unitOfWork = new FakeUnitOfWork();
@@ -103,7 +143,12 @@ public sealed class HandoffUseCasesTests
 
         Assert.Equal("IN_PROGRESS", @case.Handoff.Stage!.Code);
         Assert.Equal(1, unitOfWork.SaveChangesCallCount);
-        Assert.Contains(events.Published, e => e.Event.Type == "HANDOFF_STATUS");
+        var published = Assert.Single(events.Published, e => e.Event.Type == "HANDOFF_STATUS");
+        // web-api-v0.md §4.2: the payload is the full current handoff view, not just this update's delta.
+        Assert.Equal("SimulatedAccepted", published.Event.Payload["status"]);
+        Assert.Equal("ext-1", published.Event.Payload["external_case_id"]);
+        Assert.False((bool)published.Event.Payload["stale"]!);
+        Assert.Equal(new[] { "stage" }, published.Event.Payload["changed"]);
         Assert.Contains(notifications.Enqueued, n => n.Type == "HANDOFF_UPDATED");
     }
 
@@ -112,8 +157,8 @@ public sealed class HandoffUseCasesTests
     {
         var repository = new FakeCaseRepository();
         var @case = NewCase();
-        @case.PrepareHandoff();
-        @case.ConfirmHandoff();
+        @case.PrepareHandoff(NewPackage());
+        @case.ConfirmHandoff("Резюме");
         @case.AcknowledgeHandoff(simulated: true, "ext-1", DateTimeOffset.UtcNow);
         @case.IngestHandoffStatus(@case.Handoff!.Id, 1, new HandoffStage("QUEUED", null), null, null, DateTimeOffset.UtcNow);
         repository.Add(@case);
@@ -134,8 +179,8 @@ public sealed class HandoffUseCasesTests
     {
         var repository = new FakeCaseRepository();
         var @case = NewCase();
-        @case.PrepareHandoff();
-        @case.ConfirmHandoff();
+        @case.PrepareHandoff(NewPackage());
+        @case.ConfirmHandoff("Резюме");
         @case.AcknowledgeHandoff(simulated: true, "ext-1", DateTimeOffset.UtcNow);
         repository.Add(@case);
         var unitOfWork = new FakeUnitOfWork();

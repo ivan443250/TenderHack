@@ -2510,6 +2510,13 @@ namespace TenderHack.Infrastructure.KnowledgeClient.Generated
         [System.Text.Json.Serialization.JsonPropertyName("anchor")]
         public string? Anchor { get; set; } = default!;
 
+        /// <summary>
+        /// Additive v0 field (2026-09-12): human-readable source document title, when known, so `api` can show it on the answer's source button without a second round trip to GET /v0/sources/{fragment_id}. `null` is a normal, expected value — the caller falls back to `document_id`.
+        /// <br/>
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("title")]
+        public string? Title { get; set; } = default!;
+
         [System.Text.Json.Serialization.JsonPropertyName("scores")]
         public CandidateScores Scores { get; set; } = new CandidateScores();
 
@@ -2946,6 +2953,19 @@ namespace TenderHack.Infrastructure.KnowledgeClient.Generated
 
         [System.Text.Json.Serialization.JsonPropertyName("error_category")]
         public string? Error_category { get; set; } = default!;
+
+        /// <summary>
+        /// Additive v0 field (2026-09-12): the generator's model_version for this answer, when one was published, so quality analysis can be sliced by model without re-deriving it from snapshot_id (architecture.md §8 "Knowledge versioning").
+        /// <br/>
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("model_version")]
+        public string? Model_version { get; set; } = default!;
+
+        /// <summary>
+        /// Additive v0 field (2026-09-12) — retrieval_config_version for this turn's retrieve call, when one ran.
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("retrieval_config_version")]
+        public string? Retrieval_config_version { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 

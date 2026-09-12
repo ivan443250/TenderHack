@@ -8,7 +8,13 @@ namespace TenderHack.Application.Ports;
 /// </summary>
 public interface INotificationSink
 {
-    void Enqueue(string ownerId, CaseId caseId, string type, string title, string body, string? integrationMode);
+    /// <summary>
+    /// `sourceEventId` is the `case_events` row that caused this notification — together with
+    /// `(ownerId, caseId, type)` it is the notification's uniqueness key (architecture.md §7), so
+    /// at-least-once redelivery of the same underlying event (e.g. a duplicate status poll) never
+    /// produces a second inbox entry.
+    /// </summary>
+    void Enqueue(string ownerId, CaseId caseId, string type, string title, string body, string? integrationMode, long sourceEventId);
 }
 
 public interface INotificationReader

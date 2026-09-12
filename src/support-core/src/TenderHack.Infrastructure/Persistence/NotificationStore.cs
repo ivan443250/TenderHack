@@ -12,7 +12,7 @@ namespace TenderHack.Infrastructure.Persistence;
 /// </summary>
 public sealed class NotificationStore(TenderHackDbContext db, TimeProvider clock) : INotificationSink, INotificationReader
 {
-    public void Enqueue(string ownerId, CaseId caseId, string type, string title, string body, string? integrationMode) =>
+    public void Enqueue(string ownerId, CaseId caseId, string type, string title, string body, string? integrationMode, long sourceEventId) =>
         db.Notifications.Add(new NotificationEntity
         {
             OwnerId = ownerId,
@@ -22,6 +22,7 @@ public sealed class NotificationStore(TenderHackDbContext db, TimeProvider clock
             Title = title,
             Body = body,
             IntegrationMode = integrationMode,
+            SourceEventId = sourceEventId,
         });
 
     public async Task<IReadOnlyList<NotificationEntry>> ListAsync(string ownerId, long after, bool unreadOnly, CancellationToken ct)

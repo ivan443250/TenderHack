@@ -8,18 +8,12 @@ namespace TenderHack.Application.UseCases;
 /// <summary>
 /// Persists the handoff as `PENDING` and enqueues its submission atomically (web-api-v0.md §8).
 /// The actual `IHandoffAdapter.SubmitAsync` call happens later, in `api-worker`'s outbox consumer —
-/// never synchronously in this request.
+/// never synchronously in this request. `summary` is the only field the caller edits; every other
+/// fact was already assembled into `Handoff.Package` at `prepare` time.
 /// </summary>
 public sealed class ConfirmHandoffUseCase(ICaseRepository cases, IUnitOfWork unitOfWork, IOutbox outbox)
 {
-    public async Task<Case> ExecuteAsync(
-        CaseId caseId,
-        string ownerId,
-        string summary,
-        string dispatchQueue,
-        IReadOnlyList<string> reasonCodes,
-        bool engineeringReviewSuggested,
-        CancellationToken ct)
+    public async Task<Case> ExecuteAsync(CaseId caseId, string ownerId, string summary, CancellationToken ct)
     {
         var @case = await cases.FindAsync(caseId, ct) ?? throw new CaseNotFoundException(caseId);
         if (@case.OwnerId != ownerId)
@@ -27,9 +21,8 @@ public sealed class ConfirmHandoffUseCase(ICaseRepository cases, IUnitOfWork uni
             throw new CaseNotFoundException(caseId);
         }
 
-        @case.ConfirmHandoff();
-        outbox.Enqueue(HandoffOutboxMessages.Submit, new HandoffSubmitPayload(
-            @case.Id.ToString(), @case.Handoff!.Id.ToString(), summary, dispatchQueue, reasonCodes, engineeringReviewSuggested));
+        @case.ConfirmHandoff(summary);
+        outbox.Enqueue(HandoffOutboxMessages.Submit, new HandoffSubmitPayload(@case.Id.ToString(), @case.Handoff!.Id.ToString()));
 
         await unitOfWork.SaveChangesAsync(ct);
         return @case;

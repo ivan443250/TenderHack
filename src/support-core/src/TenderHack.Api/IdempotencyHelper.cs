@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using TenderHack.Api.Contracts;
 using TenderHack.Application.Exceptions;
 using TenderHack.Application.Ports;
 
@@ -12,6 +13,8 @@ public static class IdempotencyScopes
     public const string SubmitFeedback = "case.feedback";
     public const string ConfirmHandoff = "handoff.confirm";
     public const string RetryHandoff = "handoff.retry";
+    public const string SendMessage = "case.message";
+    public const string CompleteCase = "case.complete";
 }
 
 public static class IdempotencyHelper
@@ -48,4 +51,10 @@ public static class IdempotencyHelper
 
         return existing.EntityId;
     }
+
+    /// <summary>For endpoints (like `POST /messages`) where the thing worth replaying is the response itself, not a stable entity id.</summary>
+    public static string SerializeCachedResponse<T>(T response) => JsonSerializer.Serialize(response);
+
+    public static T DeserializeCachedResponse<T>(string cached) =>
+        JsonSerializer.Deserialize<T>(cached) ?? throw new InvalidOperationException("Cached idempotent response could not be deserialized.");
 }

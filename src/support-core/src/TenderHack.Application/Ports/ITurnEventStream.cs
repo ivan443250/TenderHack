@@ -10,7 +10,8 @@ namespace TenderHack.Application.Ports;
 /// </summary>
 public interface ITurnEventStream
 {
-    Task PublishAsync(CaseId caseId, CaseEvent @event, CancellationToken ct);
+    /// <summary>Returns the persisted event's monotonic id — the same id notifications key their own uniqueness on (architecture.md §7 "`(owner_id, case_id, type, source_event_id)`").</summary>
+    Task<long> PublishAsync(CaseId caseId, CaseEvent @event, CancellationToken ct);
 }
 
 /// <summary>
