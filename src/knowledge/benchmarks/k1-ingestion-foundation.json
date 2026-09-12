@@ -38,6 +38,7 @@
   "schema_migrations": {
     "tool": "Alembic",
     "migration": "0002_ingestion_provenance",
+    "semantics_migration": "0003_document_version_semantics",
     "knowledge_owned_tables": [
       "kb_documents",
       "kb_document_versions",
@@ -62,6 +63,11 @@
     "unchanged_ingestion_is_idempotent": true,
     "old_snapshot_content_is_mutated": false,
     "historical_can_publish_as_normative": false
+  },
+  "document_semantics": {
+    "logical_identity": true,
+    "version_specific_metadata_owner": "DocumentVersion",
+    "old_snapshot_resolution_immutable": true
   },
   "identifier_strategy": {
     "document": "stable Unicode-normalized logical filename identity; filesystem path is provenance only",

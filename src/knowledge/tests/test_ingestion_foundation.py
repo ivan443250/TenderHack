@@ -139,6 +139,7 @@ def test_same_pdf_is_idempotent_and_source_resolves(technical_pdf: bytes) -> Non
     )
     assert first.document_version.document_version_id == second.document_version.document_version_id
     assert first.document_version.content_sha256 == second.document_version.content_sha256
+    assert first.document == second.document
     assert [fragment.fragment_id for fragment in first.fragments] == [fragment.fragment_id for fragment in second.fragments]
     assert first.snapshot.snapshot_id == second.snapshot.snapshot_id
     assert second.idempotent is True
@@ -156,20 +157,65 @@ def test_same_pdf_is_idempotent_and_source_resolves(technical_pdf: bytes) -> Non
 def test_changed_bytes_create_new_version_and_old_snapshot_stays_immutable(technical_pdf: bytes) -> None:
     repository = InMemoryKnowledgeRepository()
     pipeline = IngestionPipeline(repository)
-    first = pipeline.ingest(technical_pdf, original_filename="guide.pdf", source_reference="fixture/guide.pdf")
+    first = pipeline.ingest(
+        technical_pdf,
+        original_filename="guide.pdf",
+        source_reference="fixture/guide-v1.pdf",
+        declared_version="v1",
+    )
     changed = pipeline.ingest(
         _technical_pdf([["1 Процедура подачи", "Изменённый текст."], []]),
         original_filename="guide.pdf",
-        source_reference="fixture/guide.pdf",
+        source_reference="fixture/guide-v2.pdf",
+        declared_version="v2",
     )
     assert first.document_version.document_version_id != changed.document_version.document_version_id
     assert first.document_version.content_sha256 != changed.document_version.content_sha256
+    assert first.document == changed.document
+    assert first.document.model_dump(mode="json") == {
+        "document_id": first.document.document_id,
+        "original_filename": "guide.pdf",
+        "corpus": "NORMATIVE",
+    }
     assert first.snapshot.snapshot_id != changed.snapshot.snapshot_id
     assert repository.get_snapshot(first.snapshot.snapshot_id).document_version_ids == (
         first.document_version.document_version_id,
     )
-    old_text = SourceResolver(repository).resolve(first.fragments[0].fragment_id, first.snapshot.snapshot_id).text
-    assert "Русский" in old_text
+    resolver = SourceResolver(repository)
+    old_resolution = resolver.resolve(first.fragments[0].fragment_id, first.snapshot.snapshot_id)
+    assert "Русский" in old_resolution.text
+    assert old_resolution.source_reference == first.document_version.source_reference
+    assert old_resolution.document_version_id == first.document_version.document_version_id
+    assert old_resolution.declared_version == "v1"
+    assert old_resolution.page_count == first.document_version.page_count
+    new_resolution = resolver.resolve(changed.fragments[0].fragment_id, changed.snapshot.snapshot_id)
+    assert new_resolution.document_version_id == changed.document_version.document_version_id
+    assert new_resolution.source_reference == changed.document_version.source_reference
+    assert new_resolution.declared_version == "v2"
+    assert new_resolution.page_count == changed.document_version.page_count
+
+
+def test_changed_declared_version_keeps_logical_document_identity(technical_pdf: bytes) -> None:
+    repository = InMemoryKnowledgeRepository()
+    pipeline = IngestionPipeline(repository)
+    first = pipeline.ingest(
+        technical_pdf,
+        original_filename="guide.pdf",
+        source_reference="fixture/guide.pdf",
+        declared_version="v1",
+    )
+    second = pipeline.ingest(
+        technical_pdf,
+        original_filename="guide.pdf",
+        source_reference="fixture/guide.pdf",
+        declared_version="v2",
+    )
+    assert first.document == second.document
+    assert first.document_version.document_id == second.document_version.document_id
+    assert first.document_version.document_version_id != second.document_version.document_version_id
+    assert first.document_version.declared_version == "v1"
+    assert second.document_version.declared_version == "v2"
+    assert first.document.model_dump(mode="json").keys() == {"document_id", "original_filename", "corpus"}
 
 
 def test_source_button_provenance_is_deterministic_across_version_publication(technical_pdf: bytes) -> None:
@@ -367,3 +413,10 @@ def test_migration_mentions_only_knowledge_owned_tables() -> None:
     assert "kb_documents" in source
     assert "kb_fragments" in source
     assert "kb_snapshot_fragments" in source
+    semantics_migration = Path(__file__).parents[1] / "migrations" / "versions" / "0003_document_version_semantics.py"
+    semantics_source = semantics_migration.read_text(encoding="utf-8")
+    assert 'down_revision = "0002_ingestion_provenance"' in semantics_source
+    assert "_VERSION_FACT_COLUMNS" in semantics_source
+    for column_name in ("content_sha256", "declared_version", "declared_date", "page_count", "source_reference", "ingested_at", "review_status"):
+        assert f'("{column_name}"' in semantics_source
+    assert not re.search(r"\b(?:cases|messages|turns|api_jobs|outbox|feedback)\b", semantics_source)

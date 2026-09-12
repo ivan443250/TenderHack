@@ -173,6 +173,9 @@ class InMemoryKnowledgeRepository(SourceRepository):
             text=fragment.text,
             source_anchor=fragment.source_anchor,
             review_status=fragment.review_status,
+            declared_version=version.declared_version,
+            declared_date=version.declared_date,
+            page_count=version.page_count,
         )
 
 

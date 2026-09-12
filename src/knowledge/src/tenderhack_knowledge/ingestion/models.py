@@ -33,14 +33,7 @@ class Document(BaseModel):
 
     document_id: str
     original_filename: str
-    content_sha256: str
     corpus: Corpus
-    declared_version: str | None = None
-    declared_date: date | None = None
-    page_count: int = Field(ge=0)
-    source_reference: str
-    ingested_at: datetime
-    review_status: str = "PENDING_REVIEW"
 
 
 class DocumentVersion(BaseModel):
@@ -159,6 +152,9 @@ class SourceResolution(BaseModel):
     text: str
     source_anchor: SourceAnchor
     review_status: str
+    declared_version: str | None = None
+    declared_date: date | None = None
+    page_count: int | None = Field(default=None, ge=0)
 
 
 class IngestionResult(BaseModel):

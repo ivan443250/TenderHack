@@ -64,14 +64,7 @@ class IngestionPipeline:
         candidate_document = Document(
             document_id=document_id,
             original_filename=filename,
-            content_sha256=content_sha,
             corpus=corpus_value,
-            declared_version=declared_version,
-            declared_date=parsed_date,
-            page_count=extraction.page_count,
-            source_reference=reference,
-            ingested_at=now,
-            review_status=review_status,
         )
         document = self.repository.register_document(candidate_document)
         version_id = make_document_version_id(
