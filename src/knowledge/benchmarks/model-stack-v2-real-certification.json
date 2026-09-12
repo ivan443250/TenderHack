@@ -1,0 +1,292 @@
+{
+  "report_version": "model-stack-v2-real-certification",
+  "audit_date": "2026-09-12",
+  "status": "BLOCKED_ENVIRONMENT",
+  "reason": "TARGET_A100_NOT_AVAILABLE",
+  "starting_head": "d56c408",
+  "origin_master": "d56c408",
+  "ahead_behind": {
+    "local_ahead": 0,
+    "local_behind": 0
+  },
+  "environment": {
+    "host_classification": "PORTABLE",
+    "target_profile": "CLOUD_A100",
+    "target_gate": "BLOCKED: host is not an NVIDIA A100 and TENDERHACK_ALLOW_PORTABLE_CERT is unset",
+    "portable_certification_override": "UNSET",
+    "os": "Microsoft Windows 11 Pro 10.0.26200",
+    "architecture": "AMD64",
+    "cpu": {
+      "model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "cores": 8,
+      "logical_processors": 16,
+      "max_clock_mhz": 3201
+    },
+    "ram": {
+      "total_kib": 16090664,
+      "free_kib_at_inventory": 3734800
+    },
+    "gpu": [
+      {
+        "name": "NVIDIA GeForce RTX 3060 Laptop GPU",
+        "vram_mib": 6144,
+        "driver": "581.83",
+        "driver_model": "WDDM",
+        "cuda_version_reported_by_nvidia_smi": "13.0",
+        "processes_at_inventory": 0
+      },
+      {
+        "name": "AMD Radeon(TM) Graphics",
+        "vram_bytes_reported_by_windows": 536870912,
+        "role": "integrated_display_adapter"
+      }
+    ],
+    "disk": {
+      "volume": "C:",
+      "filesystem": "NTFS",
+      "total_bytes": 1023072530432,
+      "free_bytes": 636697518080
+    },
+    "docker": {
+      "engine_version": "29.7.2",
+      "compose_version": "v5.4.0"
+    },
+    "python": {
+      "status": "UNAVAILABLE_IN_PATH",
+      "version": null,
+      "reason": "python executable resolved to Microsoft Store app alias"
+    },
+    "uv": "0.12.9",
+    "knowledge_image_digest": null,
+    "knowledge_image_digest_reason": "not inspected because Phase 0 target gate blocked",
+    "linux_kernel": null,
+    "linux_kernel_reason": "current host is Windows"
+  },
+  "llama_cpp": {
+    "status": "NOT_RUN_BLOCKED_ENVIRONMENT",
+    "repository": "llama.cpp",
+    "version": null,
+    "commit_or_tag": null,
+    "build_type": null,
+    "cuda_support": null,
+    "server_build_info": null,
+    "reason": "Do not install/build or run model serving on a non-target host before the A100 gate is satisfied"
+  },
+  "model_artifacts": {
+    "embedding": {
+      "source_model": "ai-sage/Giga-Embeddings-instruct-3B-0826",
+      "source_revision": null,
+      "runtime_repo": "ai-babai/giga-embeddings-0826-3b-gguf",
+      "runtime_revision": "04c5a2d751ce20908200de2324444a14a81b1d80",
+      "filename": "giga-embeddings-0826-3b-q8_0.gguf",
+      "expected_sha256": "429f2d04a968ffe73137fe65c2e458a08236056168b905d208b4d81ecab08c22",
+      "measured_sha256": null,
+      "status": "NOT_DOWNLOADED_BLOCKED",
+      "reason": "model download prohibited by target A100 gate"
+    },
+    "generator": {
+      "source_model": "empero-ai/Qwen3.8-4B-Distill",
+      "source_revision": "391fc7d103e3942a408def3e4f51c2f85d464417",
+      "runtime_repo": "empero-ai/Qwen3.8-4B-Distill-GGUF",
+      "runtime_revision": "391fc7d103e3942a408def3e4f51c2f85d464417",
+      "filename": "Qwen3.8-4B-Q6_K.gguf",
+      "measured_sha256": null,
+      "size_bytes": null,
+      "status": "NOT_DOWNLOADED_BLOCKED",
+      "reason": "model download prohibited by target A100 gate"
+    },
+    "reranker": {
+      "source_model": "Querit/Querit-4B",
+      "runtime": "TBD_UNVERIFIED",
+      "artifact": null,
+      "status": "UNVERIFIED",
+      "reason": "no canonical local runtime artifact was downloaded or assumed"
+    }
+  },
+  "embedding": {
+    "status": "BLOCKED_ENVIRONMENT",
+    "dimension_expected": 2048,
+    "dimension_measured": null,
+    "normalized_measured": null,
+    "real_smoke": null,
+    "reason": "Giga server was not started"
+  },
+  "embedding_space": {
+    "status": "PORTABILITY_PENDING",
+    "proposed_id": "giga-0826-q8_0-v1",
+    "measured_portability": null,
+    "reason": "requires the same fixed fixture on A100 CUDA llama.cpp and a portable backend"
+  },
+  "corpus_identity": {
+    "status": "NOT_CHECKED",
+    "expected": {
+      "documents": 6,
+      "pages": 830,
+      "fragments": 3899
+    },
+    "measured": null,
+    "reason": "certification stopped before database/corpus phase"
+  },
+  "backfill": {
+    "status": "NOT_RUN",
+    "successful_fragments": null,
+    "failed_fragments": null,
+    "total_fragments": 3899,
+    "selected_batch_size": null,
+    "number_of_batches": null,
+    "total_seconds": null,
+    "fragments_per_second": null,
+    "reason": "certification stopped before model provisioning"
+  },
+  "B1": {
+    "status": "NOT_RUN",
+    "gold_queries": 44,
+    "recall_at_5": null,
+    "recall_at_10": null,
+    "mrr": null,
+    "latency": null,
+    "reason": "certification stopped before corpus/database phase"
+  },
+  "B2": {
+    "status": "NOT_RUN",
+    "gold_queries": 44,
+    "recall_at_5": null,
+    "recall_at_10": null,
+    "mrr": null,
+    "subsets": null,
+    "latency": null,
+    "reason": "certification stopped before Giga provisioning"
+  },
+  "B3": {
+    "status": "UNVERIFIED",
+    "recall_at_5": null,
+    "recall_at_10": null,
+    "mrr": null,
+    "latency": null,
+    "reason": "Querit runtime is not certified"
+  },
+  "generator": {
+    "status": "BLOCKED_ENVIRONMENT",
+    "context_limit": 8192,
+    "structured_smoke": null,
+    "think_safety": null,
+    "reason": "Qwen server was not started"
+  },
+  "pipeline": {
+    "status": "BLOCKED_ENVIRONMENT",
+    "stages": {
+      "understand": null,
+      "retrieve": null,
+      "answerability": null,
+      "draft": null,
+      "verify": null
+    },
+    "reason": "full pipeline certification requires the target runtime artifacts"
+  },
+  "capability_modes": {
+    "FULL": {
+      "status": "BLOCKED_ENVIRONMENT",
+      "reason": "embedding, certified reranker and generator unavailable"
+    },
+    "REDUCED": {
+      "status": "BLOCKED_ENVIRONMENT",
+      "reason": "Giga embedding and generator not provisioned"
+    },
+    "MINIMAL": {
+      "status": "NOT_CERTIFIED",
+      "reason": "Phase 0 gate requires stopping before capability claims"
+    }
+  },
+  "latency": {
+    "status": "NOT_MEASURED",
+    "embedding": null,
+    "rerank_20": null,
+    "ttft": null,
+    "generation": null,
+    "end_to_end": null,
+    "reason": "no model process was started"
+  },
+  "memory": {
+    "status": "NOT_MEASURED",
+    "gpu_vram": null,
+    "ram": null,
+    "peak_vram": null,
+    "reason": "no model process was started"
+  },
+  "offline": {
+    "status": "NOT_RUN",
+    "local_artifacts": null,
+    "restart": null,
+    "reason": "artifacts were intentionally not downloaded"
+  },
+  "fallbacks": {
+    "status": "NOT_CERTIFIED",
+    "portable_profile": "not authorized without explicit TENDERHACK_ALLOW_PORTABLE_CERT=1",
+    "minimal_retrieval": "documented only; not certified in this blocked run"
+  },
+  "security": {
+    "external_llm_api": "NOT_CALLED",
+    "external_search_api": "NOT_CALLED",
+    "model_files_in_git": "NOT_CHECKED_AFTER_BLOCK; no downloads were performed",
+    "browser_to_inference": "NOT_TESTED",
+    "reason": "certification stopped at environment gate"
+  },
+  "limitations": [
+    "Current host is Windows 11 with RTX 3060 Laptop GPU (6 GiB), not the required A100 profile.",
+    "TENDERHACK_ALLOW_PORTABLE_CERT is unset; portable certification was not authorized.",
+    "Python executable is unavailable in PATH; use the target Knowledge container or install Python on the target host.",
+    "No model was downloaded, started or benchmarked; no corpus backfill or retrieval metrics exist.",
+    "No Querit runtime artifact is assumed or certified."
+  ],
+  "high_findings": [
+    {
+      "id": "TARGET_A100_NOT_AVAILABLE",
+      "severity": "HIGH",
+      "status": "BLOCKING",
+      "evidence": "nvidia-smi reports NVIDIA GeForce RTX 3060 Laptop GPU, 6144 MiB; no NVIDIA A100 is present"
+    }
+  ],
+  "medium_findings": [
+    {
+      "id": "PYTHON_RUNTIME_UNAVAILABLE",
+      "severity": "MEDIUM",
+      "status": "OBSERVED",
+      "evidence": "python command resolves to Microsoft Store app alias; uv is installed"
+    }
+  ],
+  "recommended_demo_profile": {
+    "status": "NOT_SELECTED",
+    "reason": "selection must follow measured certification on the target host"
+  },
+  "next_prerequisites": [
+    "Provide a team-controlled Linux host with an NVIDIA A100 (preferably 80 GiB) and a compatible NVIDIA driver/CUDA stack.",
+    "Provide Docker Engine/Compose, Python 3.12 or the pinned Knowledge image, and PostgreSQL 16 with pgvector.",
+    "Mount a model directory outside the repository with enough free disk for both GGUF artifacts, runtime/build temporaries, PostgreSQL and logs.",
+    "Make the six-manual canonical corpus and existing 44-query gold set available; verify 6 documents, 830 pages and 3899 fragments before backfill.",
+    "Keep Querit disabled until a canonical artifact/interface and score semantics are independently verified."
+  ],
+  "next_commands": [
+    "On the target host: nvidia-smi",
+    "On the target host: docker version && docker compose version",
+    "On the target host: python3 --version && uv --version",
+    "On the target host: df -h /models",
+    "Then follow docs/plans/active/model-stack-v2-real-certification.md from Phase 1; do not reuse this blocked report as certification evidence"
+  ],
+  "files_changed": [
+    "src/knowledge/benchmarks/model-stack-v2-real-certification.json"
+  ],
+  "verification": {
+    "phase_0_inventory": "PASS",
+    "target_gate": "BLOCKED_ENVIRONMENT",
+    "status": "NOT_RUN",
+    "deterministic_verifier": null,
+    "malformed_output": null,
+    "model_unavailable_mapping": null,
+    "reason": "model-dependent phases were not entered",
+    "model_downloads": "NOT_RUN",
+    "real_certification": "NOT_RUN",
+    "git_diff_check": "PENDING_AFTER_REPORT_WRITE",
+    "scope_check": "PENDING_AFTER_REPORT_WRITE"
+  },
+  "next_task": "MODEL_STACK_V2_REAL_CERTIFICATION_ON_TARGET_A100"
+}
