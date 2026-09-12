@@ -10,6 +10,8 @@ public interface ICaseRepository
 {
     Task<Case?> FindAsync(CaseId caseId, CancellationToken ct);
 
+    Task<IReadOnlyList<Case>> ListByOwnerAsync(string ownerId, CancellationToken ct);
+
     void Add(Case @case);
 }
 

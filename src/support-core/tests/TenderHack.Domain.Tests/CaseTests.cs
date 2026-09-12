@@ -9,7 +9,7 @@ public sealed class CaseTests
 {
     private static readonly DateTimeOffset Now = DateTimeOffset.UtcNow;
 
-    private static Case NewCase() => new(CaseId.New(), ownerId: "owner-1");
+    private static Case NewCase() => new(CaseId.New(), ownerId: "owner-1", Now);
 
     [Fact]
     public void OneActiveRevisionIsAuthoritative()

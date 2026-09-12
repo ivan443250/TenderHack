@@ -14,7 +14,7 @@ public sealed class UseCasesTests
     {
         var repository = new FakeCaseRepository();
         var unitOfWork = new FakeUnitOfWork();
-        var sut = new CreateCaseUseCase(repository, unitOfWork);
+        var sut = new CreateCaseUseCase(repository, unitOfWork, TimeProvider.System);
 
         var @case = await sut.ExecuteAsync("owner-1", CancellationToken.None);
 
@@ -31,7 +31,7 @@ public sealed class UseCasesTests
         var orchestrator = new TurnOrchestrator(
             new FakeKnowledgeService(), new FakeModerationRuleEngine(), new FakeTurnEventStream(),
             new ModerationOptions(), TimeProvider.System);
-        var @case = new Case(CaseId.New(), "owner-1");
+        var @case = new Case(CaseId.New(), "owner-1", DateTimeOffset.UtcNow);
         repository.Add(@case);
         var sut = new SendMessageUseCase(repository, unitOfWork, orchestrator);
 
@@ -58,7 +58,7 @@ public sealed class UseCasesTests
     public async Task SendMessageFromANonOwnerIsTreatedAsNotFound()
     {
         var repository = new FakeCaseRepository();
-        var @case = new Case(CaseId.New(), "owner-1");
+        var @case = new Case(CaseId.New(), "owner-1", DateTimeOffset.UtcNow);
         repository.Add(@case);
         var orchestrator = new TurnOrchestrator(
             new FakeKnowledgeService(), new FakeModerationRuleEngine(), new FakeTurnEventStream(),
@@ -73,7 +73,7 @@ public sealed class UseCasesTests
     public async Task GetCaseSnapshotReturnsTheCaseForItsOwner()
     {
         var repository = new FakeCaseRepository();
-        var @case = new Case(CaseId.New(), "owner-1");
+        var @case = new Case(CaseId.New(), "owner-1", DateTimeOffset.UtcNow);
         repository.Add(@case);
         var sut = new GetCaseSnapshotUseCase(repository);
 
@@ -86,7 +86,7 @@ public sealed class UseCasesTests
     public async Task GetCaseSnapshotFromANonOwnerIsTreatedAsNotFound()
     {
         var repository = new FakeCaseRepository();
-        var @case = new Case(CaseId.New(), "owner-1");
+        var @case = new Case(CaseId.New(), "owner-1", DateTimeOffset.UtcNow);
         repository.Add(@case);
         var sut = new GetCaseSnapshotUseCase(repository);
 

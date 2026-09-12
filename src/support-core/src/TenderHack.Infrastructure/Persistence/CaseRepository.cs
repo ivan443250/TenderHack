@@ -9,6 +9,9 @@ public sealed class CaseRepository(TenderHackDbContext db) : ICaseRepository
     public Task<Case?> FindAsync(CaseId caseId, CancellationToken ct) =>
         db.Cases.FirstOrDefaultAsync(c => c.Id == caseId, ct);
 
+    public async Task<IReadOnlyList<Case>> ListByOwnerAsync(string ownerId, CancellationToken ct) =>
+        await db.Cases.Where(c => c.OwnerId == ownerId).ToListAsync(ct);
+
     public void Add(Case @case) => db.Cases.Add(@case);
 }
 
