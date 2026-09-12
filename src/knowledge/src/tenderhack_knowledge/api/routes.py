@@ -35,14 +35,12 @@ from tenderhack_knowledge.answerability import assess_answerability
 from tenderhack_knowledge.generation import create_grounded_draft
 from tenderhack_knowledge.generation.service import GeneratorModelError, GeneratorUnavailableError
 from tenderhack_knowledge.inference.config import InferenceSettings
-from tenderhack_knowledge.inference.giga import GigaEmbeddingAdapter
 from tenderhack_knowledge.inference.generator import LocalOpenAIChatGenerator
-from tenderhack_knowledge.inference.querit import QueritRerankerAdapter
 from tenderhack_knowledge.ingestion.ids import normalize_source_name
 from tenderhack_knowledge.ingestion.repository import CorpusBoundaryError, UnknownFragmentError, UnknownSnapshotError
 from tenderhack_knowledge.persistence.db import create_engine
 from tenderhack_knowledge.persistence.repository import PostgresKnowledgeRepository
-from tenderhack_knowledge.retrieval import HybridRetriever
+from tenderhack_knowledge.retrieval import LexicalRetriever
 from tenderhack_knowledge.understanding import understand_query
 
 router = APIRouter()
@@ -173,25 +171,13 @@ async def retrieve(
     exact_codes = list(dict.fromkeys([*payload.exact_codes, *understanding.exact_codes]))
     request = payload.model_copy(update={"exact_codes": exact_codes})
     try:
-        settings = InferenceSettings.from_env()
-        embedder = GigaEmbeddingAdapter(
-            base_url=settings.embedding_base_url,
-            model_id=settings.embedding_model_id,
-            revision=settings.embedding_revision,
+        retriever = LexicalRetriever(repository)
+        result = await retriever.retrieve(
+            request,
+            mode="hybrid",
+            allow_trigram=True,
+            limit=10,
         )
-        reranker = (
-            QueritRerankerAdapter(
-                model_id=settings.reranker_model_id,
-                revision=settings.reranker_revision,
-                device=settings.reranker_device,
-                batch_size=settings.reranker_batch_size,
-                max_length=settings.reranker_max_length,
-                local_files_only=True,
-            )
-            if settings.reranker_enabled
-            else None
-        )
-        result = await HybridRetriever(repository, embedder=embedder, reranker=reranker).retrieve(request, final_limit=10)
     except UnknownSnapshotError as exc:
         from tenderhack_knowledge.contracts.v0 import ErrorCode
 
@@ -206,11 +192,11 @@ async def retrieve(
             status_code=422,
             detail={"code": ErrorCode.VALIDATION_ERROR.value, "message": str(exc)},
         ) from exc
-    except Exception as exc:  # pragma: no cover - depends on external DB/inference runtime
-        raise _internal_error("unable to retrieve hybrid candidates") from exc
+    except Exception as exc:  # pragma: no cover - depends on external DB/runtime
+        raise _internal_error("unable to retrieve lexical candidates") from exc
     return RetrieveResponse(
         snapshot_id=result.snapshot_id,
-        retrieval_config_version=result.config_version,
+        retrieval_config_version=retriever.config_version,
         candidates=list(result.candidates),
     )
 

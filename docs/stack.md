@@ -13,7 +13,7 @@ Two backend runtimes with one PostgreSQL, per `adr/0001-dotnet-support-core-pyth
 | Knowledge & inference (`knowledge`, `knowledge-worker`) | Python 3.12 + FastAPI + Pydantic v2 |
 | Python package manager | uv |
 | Persistence | PostgreSQL 16; EF Core migrations for `api` tables, Alembic + SQLAlchemy 2 + asyncpg for `knowledge` tables |
-| Retrieval | PostgreSQL FTS + pg_trgm + pgvector (used by `knowledge` only) |
+| Retrieval | **Production:** exact + PostgreSQL FTS + pg_trgm; **experimental:** Giga embeddings + pgvector |
 | Inter-service contract | frozen internal HTTP `v0`; FastAPI/OpenAPI boundary → C# client/mapping in Infrastructure |
 | PDF parsing | pdfplumber baseline; Docling/OCR only for measured failures |
 | Embeddings | ai-sage/Giga-Embeddings-instruct-3B-0826; 2048 normalized dimensions |
@@ -135,14 +135,18 @@ ANN adds tuning and recall/filter tradeoffs. Enable only after benchmark proves 
 
 PostgreSQL FTS is **not called BM25** in docs/pitch unless BM25 is explicitly implemented.
 
-Initial/current components inside `knowledge`:
+Production components inside `knowledge`:
 
 - exact code/status/entity search;
 - `to_tsvector` / `tsquery` + `ts_rank`/`ts_rank_cd`;
 - `pg_trgm` for spelling/term expansion;
-- pgvector exact similarity;
-- application-layer RRF;
-- local reranker only after its runtime path is certified.
+- deterministic lexical ranking (`lexical-v1`).
+
+Giga embeddings, pgvector exact similarity, application-layer RRF and the
+optional local reranker remain **experimental/benchmark-only**. AI-2/AI-2B
+ablation on the frozen corpus did not provide incremental recall and the dense
+layer is excluded from the online critical path; this is a measured runtime
+decision, not a claim that embeddings are universally ineffective.
 
 Keep retrieval behind a typed interface so production can move to OpenSearch later without rewriting product logic.
 
@@ -170,7 +174,12 @@ Store page/section/anchor provenance for every fragment.
 
 ### Reranker: Querit/Querit-4B
 
-Use the custom Querit `AutoModel` score interface for query-passage reranking only after a trusted runtime/artifact/scoring path is certified. No production quantized artifact is treated as verified merely because a filename exists. The safe fallback is exact/FTS/trigram + Giga dense + RRF. Scores are relevance evidence, **not a calibrated probability**.
+Use the custom Querit `AutoModel` score interface only for an explicit
+benchmark after a trusted runtime/artifact/scoring path is certified. No
+production quantized artifact is treated as verified merely because a filename
+exists. The production retrieval path is exact/FTS/trigram; Giga dense + RRF
+and Querit remain experimental. Scores are relevance evidence, **not a
+calibrated probability**.
 
 ### Generator: Qwen3.8-4B-Distill
 
