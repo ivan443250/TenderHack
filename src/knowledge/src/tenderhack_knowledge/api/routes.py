@@ -31,6 +31,7 @@ from tenderhack_knowledge.contracts.v0 import (
     VerifyResponse,
     VerifyResult,
 )
+from tenderhack_knowledge.answerability import assess_answerability
 from tenderhack_knowledge.ingestion.ids import normalize_source_name
 from tenderhack_knowledge.ingestion.repository import CorpusBoundaryError, UnknownFragmentError, UnknownSnapshotError
 from tenderhack_knowledge.persistence.db import create_engine
@@ -179,14 +180,47 @@ async def retrieve(
     response_model=AnswerabilityResponse,
     responses=RETRIEVAL_ERRORS,
 )
-def answerability(
+async def answerability(
     payload: AnswerabilityRequest,
     x_trace_id: TraceIdHeader,
     x_case_id: CaseIdHeader,
     x_turn_id: TurnIdHeader,
 ) -> AnswerabilityResponse:
-    del payload, x_trace_id, x_case_id, x_turn_id
-    return AnswerabilityResponse(evidence_sufficiency="INSUFFICIENT", evidence_fragment_ids=[], missing_conditions=[], risk_flags=["stub"])
+    del x_trace_id, x_case_id, x_turn_id
+    repository = get_knowledge_repository()
+    if repository is None:
+        # A missing knowledge database is infrastructure failure evidence, not
+        # proof that the normative corpus lacks an answer.
+        return AnswerabilityResponse(
+            evidence_sufficiency="INSUFFICIENT",
+            evidence_fragment_ids=[],
+            missing_conditions=[],
+            risk_flags=["KNOWLEDGE_UNAVAILABLE"],
+        )
+    try:
+        assessment = await assess_answerability(
+            payload.query,
+            payload.snapshot_id,
+            payload.candidate_fragment_ids,
+            repository,
+        )
+    except UnknownSnapshotError as exc:
+        from tenderhack_knowledge.contracts.v0 import ErrorCode
+
+        raise HTTPException(
+            status_code=404,
+            detail={"code": ErrorCode.UNKNOWN_SNAPSHOT.value, "message": f"Unknown snapshot: {payload.snapshot_id}"},
+        ) from exc
+    except CorpusBoundaryError as exc:
+        from tenderhack_knowledge.contracts.v0 import ErrorCode
+
+        raise HTTPException(
+            status_code=422,
+            detail={"code": ErrorCode.VALIDATION_ERROR.value, "message": str(exc)},
+        ) from exc
+    except Exception as exc:  # pragma: no cover - depends on external DB
+        raise _internal_error("unable to assess evidence answerability") from exc
+    return assessment.to_contract()
 
 
 @router.post(

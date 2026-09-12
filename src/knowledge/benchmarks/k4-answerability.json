@@ -1,0 +1,64 @@
+{
+  "stage": "K4",
+  "status": "PASS_WITH_LIMITATIONS",
+  "snapshot_id": "snap_0e979dfef376faff41f7c76416fda457",
+  "corpus": "NORMATIVE",
+  "preconditions": {
+    "k2c": "PASS_WITH_LIMITATIONS",
+    "k3": "PASS",
+    "normative_fragments_only": true,
+    "historical_fragments_used": false
+  },
+  "gate": {
+    "implementation": "deterministic evidence-driven gate",
+    "config_version": "k4-deterministic-v1",
+    "dimensions": ["SOURCE", "SPECIFICITY", "APPLICABILITY", "COMPLETENESS", "HUMAN_NEED"],
+    "allowed_sufficiency": ["SUFFICIENT", "CONDITION_DEPENDENT", "INSUFFICIENT"],
+    "decision_ownership": "knowledge assesses evidence; .NET owns business decisions",
+    "uses_retrieval_score_as_truth": false,
+    "uses_top1_top2_gap_as_truth": false,
+    "external_llm": false
+  },
+  "fixture": {
+    "path": "src/knowledge/benchmarks/k4-answerability-fixture.json",
+    "cases": 35,
+    "grounded_in_real_normative_fragment_ids": true,
+    "adversarial_coverage": [
+      "no evidence", "missing conditions", "wrong provider", "wrong status",
+      "exact error code", "table evidence", "long description", "negation",
+      "post-instruction failure", "supplier/customer ambiguity", "duplicate/irrelevant context",
+      "typo", "threshold support branch"
+    ]
+  },
+  "confusion_like": {
+    "total": 35,
+    "correct": 35,
+    "false_sufficient": 0,
+    "false_condition_dependent": 0,
+    "false_insufficient": 0,
+    "expected_vs_actual": {
+      "SUFFICIENT": {"SUFFICIENT": 17, "CONDITION_DEPENDENT": 0, "INSUFFICIENT": 0},
+      "CONDITION_DEPENDENT": {"SUFFICIENT": 0, "CONDITION_DEPENDENT": 5, "INSUFFICIENT": 0},
+      "INSUFFICIENT": {"SUFFICIENT": 0, "CONDITION_DEPENDENT": 0, "INSUFFICIENT": 13}
+    },
+    "false_sufficient_policy": "treated as a serious error and explicitly counted"
+  },
+  "latency_ms": {
+    "measurement": "35 sequential real PostgreSQL assessments on local Docker database",
+    "min": 159.11,
+    "p50": 174.15,
+    "p95": 200.82,
+    "max": 260.20
+  },
+  "organizer_questions": {
+    "new_questions_added": 0,
+    "unresolved_existing_questions": 4,
+    "answerability_specific_ambiguous_tz_rule": false
+  },
+  "limitations": [
+    "Specificity and slot extraction are deterministic lexical rules; no semantic model is used.",
+    "Missing conditions are limited to frozen card slots and explicit query markers.",
+    "The six-manual snapshot remains PENDING_REVIEW in source metadata; K4 does not change that review status.",
+    "K2C Recall@10 remains below the 90% target and is not re-labelled by this gate."
+  ]
+}
