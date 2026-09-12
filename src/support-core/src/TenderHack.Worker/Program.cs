@@ -16,5 +16,6 @@ builder.Services.AddScoped<IngestHandoffStatusUseCase>();
 
 builder.Services.AddHostedService<HandoffSubmitWorker>();
 builder.Services.AddHostedService<HandoffStatusSyncWorker>();
+builder.Services.AddHostedService<QualityPushWorker>();
 
 await builder.Build().RunAsync();

@@ -30,9 +30,12 @@ public sealed class FakeKnowledgeService : IKnowledgeService
         return Task.FromResult(ModerationContext);
     }
 
+    public RetrieveRequest? LastRetrieveRequest { get; private set; }
+
     public Task<RetrieveResult> RetrieveAsync(RetrieveRequest request, KnowledgeRequestContext context, CancellationToken ct)
     {
         ThrowIfConfiguredToFail(nameof(RetrieveAsync));
+        LastRetrieveRequest = request;
         return Task.FromResult(new RetrieveResult("snapshot-1", "stub-v0", [new RetrievalCandidate("frag-1", "doc-1", 1, null)]));
     }
 
@@ -58,6 +61,45 @@ public sealed class FakeKnowledgeService : IKnowledgeService
     {
         ThrowIfConfiguredToFail(nameof(GetSourceAsync));
         return Task.FromResult(new SourceFragment("doc-1", "Title", "v1", 1, null, "text", "snapshot-1"));
+    }
+
+    public List<QualityTurnPush> PushedTurns { get; } = [];
+    public List<QualityFeedbackPush> PushedFeedback { get; } = [];
+    public List<QualityCompletionPush> PushedCompletions { get; } = [];
+    public QualityEvaluations Evaluations { get; set; } = new("case-1", []);
+    public IssueGroups IssueGroups { get; set; } = new([]);
+
+    public Task PushQualityTurnAsync(QualityTurnPush push, CancellationToken ct)
+    {
+        ThrowIfConfiguredToFail(nameof(PushQualityTurnAsync));
+        PushedTurns.Add(push);
+        return Task.CompletedTask;
+    }
+
+    public Task PushQualityFeedbackAsync(QualityFeedbackPush push, CancellationToken ct)
+    {
+        ThrowIfConfiguredToFail(nameof(PushQualityFeedbackAsync));
+        PushedFeedback.Add(push);
+        return Task.CompletedTask;
+    }
+
+    public Task PushQualityCompletionAsync(QualityCompletionPush push, CancellationToken ct)
+    {
+        ThrowIfConfiguredToFail(nameof(PushQualityCompletionAsync));
+        PushedCompletions.Add(push);
+        return Task.CompletedTask;
+    }
+
+    public Task<QualityEvaluations> GetQualityEvaluationsAsync(string caseId, CancellationToken ct)
+    {
+        ThrowIfConfiguredToFail(nameof(GetQualityEvaluationsAsync));
+        return Task.FromResult(Evaluations);
+    }
+
+    public Task<IssueGroups> GetIssueGroupsAsync(CancellationToken ct)
+    {
+        ThrowIfConfiguredToFail(nameof(GetIssueGroupsAsync));
+        return Task.FromResult(IssueGroups);
     }
 
     private void ThrowIfConfiguredToFail(string stage)

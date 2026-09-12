@@ -52,6 +52,7 @@ app.MapSourceEndpoints();
 app.MapHandoffEndpoints();
 app.MapCompletionEndpoints();
 app.MapNotificationEndpoints();
+app.MapAnalyticsEndpoints();
 
 var supportOptions = app.Services.GetRequiredService<IOptions<SupportOptions>>().Value;
 app.MapSupportWebhookEndpoints(supportOptions);

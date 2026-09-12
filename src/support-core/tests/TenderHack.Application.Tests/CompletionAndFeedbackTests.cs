@@ -21,7 +21,7 @@ public sealed class CompletionAndFeedbackTests
         repository.Add(@case);
         var events = new FakeTurnEventStream();
         var notifications = new FakeNotificationSink();
-        var sut = new CompleteCaseUseCase(repository, new FakeUnitOfWork(), new CaseCompletionPublisher(events, notifications), TimeProvider.System);
+        var sut = new CompleteCaseUseCase(repository, new FakeUnitOfWork(), new CaseCompletionPublisher(events, notifications, new FakeOutbox()), TimeProvider.System);
 
         await sut.ExecuteAsync(@case.Id, "owner-1", solved: null, CancellationToken.None);
 
@@ -39,7 +39,7 @@ public sealed class CompletionAndFeedbackTests
         repository.Add(@case);
         var events = new FakeTurnEventStream();
         var notifications = new FakeNotificationSink();
-        var sut = new CompleteCaseUseCase(repository, new FakeUnitOfWork(), new CaseCompletionPublisher(events, notifications), TimeProvider.System);
+        var sut = new CompleteCaseUseCase(repository, new FakeUnitOfWork(), new CaseCompletionPublisher(events, notifications, new FakeOutbox()), TimeProvider.System);
 
         await sut.ExecuteAsync(@case.Id, "owner-1", solved: true, CancellationToken.None);
 
@@ -56,7 +56,7 @@ public sealed class CompletionAndFeedbackTests
         repository.Add(@case);
         var events = new FakeTurnEventStream();
         var notifications = new FakeNotificationSink();
-        var sut = new CompleteCaseUseCase(repository, new FakeUnitOfWork(), new CaseCompletionPublisher(events, notifications), TimeProvider.System);
+        var sut = new CompleteCaseUseCase(repository, new FakeUnitOfWork(), new CaseCompletionPublisher(events, notifications, new FakeOutbox()), TimeProvider.System);
 
         await Assert.ThrowsAsync<CaseAlreadyCompletedException>(() => sut.ExecuteAsync(@case.Id, "owner-1", false, CancellationToken.None));
         Assert.Empty(events.Published);
@@ -71,7 +71,7 @@ public sealed class CompletionAndFeedbackTests
         @case.RecordModerationViolation(closeAfterWarnings: 0, DateTimeOffset.UtcNow); // immediately closes
         var events = new FakeTurnEventStream();
         var notifications = new FakeNotificationSink();
-        var publisher = new CaseCompletionPublisher(events, notifications);
+        var publisher = new CaseCompletionPublisher(events, notifications, new FakeOutbox());
 
         await publisher.PublishAsync(@case, ResolutionStatus.Unknown, DateTimeOffset.UtcNow, CancellationToken.None);
 
@@ -89,7 +89,7 @@ public sealed class CompletionAndFeedbackTests
         @case.CompleteByUser(null, DateTimeOffset.UtcNow);
         repository.Add(@case);
         var events = new FakeTurnEventStream();
-        var sut = new SubmitFeedbackUseCase(repository, feedbackRepository, new FakeUnitOfWork(), events, TimeProvider.System);
+        var sut = new SubmitFeedbackUseCase(repository, feedbackRepository, new FakeUnitOfWork(), events, new FakeOutbox(), TimeProvider.System);
 
         var feedback = await sut.ExecuteAsync(@case.Id, "owner-1", FeedbackRating.Positive, FeedbackRating.Negative, solved: true, "спасибо", CancellationToken.None);
 
@@ -107,7 +107,7 @@ public sealed class CompletionAndFeedbackTests
         var @case = NewCase();
         @case.CompleteByUser(null, DateTimeOffset.UtcNow);
         repository.Add(@case);
-        var sut = new SubmitFeedbackUseCase(repository, feedbackRepository, new FakeUnitOfWork(), new FakeTurnEventStream(), TimeProvider.System);
+        var sut = new SubmitFeedbackUseCase(repository, feedbackRepository, new FakeUnitOfWork(), new FakeTurnEventStream(), new FakeOutbox(), TimeProvider.System);
         await sut.ExecuteAsync(@case.Id, "owner-1", null, null, null, null, CancellationToken.None);
 
         await Assert.ThrowsAsync<FeedbackAlreadySubmittedException>(() =>
@@ -120,7 +120,7 @@ public sealed class CompletionAndFeedbackTests
         var repository = new FakeCaseRepository();
         var @case = NewCase();
         repository.Add(@case);
-        var sut = new SubmitFeedbackUseCase(repository, new FakeFeedbackRepository(), new FakeUnitOfWork(), new FakeTurnEventStream(), TimeProvider.System);
+        var sut = new SubmitFeedbackUseCase(repository, new FakeFeedbackRepository(), new FakeUnitOfWork(), new FakeTurnEventStream(), new FakeOutbox(), TimeProvider.System);
 
         await Assert.ThrowsAsync<CaseNotCompletedException>(() =>
             sut.ExecuteAsync(@case.Id, "owner-1", null, null, true, null, CancellationToken.None));

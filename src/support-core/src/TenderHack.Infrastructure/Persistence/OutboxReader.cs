@@ -46,4 +46,17 @@ public sealed class OutboxReader(TenderHackDbContext db) : IOutboxReader
         // fresh user-triggered `/handoff/retry` command, not the worker re-driving the same row).
         row.DeliveredAt = DateTimeOffset.UtcNow;
     }
+
+    public async Task RecordAttemptFailureAsync(long id, string error, CancellationToken ct)
+    {
+        var row = await db.OutboxMessages.FirstOrDefaultAsync(m => m.Id == id, ct);
+        if (row is null)
+        {
+            return;
+        }
+
+        row.AttemptCount++;
+        row.LastError = error;
+        // Left pending (no DeliveredAt) — at-least-once, the next tick retries it.
+    }
 }

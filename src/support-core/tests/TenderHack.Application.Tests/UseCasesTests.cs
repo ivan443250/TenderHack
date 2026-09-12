@@ -29,7 +29,7 @@ public sealed class UseCasesTests
         var repository = new FakeCaseRepository();
         var unitOfWork = new FakeUnitOfWork();
         var orchestrator = new TurnOrchestrator(
-            new FakeKnowledgeService(), new FakeModerationRuleEngine(), new FakeTurnEventStream(),
+            new FakeKnowledgeService(), new FakeModerationRuleEngine(), new FakeTurnEventStream(), new FakeOutbox(),
             new ModerationOptions(), TimeProvider.System);
         var @case = new Case(CaseId.New(), "owner-1", DateTimeOffset.UtcNow);
         repository.Add(@case);
@@ -46,7 +46,7 @@ public sealed class UseCasesTests
     {
         var repository = new FakeCaseRepository();
         var orchestrator = new TurnOrchestrator(
-            new FakeKnowledgeService(), new FakeModerationRuleEngine(), new FakeTurnEventStream(),
+            new FakeKnowledgeService(), new FakeModerationRuleEngine(), new FakeTurnEventStream(), new FakeOutbox(),
             new ModerationOptions(), TimeProvider.System);
         var sut = new SendMessageUseCase(repository, new FakeUnitOfWork(), orchestrator);
 
@@ -61,7 +61,7 @@ public sealed class UseCasesTests
         var @case = new Case(CaseId.New(), "owner-1", DateTimeOffset.UtcNow);
         repository.Add(@case);
         var orchestrator = new TurnOrchestrator(
-            new FakeKnowledgeService(), new FakeModerationRuleEngine(), new FakeTurnEventStream(),
+            new FakeKnowledgeService(), new FakeModerationRuleEngine(), new FakeTurnEventStream(), new FakeOutbox(),
             new ModerationOptions(), TimeProvider.System);
         var sut = new SendMessageUseCase(repository, new FakeUnitOfWork(), orchestrator);
 

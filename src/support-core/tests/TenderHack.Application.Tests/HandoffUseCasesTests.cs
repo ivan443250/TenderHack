@@ -81,7 +81,7 @@ public sealed class HandoffUseCasesTests
 
     private static IngestHandoffStatusUseCase CreateIngestUseCase(
         FakeCaseRepository repository, FakeUnitOfWork unitOfWork, FakeTurnEventStream events, FakeNotificationSink notifications) =>
-        new(repository, unitOfWork, events, notifications, new CaseCompletionPublisher(events, notifications), TimeProvider.System);
+        new(repository, unitOfWork, events, notifications, new CaseCompletionPublisher(events, notifications, new FakeOutbox()), TimeProvider.System);
 
     [Fact]
     public async Task IngestHandoffStatusAppliesFactsThroughTheCase()
