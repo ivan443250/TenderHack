@@ -38,7 +38,7 @@ export function SourceCitation({ fragmentId, title, page, api, onOpen }: SourceC
       type="button"
       disabled={loading}
       onClick={handleClick}
-      className="flex h-[60px] w-full max-w-[512px] items-center justify-between rounded-[18px] border border-[var(--border-default)] bg-white px-3 py-2.5 text-left disabled:opacity-60"
+      className="flex h-16 w-full max-w-[560px] animate-fade-up items-center justify-between rounded-[18px] border border-[var(--border-default)] bg-white px-4 py-2.5 text-left transition-[transform,box-shadow,border-color] duration-150 hover:-translate-y-px hover:border-[#d5dce3] hover:shadow-md active:scale-[0.99] disabled:opacity-60"
     >
       <div className="flex min-w-0 flex-1 items-center gap-2.5">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#fff6f7]">
@@ -46,7 +46,7 @@ export function SourceCitation({ fragmentId, title, page, api, onOpen }: SourceC
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs font-medium text-[var(--content-primary)]">{title}</p>
-          {page !== null && <p className="truncate text-[11px] text-[var(--content-tertiary)]">{`стр. ${page}`}</p>}
+          {page !== null && <p className="truncate text-xs text-[var(--content-tertiary)]">{`стр. ${page}`}</p>}
         </div>
       </div>
       <ExternalLinkIcon className="size-5 shrink-0 text-[var(--content-primary)]" />

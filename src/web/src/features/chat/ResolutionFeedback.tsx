@@ -53,10 +53,10 @@ export function ResolutionFeedback({ snapshot, onComplete, onSubmitFeedback }: R
   }
 
   return (
-    <div className="flex w-full max-w-[512px] flex-col gap-3.5 rounded-[18px] border border-[var(--border-default)] bg-white p-4">
+    <div className="flex w-full max-w-[560px] animate-pop-in flex-col gap-4 rounded-[18px] border border-[var(--border-default)] bg-white p-5">
       {showSolvedControl && (
         <div className="flex flex-col gap-2">
-          <p className="text-xs font-medium text-[var(--content-primary)]">Вопрос решён?</p>
+          <p className="text-sm font-medium text-[var(--content-primary)]">Вопрос решён?</p>
           <div className="flex gap-2">
             <PillChoice selected={solved === true} onClick={() => setSolved(true)}>
               Решён
@@ -69,7 +69,7 @@ export function ResolutionFeedback({ snapshot, onComplete, onSubmitFeedback }: R
       )}
 
       <div className="flex flex-col gap-2">
-        <p className="text-xs font-medium text-[var(--content-primary)]">Оцените качество ответа</p>
+        <p className="text-sm font-medium text-[var(--content-primary)]">Оцените качество ответа</p>
         <div className="flex gap-2">
           <PillChoice selected={infoRating === "POSITIVE"} onClick={() => setInfoRating("POSITIVE")}>
             Полезно
@@ -82,7 +82,7 @@ export function ResolutionFeedback({ snapshot, onComplete, onSubmitFeedback }: R
 
       {showSpecialistControl && (
         <div className="flex flex-col gap-2">
-          <p className="text-xs font-medium text-[var(--content-primary)]">
+          <p className="text-sm font-medium text-[var(--content-primary)]">
             Оцените работу специалиста{snapshot.handoff?.integration_mode === "SIMULATED" ? " (демо)" : ""}
           </p>
           <div className="flex gap-2">
@@ -97,7 +97,7 @@ export function ResolutionFeedback({ snapshot, onComplete, onSubmitFeedback }: R
       )}
 
       <div className="flex flex-col gap-2">
-        <p className="text-xs font-medium text-[var(--content-primary)]">Комментарий (необязательно)</p>
+        <p className="text-sm font-medium text-[var(--content-primary)]">Комментарий (необязательно)</p>
         <div className="flex items-center gap-3">
           <TextField
             value={comment}

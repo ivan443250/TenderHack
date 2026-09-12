@@ -7,21 +7,21 @@ import robotTRex from "../../assets/robot-trex.svg";
 export function FeedbackThanks() {
   const navigate = useNavigate();
   return (
-    <div className="flex h-[220px] w-full max-w-[512px] items-center justify-between overflow-hidden rounded-[18px] border border-[var(--border-default)] bg-white py-5 pl-[22px] pr-[18px]">
+    <div className="flex min-h-[220px] w-full max-w-[560px] animate-pop-in items-center justify-between overflow-hidden rounded-[18px] border border-[var(--border-default)] bg-white py-5 pl-[22px] pr-[18px]">
       <div className="flex w-[300px] flex-col items-start justify-center gap-3">
         <p className="text-lg font-semibold text-[var(--action-primary)]">Спасибо за отзыв</p>
-        <p className="w-[286px] text-xs leading-[18px] text-[var(--content-secondary)]">
+        <p className="w-[286px] text-xs leading-snug text-[var(--content-secondary)]">
           Он поможет нам точнее оценивать качество ответов и улучшать поддержку Портала.
         </p>
         <button
           type="button"
           onClick={() => navigate("/")}
-          className="inline-flex h-9 items-center rounded-full border border-[var(--border-default)] bg-[var(--surface-subtle)] px-3.5 text-xs font-medium text-[var(--content-primary)] transition-colors hover:bg-white"
+          className="inline-flex h-11 items-center rounded-full border border-[var(--border-default)] bg-[var(--surface-subtle)] px-5 text-xs font-medium text-[var(--content-primary)] transition-[background-color,transform,border-color] duration-150 hover:-translate-y-px hover:border-[#d5dce3] hover:bg-white active:scale-[0.98]"
         >
           Задать новый вопрос
         </button>
       </div>
-      <span className="relative block size-[148px] shrink-0 overflow-hidden" aria-hidden="true">
+      <span className="relative block size-[148px] shrink-0 animate-bob overflow-hidden" aria-hidden="true">
         <img src={robotTRex} alt="" className="absolute left-[-19px] top-[-16px] size-[182px] max-w-none" />
       </span>
     </div>

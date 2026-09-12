@@ -15,10 +15,10 @@ export function ContextPanel({ usedSources, onClose }: ContextPanelProps) {
   const [tab, setTab] = useState<"sources" | "materials">("sources");
 
   return (
-    <aside className="flex h-full w-[360px] shrink-0 flex-col border-l border-[var(--border-default)] bg-white">
-      <div className="flex h-14 items-center justify-between pl-5 pr-4">
+    <aside className="flex h-full w-[380px] shrink-0 animate-slide-in-right flex-col border-l border-[var(--border-default)] bg-white">
+      <div className="flex h-16 items-center justify-between pl-5 pr-4">
         <p className="text-sm font-semibold text-[var(--content-primary)]">Источники и материалы</p>
-        <button type="button" onClick={onClose} aria-label="Закрыть панель" className="flex size-8 items-center justify-center rounded-2xl hover:bg-[var(--surface-subtle)]">
+        <button type="button" onClick={onClose} aria-label="Закрыть панель" className="flex size-9 items-center justify-center rounded-2xl transition-[background-color,transform] duration-150 hover:bg-[var(--surface-subtle)] active:scale-95">
           <ChevronRightIcon className="size-4" />
         </button>
       </div>
@@ -28,14 +28,14 @@ export function ContextPanel({ usedSources, onClose }: ContextPanelProps) {
           <button
             type="button"
             onClick={() => setTab("sources")}
-            className={`flex-1 rounded-[9px] text-xs font-medium ${tab === "sources" ? "bg-white text-[var(--content-primary)] shadow-sm" : "text-[#5e6975]"}`}
+            className={`flex-1 rounded-[9px] text-xs font-medium transition-[background-color,color,box-shadow] duration-200 ${tab === "sources" ? "bg-white text-[var(--content-primary)] shadow-sm" : "text-[#5e6975]"}`}
           >
             Источники · {usedSources.length}
           </button>
           <button
             type="button"
             onClick={() => setTab("materials")}
-            className={`flex-1 rounded-[9px] text-xs font-medium ${tab === "materials" ? "bg-white text-[var(--content-primary)] shadow-sm" : "text-[#5e6975]"}`}
+            className={`flex-1 rounded-[9px] text-xs font-medium transition-[background-color,color,box-shadow] duration-200 ${tab === "materials" ? "bg-white text-[var(--content-primary)] shadow-sm" : "text-[#5e6975]"}`}
           >
             Материалы
           </button>
@@ -43,14 +43,14 @@ export function ContextPanel({ usedSources, onClose }: ContextPanelProps) {
 
         {tab === "sources" && (
           <>
-            <p className="text-[10px] font-semibold tracking-[0.6px] text-[#7d8796]">ИСПОЛЬЗОВАНО В ОТВЕТЕ</p>
+            <p className="text-xs font-semibold tracking-[0.6px] text-[#7d8796]">ИСПОЛЬЗОВАНО В ОТВЕТЕ</p>
             {usedSources.length === 0 && <p className="text-xs text-[var(--content-tertiary)]">Пока нет источников для этого ответа.</p>}
             {usedSources.map((source) => (
               <div key={source.document_id} className="flex h-16 items-center gap-2.5 rounded-xl border border-[#f5c7cc] bg-[#fff6f7] px-3 py-2.5">
                 <FileTextIcon className="size-[18px] shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[11px] font-semibold text-[var(--content-primary)]">{source.title}</p>
-                  <p className="text-[10px] text-[#7d8796]">{source.page ? `стр. ${source.page}` : source.version}</p>
+                  <p className="truncate text-xs font-semibold text-[var(--content-primary)]">{source.title}</p>
+                  <p className="text-xs text-[#7d8796]">{source.page ? `стр. ${source.page}` : source.version}</p>
                 </div>
                 <a href={`#source-${source.document_id}`} onClick={(event) => event.preventDefault()}>
                   <ExternalLinkIcon className="size-4" />
