@@ -1,0 +1,58 @@
+{
+  "stage": "K5/K6",
+  "status": "PASS_WITH_LIMITATIONS",
+  "snapshot_id": "snap_0e979dfef376faff41f7c76416fda457",
+  "prompt_versions": {
+    "draft": "draft_v1",
+    "verification_rules": "verify_v1"
+  },
+  "generator_adapter": {
+    "name": "VllmGeneratorClient",
+    "runtime": "local vLLM OpenAI-compatible HTTP boundary",
+    "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+    "revision": "cdbee75f17c01a7cc42f958dc650907174af0554"
+  },
+  "real_generation_smoke": {
+    "status": "BLOCKED_ENVIRONMENT",
+    "reason": "The current Windows development host has no reachable local vLLM runtime; target runtime remains Linux. No weights were downloaded."
+  },
+  "tests": {
+    "fake_generator_cases": 12,
+    "real_postgres_integration_cases": 1,
+    "verification_cases": 9,
+    "full_pytest": "90 passed, 1 skipped (K56/K4/K2 database URLs configured; K1C durable gate remains skipped)",
+    "openapi_semantic_parity": "passed",
+    "uv_lock_check": "passed",
+    "git_diff_check": "passed"
+  },
+  "verification_cases": {
+    "clear_procedure": "passed",
+    "condition_dependent_gate": "passed",
+    "numeric_threshold": "passed",
+    "exact_status": "passed",
+    "exact_code": "passed",
+    "table_or_action_evidence": "passed",
+    "unsupported_claim": "passed",
+    "invented_number_rejection": true,
+    "invented_code_rejection": true,
+    "invented_button_rejection": true,
+    "unknown_url_rejection": true,
+    "wrong_snapshot_rejection": true,
+    "historical_snapshot_rejection": true,
+    "condition_applicability_preserved": true
+  },
+  "failure_policy": {
+    "generation_attempts": 1,
+    "verification_passes": 1,
+    "rewrite_attempts": 0,
+    "unbounded_retry": false,
+    "invalid_structured_output": "MODEL_ERROR",
+    "unavailable_generator": "MODEL_UNAVAILABLE"
+  },
+  "limitations": [
+    "No real vLLM generation was executed in the Windows/6 GB development environment.",
+    "A controlled rewrite is intentionally not enabled yet; an invalid grounded draft fails closed with MODEL_ERROR.",
+    "K2 retrieval remains PASS_WITH_LIMITATIONS (Recall@10 0.75 versus 0.90 target); drafting cannot compensate for missing candidates.",
+    "Public DraftResponse and VerifyResponse remain unchanged; internal applies_if and human-check metadata are not exposed over the frozen API."
+  ]
+}

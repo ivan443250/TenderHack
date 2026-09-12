@@ -32,6 +32,10 @@ from tenderhack_knowledge.contracts.v0 import (
     VerifyResult,
 )
 from tenderhack_knowledge.answerability import assess_answerability
+from tenderhack_knowledge.generation import create_grounded_draft
+from tenderhack_knowledge.generation.service import GeneratorModelError, GeneratorUnavailableError
+from tenderhack_knowledge.inference.config import InferenceSettings
+from tenderhack_knowledge.inference.generator import VllmGeneratorClient
 from tenderhack_knowledge.ingestion.ids import normalize_source_name
 from tenderhack_knowledge.ingestion.repository import CorpusBoundaryError, UnknownFragmentError, UnknownSnapshotError
 from tenderhack_knowledge.persistence.db import create_engine
@@ -48,6 +52,20 @@ def get_knowledge_repository() -> PostgresKnowledgeRepository | None:
 
     engine = create_engine()
     return PostgresKnowledgeRepository(engine) if engine is not None else None
+
+
+def get_generator() -> VllmGeneratorClient:
+    """Create the lazy local generator client without loading model weights."""
+
+    settings = InferenceSettings.from_env()
+    return VllmGeneratorClient(
+        base_url=settings.vllm_base_url,
+        model_id=settings.generator_model_id,
+        revision=settings.generator_revision,
+        timeout_seconds=settings.generator_timeout_seconds,
+        temperature=settings.generator_temperature,
+        max_tokens=settings.generator_max_tokens,
+    )
 
 
 def _internal_error(message: str) -> HTTPException:
@@ -228,14 +246,54 @@ async def answerability(
     response_model=DraftResponse,
     responses=RETRIEVAL_ERRORS,
 )
-def draft(
+async def draft(
     payload: DraftRequest,
     x_trace_id: TraceIdHeader,
     x_case_id: CaseIdHeader,
     x_turn_id: TurnIdHeader,
 ) -> DraftResponse:
-    del payload, x_trace_id, x_case_id, x_turn_id
-    return DraftResponse(draft_markdown="", claims=[], model_version="stub-v0", token_usage=TokenUsage(input=0, output=0))
+    del x_trace_id, x_case_id, x_turn_id
+    repository = get_knowledge_repository()
+    if repository is None:
+        # No evidence repository means the answerability gate cannot pass.
+        # Return an empty, explicitly gated response rather than fabricating a
+        # draft or pretending that a model was available.
+        return DraftResponse(
+            draft_markdown="",
+            claims=[],
+            model_version="draft_v1:gated:INSUFFICIENT",
+            token_usage=TokenUsage(input=0, output=0),
+        )
+    try:
+        result = await create_grounded_draft(payload, repository, generator_factory=get_generator)
+    except UnknownSnapshotError as exc:
+        from tenderhack_knowledge.contracts.v0 import ErrorCode
+
+        raise HTTPException(
+            status_code=404,
+            detail={"code": ErrorCode.UNKNOWN_SNAPSHOT.value, "message": f"Unknown snapshot: {payload.snapshot_id}"},
+        ) from exc
+    except CorpusBoundaryError as exc:
+        from tenderhack_knowledge.contracts.v0 import ErrorCode
+
+        raise HTTPException(status_code=422, detail={"code": ErrorCode.VALIDATION_ERROR.value, "message": str(exc)}) from exc
+    except GeneratorUnavailableError as exc:
+        from tenderhack_knowledge.contracts.v0 import ErrorCode
+
+        raise HTTPException(
+            status_code=503,
+            detail={"code": ErrorCode.MODEL_UNAVAILABLE.value, "message": "local generator is unavailable"},
+        ) from exc
+    except GeneratorModelError as exc:
+        from tenderhack_knowledge.contracts.v0 import ErrorCode
+
+        raise HTTPException(
+            status_code=500,
+            detail={"code": ErrorCode.MODEL_ERROR.value, "message": str(exc)},
+        ) from exc
+    except Exception as exc:  # pragma: no cover - depends on external DB/runtime
+        raise _internal_error("unable to generate grounded draft") from exc
+    return result.response
 
 
 @router.post(
@@ -243,16 +301,39 @@ def draft(
     response_model=VerifyResponse,
     responses=RETRIEVAL_ERRORS,
 )
-def verify(
+async def verify(
     payload: VerifyRequest,
     x_trace_id: TraceIdHeader,
     x_case_id: CaseIdHeader,
     x_turn_id: TurnIdHeader,
 ) -> VerifyResponse:
     del x_trace_id, x_case_id, x_turn_id
-    return VerifyResponse(
-        results=[VerifyResult(claim_id=claim.claim_id, supported=False, evidence_fragment_ids=[]) for claim in payload.claims]
-    )
+    repository = get_knowledge_repository()
+    if repository is None:
+        # Without a source repository no claim can be supported. Returning
+        # explicit negatives preserves the frozen response shape and avoids a
+        # misleading model/runtime error for an empty local development setup.
+        return VerifyResponse(
+            results=[VerifyResult(claim_id=claim.claim_id, supported=False, evidence_fragment_ids=[]) for claim in payload.claims]
+        )
+    from tenderhack_knowledge.verification import verify_claims
+
+    try:
+        checks = await verify_claims(payload.snapshot_id, payload.claims, repository)
+    except UnknownSnapshotError as exc:
+        from tenderhack_knowledge.contracts.v0 import ErrorCode
+
+        raise HTTPException(
+            status_code=404,
+            detail={"code": ErrorCode.UNKNOWN_SNAPSHOT.value, "message": f"Unknown snapshot: {payload.snapshot_id}"},
+        ) from exc
+    except CorpusBoundaryError as exc:
+        from tenderhack_knowledge.contracts.v0 import ErrorCode
+
+        raise HTTPException(status_code=422, detail={"code": ErrorCode.VALIDATION_ERROR.value, "message": str(exc)}) from exc
+    except Exception as exc:  # pragma: no cover - depends on external DB
+        raise _internal_error("unable to verify grounded claims") from exc
+    return VerifyResponse(results=[check.result for check in checks])
 
 
 @router.get(
