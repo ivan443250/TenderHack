@@ -6,6 +6,13 @@ from tenderhack_knowledge.persistence.db import create_engine
 from tenderhack_knowledge.settings.config import Settings, get_settings
 
 
+HEADERS = {
+    "X-Trace-Id": "00000000-0000-4000-8000-000000000000",
+    "X-Case-Id": "case",
+    "X-Turn-Id": "turn",
+}
+
+
 def test_live_health() -> None:
     response = TestClient(app).get("/health/live")
     assert response.status_code == 200
@@ -15,7 +22,7 @@ def test_live_health() -> None:
 def test_stub_never_emits_business_decision() -> None:
     response = TestClient(app).post(
         "/v0/answerability",
-        headers={"X-Trace-Id": "trace", "X-Case-Id": "case", "X-Turn-Id": "turn"},
+        headers=HEADERS,
         json={"query": "x", "snapshot_id": "s", "candidate_fragment_ids": []},
     )
     assert response.status_code == 200
@@ -25,11 +32,11 @@ def test_stub_never_emits_business_decision() -> None:
 def test_orchestration_stage_requires_all_frozen_headers() -> None:
     response = TestClient(app).post(
         "/v0/understand",
-        headers={"X-Trace-Id": "trace"},
+        headers={"X-Trace-Id": HEADERS["X-Trace-Id"]},
         json={"text": "x"},
     )
     assert response.status_code == 400
-    assert response.json()["detail"]["code"] == "MISSING_TRACE_HEADER"
+    assert response.json()["code"] == "MISSING_TRACE_HEADER"
 
 
 def test_settings_validation_and_unconfigured_db_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
