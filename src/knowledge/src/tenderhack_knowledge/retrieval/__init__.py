@@ -1,1 +1,4 @@
-"""Retrieval interfaces; no retrieval engine is loaded in the scaffold."""
+"""Retrieval interfaces and the deterministic lexical baseline."""
+from .service import LexicalRetriever, RetrievalError, RetrievalRecord, RetrievalResult
+
+__all__ = ["LexicalRetriever", "RetrievalError", "RetrievalRecord", "RetrievalResult"]

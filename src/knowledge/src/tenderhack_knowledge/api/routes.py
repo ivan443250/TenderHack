@@ -32,9 +32,11 @@ from tenderhack_knowledge.contracts.v0 import (
     VerifyResult,
 )
 from tenderhack_knowledge.ingestion.ids import normalize_source_name
-from tenderhack_knowledge.ingestion.repository import UnknownFragmentError, UnknownSnapshotError
+from tenderhack_knowledge.ingestion.repository import CorpusBoundaryError, UnknownFragmentError, UnknownSnapshotError
 from tenderhack_knowledge.persistence.db import create_engine
 from tenderhack_knowledge.persistence.repository import PostgresKnowledgeRepository
+from tenderhack_knowledge.retrieval import LexicalRetriever
+from tenderhack_knowledge.understanding import understand_query
 
 router = APIRouter()
 
@@ -109,12 +111,7 @@ def understand(
     x_turn_id: TurnIdHeader,
 ) -> UnderstandResponse:
     del x_trace_id, x_case_id, x_turn_id
-    return UnderstandResponse(
-        normalized_text=payload.text,
-        entities=[],
-        exact_codes=[],
-        language_flags={"detected_language": "unknown", "typo_corrected": False},
-    )
+    return understand_query(payload.text).to_contract()
 
 
 @router.post(
@@ -137,15 +134,46 @@ def moderation_context(
     response_model=RetrieveResponse,
     responses=RETRIEVAL_ERRORS,
 )
-def retrieve(
+async def retrieve(
     payload: RetrieveRequest,
     x_trace_id: TraceIdHeader,
     x_case_id: CaseIdHeader,
     x_turn_id: TurnIdHeader,
 ) -> RetrieveResponse:
     del x_trace_id, x_case_id, x_turn_id
-    snapshot_id = payload.snapshot_id or "snapshot-stub-v0"
-    return RetrieveResponse(snapshot_id=snapshot_id, retrieval_config_version="stub-v0", candidates=[])
+    repository = get_knowledge_repository()
+    if repository is None:
+        snapshot_id = payload.snapshot_id or "snapshot-stub-v0"
+        return RetrieveResponse(snapshot_id=snapshot_id, retrieval_config_version="stub-v0", candidates=[])
+
+    understanding = understand_query(payload.query)
+    exact_codes = list(dict.fromkeys([*payload.exact_codes, *understanding.exact_codes]))
+    critical_exact = {"exact_code", "numeric_identifier", "document_abbreviation"}
+    allow_trigram = not any(entity.type in critical_exact for entity in understanding.entities)
+    request = payload.model_copy(update={"exact_codes": exact_codes})
+    try:
+        result = await LexicalRetriever(repository).retrieve(request, allow_trigram=allow_trigram)
+    except UnknownSnapshotError as exc:
+        from tenderhack_knowledge.contracts.v0 import ErrorCode
+
+        raise HTTPException(
+            status_code=404,
+            detail={"code": ErrorCode.UNKNOWN_SNAPSHOT.value, "message": f"Unknown snapshot: {payload.snapshot_id or exc}"},
+        ) from exc
+    except CorpusBoundaryError as exc:
+        from tenderhack_knowledge.contracts.v0 import ErrorCode
+
+        raise HTTPException(
+            status_code=422,
+            detail={"code": ErrorCode.VALIDATION_ERROR.value, "message": str(exc)},
+        ) from exc
+    except Exception as exc:  # pragma: no cover - depends on external DB
+        raise _internal_error("unable to retrieve lexical candidates") from exc
+    return RetrieveResponse(
+        snapshot_id=result.snapshot_id,
+        retrieval_config_version=LexicalRetriever.config_version,
+        candidates=list(result.candidates),
+    )
 
 
 @router.post(

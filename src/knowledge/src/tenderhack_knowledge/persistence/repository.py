@@ -12,7 +12,7 @@ from datetime import datetime
 
 import sqlalchemy as sa
 from sqlalchemy import Select, select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.postgresql import REGCONFIG, insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from tenderhack_knowledge.ingestion.ids import make_snapshot_id
@@ -304,6 +304,76 @@ class PostgresKnowledgeRepository:
             )
             return int(document_count_row.count), int(fragment_count_row.count)
 
+    async def lexical_search(
+        self,
+        snapshot_id: str,
+        query: str,
+        exact_codes: Iterable[str] = (),
+        *,
+        limit: int = 30,
+        allow_trigram: bool = True,
+        use_fts: bool = True,
+    ) -> tuple[dict[str, object], ...]:
+        """Search only snapshot members using exact, FTS and weak trigram signals."""
+
+        normalized_query = query.strip()
+        safe_limit = max(1, min(int(limit), 100))
+        codes = tuple(dict.fromkeys(code for code in exact_codes if code))
+        exact_predicates = tuple(
+            kb_fragments.c.text.ilike(f"%{_escape_like(code)}%", escape="\\")
+            for code in codes
+        )
+        exact_score = sa.literal(0.0)
+        if exact_predicates:
+            exact_score = sum(
+                (sa.case((predicate, 1.0), else_=0.0) for predicate in exact_predicates),
+                sa.literal(0.0),
+            )
+
+        russian_config = sa.cast(sa.literal("russian"), REGCONFIG)
+        simple_config = sa.cast(sa.literal("simple"), REGCONFIG)
+        russian_vector = sa.func.to_tsvector(russian_config, kb_fragments.c.text)
+        simple_vector = sa.func.to_tsvector(simple_config, kb_fragments.c.text)
+        russian_query = sa.func.websearch_to_tsquery(russian_config, normalized_query)
+        simple_query = sa.func.websearch_to_tsquery(simple_config, normalized_query)
+        russian_match = russian_vector.op("@@")(russian_query)
+        simple_match = simple_vector.op("@@")(simple_query)
+        fts_score = sa.func.greatest(
+            sa.func.ts_rank_cd(russian_vector, russian_query),
+            sa.func.ts_rank_cd(simple_vector, simple_query),
+        )
+        trigram_score = sa.func.word_similarity(normalized_query, kb_fragments.c.text)
+        channels = [*exact_predicates]
+        if use_fts:
+            channels.extend((russian_match, simple_match))
+        if allow_trigram and normalized_query:
+            channels.append(trigram_score >= 0.28)
+        if not channels:
+            return ()
+
+        membership = kb_snapshot_fragments
+        statement = (
+            select(
+                kb_fragments.c.fragment_id,
+                kb_document_versions.c.document_id,
+                kb_fragments.c.page_start,
+                kb_fragments.c.source_anchor,
+                kb_fragments.c.text,
+                exact_score.label("exact_score"),
+                fts_score.label("fts_score"),
+                trigram_score.label("trigram_score"),
+            )
+            .join(membership, membership.c.fragment_id == kb_fragments.c.fragment_id)
+            .join(kb_document_versions, kb_document_versions.c.document_version_id == kb_fragments.c.document_version_id)
+            .where(membership.c.snapshot_id == snapshot_id)
+            .where(sa.or_(*channels))
+            .order_by(exact_score.desc(), fts_score.desc(), trigram_score.desc(), kb_fragments.c.fragment_id)
+            .limit(safe_limit)
+        )
+        async with self.engine.connect() as connection:
+            result = await connection.execute(statement)
+            return tuple(result.mappings())
+
     async def resolve_source(self, fragment_id: str, snapshot_id: str | None = None) -> SourceResolution:
         async with self.engine.connect() as connection:
             effective_snapshot_id = snapshot_id
@@ -445,6 +515,12 @@ def _fragment_values(fragment: KnowledgeFragment) -> dict[str, object]:
     payload = fragment.model_dump(mode="json")
     payload.pop("snapshot_id", None)
     return payload
+
+
+def _escape_like(value: str) -> str:
+    """Escape user-controlled LIKE wildcards before building an exact predicate."""
+
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def _fragment_from_row(row: object) -> KnowledgeFragment:

@@ -1,0 +1,98 @@
+{
+  "benchmark": "k2a-lexical-retrieval",
+  "status": "PASS_WITH_LIMITATIONS",
+  "start_head": "cfc3e46",
+  "migration": {
+    "revision": "0004_lexical_retrieval_indexes",
+    "status": "head"
+  },
+  "corpus": {
+    "snapshot_id": "snap_0e979dfef376faff41f7c76416fda457",
+    "corpus": "NORMATIVE",
+    "documents": 6,
+    "pages": 830,
+    "fragments": 3899,
+    "source_files": 6
+  },
+  "gold_set": {
+    "path": "src/knowledge/evals/k2a-gold.json",
+    "queries": 44,
+    "documents": [
+      "act",
+      "yml",
+      "supplier",
+      "offer",
+      "mcd",
+      "customer"
+    ],
+    "label_source": "manual source/page review; labels are not generated from retrieval output"
+  },
+  "levels": {
+    "L0_exact": {
+      "recall_at_5": 0.25,
+      "recall_at_10": 0.25,
+      "mrr": 0.178,
+      "exact_code_hit_at_10": 0.6875,
+      "typo_subset_recall_at_10": 0
+    },
+    "L1_fts": {
+      "recall_at_5": 0.5455,
+      "recall_at_10": 0.5909,
+      "mrr": 0.3295,
+      "exact_code_hit_at_10": 0.625,
+      "typo_subset_recall_at_10": 0
+    },
+    "L2_hybrid_trigram": {
+      "recall_at_5": 0.6136,
+      "recall_at_10": 0.75,
+      "mrr": 0.3826,
+      "exact_code_hit_at_10": 0.6875,
+      "typo_subset_recall_at_10": 1
+    }
+  },
+  "latency_ms": {
+    "route": "L2_hybrid_trigram",
+    "sample_count": 44,
+    "p50": 307.153,
+    "p95": 364.275,
+    "mean": 314.608
+  },
+  "per_document_failures_l2_at_10": {
+    "act": [
+      "act-03",
+      "act-07"
+    ],
+    "yml": [
+      "yml-06"
+    ],
+    "supplier": [
+      "supplier-01",
+      "supplier-02",
+      "supplier-04",
+      "supplier-05",
+      "supplier-08",
+      "supplier-09"
+    ],
+    "offer": [
+      "offer-01"
+    ],
+    "mcd": [
+      "mcd-05"
+    ]
+  },
+  "verification": {
+    "uv_lock_check": "PASS",
+    "pytest_offline": "PASS (44 passed, 1 skipped without K1C DB)",
+    "pytest_real_postgres": "PASS (2 tests against running K2 container)",
+    "alembic_heads": "PASS",
+    "alembic_current": "0004_lexical_retrieval_indexes (head)",
+    "openapi_semantic_parity": "PASS",
+    "git_diff_check": "PASS"
+  },
+  "notes": [
+    "Metrics are measured on the running disposable PostgreSQL corpus and describe retrieval, not answer correctness.",
+    "L0 uses exact codes only; L1 uses PostgreSQL FTS; L2 adds one weak pg_trgm pass for ordinary-word typos.",
+    "Recall@10 is below the target 0.90 on this baseline; no dense retrieval or reranking was started in K2A.",
+    "Historical corpus is never implicitly searched when corpus=HISTORICAL and snapshot_id is null."
+  ]
+}
