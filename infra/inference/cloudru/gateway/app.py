@@ -371,6 +371,13 @@ class InferenceGatewayHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802 - stdlib handler API
         started = time.perf_counter()
         request_id = self._request_id()
+        if self.path == "/ping":
+            # RunPod Load Balancer uses a cheap routing probe.  Keep this
+            # independent from model readiness so every probe does not call
+            # Giga/Qwen and so an optional gateway token is not required.
+            self._send_json(HTTPStatus.OK, {"status": "ok"})
+            self._log_request(request_id, "/ping", 200, "gateway", started)
+            return
         if self.path == "/health/live":
             self._send_json(HTTPStatus.OK, {"live": True})
             self._log_request(request_id, "/health/live", 200, "health", started)

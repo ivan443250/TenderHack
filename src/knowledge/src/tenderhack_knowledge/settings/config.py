@@ -11,6 +11,9 @@ class Settings(BaseModel):
     embedding_base_url: str = "http://embedding-inference:8080"
     reranker_base_url: str = ""
     generator_base_url: str = "http://generator-inference:8080"
+    # Optional provider-neutral credential for a remote/local inference
+    # gateway.  Empty means the existing unauthenticated local behavior.
+    inference_bearer_token: str | None = Field(default=None, repr=False)
     environment: str = "Development"
 
     @classmethod
@@ -22,6 +25,7 @@ class Settings(BaseModel):
             embedding_base_url=os.getenv("KNOWLEDGE_EMBEDDING_BASE_URL", "http://embedding-inference:8080"),
             reranker_base_url=os.getenv("KNOWLEDGE_RERANKER_BASE_URL", ""),
             generator_base_url=os.getenv("KNOWLEDGE_GENERATOR_BASE_URL", "http://generator-inference:8080"),
+            inference_bearer_token=os.getenv("KNOWLEDGE_INFERENCE_BEARER_TOKEN") or None,
             environment=os.getenv("ASPNETCORE_ENVIRONMENT", os.getenv("ENVIRONMENT", "Development")),
         )
 

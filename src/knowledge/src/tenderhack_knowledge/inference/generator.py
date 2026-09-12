@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import os
 from typing import Any
 
 import httpx
@@ -28,6 +29,7 @@ class LocalOpenAIChatGenerator:
         top_p: float = 0.95,
         top_k: int = 20,
         max_tokens: int = 512,
+        bearer_token: str | None = None,
         system_prompt: str = "Ты создаёшь только проверяемый структурированный черновик ответа по переданным источникам.",
         client: Any | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
@@ -45,6 +47,7 @@ class LocalOpenAIChatGenerator:
         self.top_k = top_k
         self.max_tokens = max_tokens
         self.system_prompt = system_prompt
+        self._bearer_token = bearer_token if bearer_token is not None else (os.getenv("KNOWLEDGE_INFERENCE_BEARER_TOKEN") or None)
         self._client = client
         self._transport = transport
 
@@ -93,17 +96,28 @@ class LocalOpenAIChatGenerator:
         return strip_reasoning(_extract_content(response))
 
     async def _post(self, payload: Mapping[str, object]) -> Mapping[str, object]:
+        headers = {"Authorization": f"Bearer {self._bearer_token}"} if self._bearer_token else None
         try:
             if self._client is not None:
-                response = await self._client.post(self.endpoint, json=dict(payload))
+                if headers is None:
+                    response = await self._client.post(self.endpoint, json=dict(payload))
+                else:
+                    response = await self._client.post(self.endpoint, json=dict(payload), headers=headers)
             else:
                 async with httpx.AsyncClient(timeout=self.timeout_seconds, transport=self._transport) as client:
-                    response = await client.post(self.endpoint, json=dict(payload))
+                    if headers is None:
+                        response = await client.post(self.endpoint, json=dict(payload))
+                    else:
+                        response = await client.post(self.endpoint, json=dict(payload), headers=headers)
         except Exception as exc:
+            if self._bearer_token:
+                detail = _redact(str(exc), self._bearer_token)
+                suffix = f": {detail}" if detail else ""
+                raise GeneratorClientError(f"local generator request failed at {self.endpoint}{suffix}") from None
             raise GeneratorClientError(f"local generator request failed at {self.endpoint}") from exc
         status_code = getattr(response, "status_code", 200)
         if status_code >= 400:
-            detail = getattr(response, "text", "")
+            detail = _redact(str(getattr(response, "text", "")), self._bearer_token)
             raise GeneratorClientError(f"local generator returned HTTP {status_code}: {detail[:500]}")
         try:
             body = response.json()
@@ -112,6 +126,14 @@ class LocalOpenAIChatGenerator:
         if not isinstance(body, Mapping):
             raise GeneratorClientError("local generator response must be a JSON object")
         return body
+
+
+def _redact(value: str, secret: str | None) -> str:
+    """Prevent an upstream/transport echo from leaking the bearer token."""
+
+    if not secret:
+        return value
+    return value.replace(secret, "[REDACTED]")
 
 
 def _extract_content(body: Mapping[str, object]) -> str:

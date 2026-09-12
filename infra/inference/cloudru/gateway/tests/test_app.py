@@ -77,6 +77,10 @@ class GatewayTests(unittest.TestCase):
         return result
 
     def test_liveness_and_readiness_with_fake_providers(self) -> None:
+        status, body = self.request("GET", "/ping")
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body), {"status": "ok"})
+
         status, body = self.request("GET", "/health/live")
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(body), {"live": True})
@@ -142,6 +146,12 @@ class GatewayTests(unittest.TestCase):
         thread = threading.Thread(target=authenticated.serve_forever, daemon=True)
         thread.start()
         port = authenticated.server_address[1]
+        connection = HTTPConnection("127.0.0.1", port, timeout=2)
+        connection.request("GET", "/ping")
+        response = connection.getresponse()
+        self.assertEqual(response.status, 200)
+        response.read()
+        connection.close()
         connection = HTTPConnection("127.0.0.1", port, timeout=2)
         connection.request("GET", "/v1/capabilities")
         response = connection.getresponse()

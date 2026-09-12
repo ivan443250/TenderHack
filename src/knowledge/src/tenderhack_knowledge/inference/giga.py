@@ -7,6 +7,7 @@ protocol.  It does not import llama.cpp or download model files.
 from __future__ import annotations
 
 import math
+import os
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -46,6 +47,7 @@ class GigaEmbeddingAdapter:
         model_id: str = model_id,
         revision: str | None = revision,
         timeout_seconds: float = 10.0,
+        bearer_token: str | None = None,
         client: Any | None = None,
     ) -> None:
         if timeout_seconds <= 0:
@@ -54,6 +56,9 @@ class GigaEmbeddingAdapter:
         self.model_id = model_id
         self.revision = revision
         self.timeout_seconds = timeout_seconds
+        # ``None`` means "read the optional provider-neutral setting".  An
+        # explicitly empty token still keeps requests unauthenticated.
+        self._bearer_token = bearer_token if bearer_token is not None else (os.getenv("KNOWLEDGE_INFERENCE_BEARER_TOKEN") or None)
         self._client = client
 
     @property
@@ -99,14 +104,26 @@ class GigaEmbeddingAdapter:
         if not inputs:
             return []
         payload = {"model": self.model_id, "input": list(inputs)}
+        headers = {"Authorization": f"Bearer {self._bearer_token}"} if self._bearer_token else None
         try:
             if self._client is not None:
-                response = await self._client.post(self.endpoint, json=payload)
+                if headers is None:
+                    response = await self._client.post(self.endpoint, json=payload)
+                else:
+                    response = await self._client.post(self.endpoint, json=payload, headers=headers)
             else:
                 async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-                    response = await client.post(self.endpoint, json=payload)
+                    if headers is None:
+                        response = await client.post(self.endpoint, json=payload)
+                    else:
+                        response = await client.post(self.endpoint, json=payload, headers=headers)
         except Exception as exc:
-            raise EmbeddingUnavailableError(f"local embedding request failed at {self.endpoint}") from exc
+            error = EmbeddingUnavailableError(f"local embedding request failed at {self.endpoint}")
+            # Keep the historical chained exception for local unauthenticated
+            # calls, but never retain a provider error that could echo a token.
+            if self._bearer_token:
+                raise error from None
+            raise error from exc
         status_code = getattr(response, "status_code", 200)
         if status_code >= 400:
             raise EmbeddingUnavailableError(f"local embedding returned HTTP {status_code}")

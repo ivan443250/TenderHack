@@ -14,6 +14,14 @@ from tenderhack_knowledge.inference.safety import strip_reasoning
 from tenderhack_knowledge.inference.errors import EmbeddingRevisionMismatchError
 from tenderhack_knowledge.inference.smoke import run_smoke
 from tenderhack_knowledge.persistence.repository import _validate_embedding_metadata
+from tenderhack_knowledge.settings.config import Settings
+
+
+@pytest.fixture(autouse=True)
+def _clear_optional_inference_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep legacy fake clients exercising the unauthenticated path."""
+
+    monkeypatch.delenv("KNOWLEDGE_INFERENCE_BEARER_TOKEN", raising=False)
 
 
 class _Response:
@@ -37,6 +45,20 @@ class _EmbeddingClient:
         return _Response({"data": [{"index": index, "embedding": value} for index, _ in enumerate(json["input"]) ]})
 
 
+class _AuthEmbeddingClient:
+    def __init__(self, body: object | None = None) -> None:
+        self.headers: list[dict[str, str] | None] = []
+        self.body = body
+
+    async def post(self, _url: str, *, json: dict[str, object], headers: dict[str, str] | None = None) -> _Response:
+        del json
+        self.headers.append(headers)
+        if self.body is not None:
+            return _Response(self.body)
+        value = [1 / (2048**0.5)] * 2048
+        return _Response({"data": [{"index": 0, "embedding": value}]})
+
+
 @pytest.mark.asyncio
 async def test_giga_query_instruction_once_and_document_plain() -> None:
     client = _EmbeddingClient()
@@ -48,6 +70,52 @@ async def test_giga_query_instruction_once_and_document_plain() -> None:
     assert len(query_vector) == len(document_vector) == 2048
     assert client.payloads[0]["input"][0].count("Instruct:") == 1
     assert "Instruct:" not in client.payloads[1]["input"][0]
+
+
+@pytest.mark.asyncio
+async def test_giga_optional_bearer_header_and_secret_redaction(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("KNOWLEDGE_INFERENCE_BEARER_TOKEN", raising=False)
+    unauthenticated_client = _AuthEmbeddingClient()
+    await GigaEmbeddingAdapter(client=unauthenticated_client).embed_documents(["document"])
+    assert unauthenticated_client.headers == [None]
+
+    token = "runpod-secret-token"
+    authenticated_client = _AuthEmbeddingClient()
+    adapter = GigaEmbeddingAdapter(client=authenticated_client, bearer_token=token)
+    await adapter.embed_documents(["document"])
+    assert authenticated_client.headers == [{"Authorization": f"Bearer {token}"}]
+    assert token not in repr(adapter.metadata)
+    assert token not in str(adapter.metadata)
+
+    monkeypatch.setenv("KNOWLEDGE_INFERENCE_BEARER_TOKEN", token)
+    env_client = _AuthEmbeddingClient()
+    await GigaEmbeddingAdapter(client=env_client).embed_documents(["document"])
+    assert env_client.headers == [{"Authorization": f"Bearer {token}"}]
+
+    class ErrorClient:
+        async def post(
+            self,
+            _url: str,
+            *,
+            json: dict[str, object],
+            headers: dict[str, str] | None = None,
+        ) -> _Response:
+            del json, headers
+            raise RuntimeError(f"upstream echoed {token}")
+
+    with pytest.raises(Exception) as error:
+        await GigaEmbeddingAdapter(client=ErrorClient(), bearer_token=token).embed_documents(["document"])
+    assert token not in str(error.value)
+    assert error.value.__cause__ is None
+
+
+def test_inference_bearer_setting_is_optional(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("KNOWLEDGE_INFERENCE_BEARER_TOKEN", raising=False)
+    assert Settings.from_env().inference_bearer_token is None
+    monkeypatch.setenv("KNOWLEDGE_INFERENCE_BEARER_TOKEN", "configured-token")
+    settings = Settings.from_env()
+    assert settings.inference_bearer_token == "configured-token"
+    assert "configured-token" not in repr(settings)
 
 
 @pytest.mark.asyncio
@@ -129,9 +197,17 @@ class _GeneratorClient:
     def __init__(self, body: object) -> None:
         self.body = body
         self.calls: list[tuple[str, dict[str, object]]] = []
+        self.headers: list[dict[str, str] | None] = []
 
-    async def post(self, url: str, *, json: dict[str, object]) -> _Response:
+    async def post(
+        self,
+        url: str,
+        *,
+        json: dict[str, object],
+        headers: dict[str, str] | None = None,
+    ) -> _Response:
         self.calls.append((url, json))
+        self.headers.append(headers)
         return _Response(self.body)
 
 
@@ -143,6 +219,42 @@ async def test_local_generator_uses_chat_completions_and_reasoning_boundary() ->
     assert fake.calls[0][0] == "http://generator/v1/chat/completions"
     assert fake.calls[0][1]["messages"][0]["role"] == "system"
     assert "<think>" not in await generator.draft("evidence")
+    assert fake.headers == [None, None]
+
+
+@pytest.mark.asyncio
+async def test_generator_optional_bearer_header_and_error_redaction(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("KNOWLEDGE_INFERENCE_BEARER_TOKEN", raising=False)
+    token = "runpod-generator-secret"
+    fake = _GeneratorClient({"choices": [{"message": {"content": "answer"}}]})
+    generator = LocalOpenAIChatGenerator(client=fake, base_url="http://generator", bearer_token=token)
+    assert await generator.draft("evidence") == "answer"
+    assert fake.headers == [{"Authorization": f"Bearer {token}"}]
+    assert token not in repr(generator.metadata)
+    assert token not in str(generator.metadata)
+
+    monkeypatch.setenv("KNOWLEDGE_INFERENCE_BEARER_TOKEN", token)
+    env_fake = _GeneratorClient({"choices": [{"message": {"content": "answer"}}]})
+    assert await LocalOpenAIChatGenerator(client=env_fake).draft("evidence") == "answer"
+    assert env_fake.headers == [{"Authorization": f"Bearer {token}"}]
+
+    class ErrorClient:
+        async def post(
+            self,
+            _url: str,
+            *,
+            json: dict[str, object],
+            headers: dict[str, str] | None = None,
+        ) -> _Response:
+            del json, headers
+            response = _Response({})
+            response.status_code = 502
+            response.text = f"upstream echoed {token}"
+            return response
+
+    with pytest.raises(Exception) as error:
+        await LocalOpenAIChatGenerator(client=ErrorClient(), bearer_token=token).draft("evidence")
+    assert token not in str(error.value)
 
 
 def test_reasoning_boundary_fails_closed_when_unterminated() -> None:
