@@ -32,7 +32,8 @@ public sealed record UnderstandResult(
     IReadOnlyList<string> ExactCodes,
     IReadOnlyList<string> LanguageFlags);
 
-public sealed record ModerationContextRequest(string Text, string RuleId, string RuleVersion, string MatchedTerm);
+/// <summary><see cref="Start"/>/<see cref="End"/> are the rule engine's own offsets into its normalized text (knowledge-v0 `matched_span`).</summary>
+public sealed record ModerationContextRequest(string Text, string RuleId, string RuleVersion, string MatchedTerm, int Start, int End);
 
 public enum ModerationAmbiguity
 {

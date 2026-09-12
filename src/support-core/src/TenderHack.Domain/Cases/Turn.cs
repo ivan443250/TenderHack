@@ -20,14 +20,6 @@ public sealed class Turn
         CreatedAt = createdAt;
     }
 
-    internal void MarkRunning()
-    {
-        if (Status == TurnStatus.Queued)
-        {
-            Status = TurnStatus.Running;
-        }
-    }
-
     /// <summary>A newer user revision supersedes this one; a superseded turn can no longer publish.</summary>
     internal void Supersede()
     {

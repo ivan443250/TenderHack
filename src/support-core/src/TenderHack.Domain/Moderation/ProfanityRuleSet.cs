@@ -32,28 +32,28 @@ public static partial class ProfanityRuleSet
         new("PROFANITY_A03", TupoyRegex()),
     ];
 
-    [GeneratedRegex(@"\bбля[а-я]*\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\bбля[а-яё]*\b", RegexOptions.IgnoreCase)]
     private static partial Regex BlyaRegex();
 
-    [GeneratedRegex(@"\bху[йеяю][а-я]*\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\bху[йеяю][а-яё]*\b", RegexOptions.IgnoreCase)]
     private static partial Regex HuyRegex();
 
-    [GeneratedRegex(@"\bпизд[а-я]*\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\bпизд[а-яё]*\b", RegexOptions.IgnoreCase)]
     private static partial Regex PizdRegex();
 
-    [GeneratedRegex(@"\bеб[а-я]{1,6}\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\bеб[а-яё]{1,6}\b", RegexOptions.IgnoreCase)]
     private static partial Regex EbatRegex();
 
-    [GeneratedRegex(@"\bсук[аи][а-я]*\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\bсук[аи][а-яё]*\b", RegexOptions.IgnoreCase)]
     private static partial Regex SukaRegex();
 
-    [GeneratedRegex(@"\bдур[а-я]*\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\bдур[а-яё]*\b", RegexOptions.IgnoreCase)]
     private static partial Regex DuraRegex();
 
-    [GeneratedRegex(@"\bидиот[а-я]*\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\bидиот[а-яё]*\b", RegexOptions.IgnoreCase)]
     private static partial Regex IdiotRegex();
 
-    [GeneratedRegex(@"\bтуп[а-я]*\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\bтуп[а-яё]*\b", RegexOptions.IgnoreCase)]
     private static partial Regex TupoyRegex();
 }
 

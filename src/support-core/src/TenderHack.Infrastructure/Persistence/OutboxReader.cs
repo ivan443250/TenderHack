@@ -3,7 +3,7 @@ using TenderHack.Application.Ports;
 
 namespace TenderHack.Infrastructure.Persistence;
 
-public sealed class OutboxReader(TenderHackDbContext db) : IOutboxReader
+public sealed class OutboxReader(TenderHackDbContext db, TimeProvider clock) : IOutboxReader
 {
     public async Task<IReadOnlyList<OutboxEntry>> ListPendingAsync(string messageType, int batchSize, CancellationToken ct)
     {
@@ -29,7 +29,7 @@ public sealed class OutboxReader(TenderHackDbContext db) : IOutboxReader
             return;
         }
 
-        row.DeliveredAt = DateTimeOffset.UtcNow;
+        row.DeliveredAt = clock.GetUtcNow();
     }
 
     public async Task MarkFailedAsync(long id, string error, CancellationToken ct)
@@ -44,7 +44,7 @@ public sealed class OutboxReader(TenderHackDbContext db) : IOutboxReader
         row.LastError = error;
         // A failed submit attempt still terminates this outbox row (architecture.md §15: retry is a
         // fresh user-triggered `/handoff/retry` command, not the worker re-driving the same row).
-        row.DeliveredAt = DateTimeOffset.UtcNow;
+        row.DeliveredAt = clock.GetUtcNow();
     }
 
     public async Task RecordAttemptFailureAsync(long id, string error, CancellationToken ct)

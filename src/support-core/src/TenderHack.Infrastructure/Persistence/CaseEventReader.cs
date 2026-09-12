@@ -9,6 +9,7 @@ public sealed class CaseEventReader(TenderHackDbContext db) : ICaseEventReader
     public async Task<IReadOnlyList<PersistedCaseEvent>> ListAsync(CaseId caseId, long after, CancellationToken ct)
     {
         var rows = await db.CaseEvents
+            .AsNoTracking()
             .Where(e => e.CaseId == caseId.Value && e.Id > after)
             .OrderBy(e => e.Id)
             .ToListAsync(ct);

@@ -34,9 +34,11 @@ public sealed class DemoHandoffAdapter(IOptions<SupportOptions> options, TimePro
             return Task.FromResult<HandoffStatusSnapshot?>(null);
         }
 
+        // One step per poll, in script order — never "whatever is latest by now", or a poll interval
+        // longer than the stage delay would skip the ASSIGNED step and the specialist with it.
         var elapsed = clock.GetUtcNow() - query.AcceptedAt;
-        var step = DemoHandoffScript.StepFor(elapsed, TimeSpan.FromSeconds(demo.StageDelaySeconds));
-        if (step is null || step.ExternalRevision <= (query.LastKnownExternalRevision ?? 0))
+        var step = DemoHandoffScript.NextStep(elapsed, TimeSpan.FromSeconds(demo.StageDelaySeconds), query.LastKnownExternalRevision ?? 0);
+        if (step is null)
         {
             return Task.FromResult<HandoffStatusSnapshot?>(null);
         }

@@ -38,6 +38,11 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(System.Text.Json.JsonNamingPolicy.SnakeCaseUpper));
 });
 
+// A malformed/mistyped JSON body must surface through ApiExceptionHandler as `MALFORMED_REQUEST`
+// (web-api-v0 §10: every error carries a machine `code`); without this, minimal APIs answer with an
+// empty 400 before the handler ever sees it.
+builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
+
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 
@@ -52,6 +57,11 @@ using (var startupScope = app.Services.CreateScope())
 }
 
 app.UseExceptionHandler();
+
+// Dev-only manual test console (wwwroot/) — same-origin static files so the owner_id cookie works
+// without any CORS setup. Not part of the product surface.
+app.UseDefaultFiles();
+app.UseStaticFiles();
 
 app.MapGet("/health/live", () => Results.Ok(new { status = "ok", service = "api" }));
 app.MapGet("/health/ready", async (TenderHackDbContext db, CancellationToken ct) =>

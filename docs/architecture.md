@@ -337,6 +337,11 @@ Expected behavior:
 
 Do not claim exactly-once delivery.
 
+Implementation status (2026-09-12), so that this section is not read as a description of running code:
+
+- **implemented:** idempotency keys (`idempotency_keys`), one handoff per case, `handoff_id + external_revision` dedupe, `turns(case_id, revision)` unique index + `ConcurrencyConflictException → 409 CONCURRENCY_CONFLICT`, the QUEUED turn row committed before the first stage (so `stale-turn cleanup` has something to recover after a crash), at-least-once outbox delivery from a single `api-worker`;
+- **documented target, not implemented:** outbox lease/heartbeat claiming (a second `api-worker` instance would double-deliver), `api → knowledge` retries for idempotent stages (today one attempt per stage, then `TECHNICAL_ERROR`), the `(owner_id, case_id, type, source_event_id)` notification uniqueness key (notifications are written once per state change, no dedupe column).
+
 ## 8. Persistence
 
 PostgreSQL 16 is both system of record and initial retrieval engine. One database, two migration systems, **strict table ownership**:

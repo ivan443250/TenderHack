@@ -42,9 +42,11 @@ public static class SupportWebhookEndpoints
             return Results.Problem("Support:Webhook:Secret is not configured.", statusCode: StatusCodes.Status500InternalServerError);
         }
 
-        using var bodyReader = new StreamReader(context.Request.Body);
-        var rawBody = await bodyReader.ReadToEndAsync(ct);
-        var rawBytes = Encoding.UTF8.GetBytes(rawBody);
+        // The HMAC is over the raw body bytes (support-adapter-v0 §6.2): never round-trip through a
+        // string — a BOM or any non-UTF-8 byte would re-encode differently and fail a valid signature.
+        using var buffer = new MemoryStream();
+        await context.Request.Body.CopyToAsync(buffer, ct);
+        var rawBytes = buffer.ToArray();
 
         if (!IsValidTimestamp(context.Request.Headers["X-Support-Timestamp"]))
         {

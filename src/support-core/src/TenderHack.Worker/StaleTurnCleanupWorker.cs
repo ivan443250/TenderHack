@@ -23,7 +23,7 @@ public sealed class StaleTurnCleanupWorker(IServiceScopeFactory scopeFactory, IL
             {
                 await RunOnceAsync(stoppingToken);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
                 logger.LogError(ex, "stale-turn cleanup tick failed");
             }

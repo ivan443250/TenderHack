@@ -9,6 +9,10 @@ public sealed class ProfanityMatcherTests
     [InlineData("это просто сука какая-то ситуация")]
     [InlineData("СУКА, опять не работает")]
     [InlineData("с.у.к.а")] // punctuation-obfuscated
+    [InlineData("сук4 не работает")] // leet digit
+    [InlineData("это полный п1здец")] // leet digit inside the word
+    [InlineData("cyka, опять")] // Latin look-alikes
+    [InlineData("ну ты и блядё")] // ё inside the word tail
     public void ConfirmedTermIsNotAmbiguous(string text)
     {
         var match = ProfanityMatcher.Evaluate(text);

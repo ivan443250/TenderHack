@@ -32,7 +32,7 @@ public sealed class HandoffStatusSyncWorker(IServiceScopeFactory scopeFactory, I
             {
                 await PollOnceAsync(stoppingToken);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
                 logger.LogError(ex, "handoff-status-sync tick failed");
             }
@@ -85,7 +85,7 @@ public sealed class HandoffStatusSyncWorker(IServiceScopeFactory scopeFactory, I
             await ingest.ExecuteAsync(
                 @case.Id, handoff.Id, snapshot.ExternalRevision, snapshot.Stage, snapshot.AssignedSpecialist, snapshot.Terminal, ct);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (!ct.IsCancellationRequested)
         {
             // An adapter timeout/5xx is a failed poll attempt, never a status change
             // (support-adapter-v0.md §6.1) — log and let the next tick retry.

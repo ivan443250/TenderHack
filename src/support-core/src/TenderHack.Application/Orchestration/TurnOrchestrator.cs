@@ -6,23 +6,36 @@ using TenderHack.Domain.Routing;
 namespace TenderHack.Application.Orchestration;
 
 /// <summary>
-/// Per-turn state machine (architecture.md §5.2): persist → moderate → direct human-request check →
-/// understand → retrieve → answerability → draft/verify when evidence allows → decide → persist.
+/// Per-turn state machine (architecture.md §5.2): persist input → moderate → direct human-request
+/// check → understand → retrieve → answerability → draft/verify when evidence allows → decide.
 /// Every stage result is published as a `case_events` row before the next stage starts. On every
-/// exit it also enqueues a `quality.turn` outbox push (knowledge-v0.md §10) for analytics.
+/// exit it also enqueues a `quality.turn` outbox push (knowledge-v0.md §10) for analytics. The
+/// final decision is left staged on the unit of work — the caller commits it.
 /// </summary>
 public sealed class TurnOrchestrator(
     IKnowledgeService knowledge,
     IModerationRuleEngine moderationRules,
     ITurnEventStream events,
     IOutbox outbox,
+    IUnitOfWork unitOfWork,
     ModerationOptions moderationOptions,
     TimeProvider clock)
 {
+    /// <summary>`TECHNICAL_ERROR` category for a failure that is not a classified `knowledge` call failure.</summary>
+    public const string InternalErrorCategory = "INTERNAL";
+
     public async Task<TurnOutcome> RunAsync(Case @case, string messageText, CancellationToken ct)
     {
         var now = clock.GetUtcNow();
         var turn = @case.StartTurn(now);
+
+        // Persist input first: the QUEUED turn row must exist before any stage runs, so a crash
+        // mid-turn leaves something `stale-turn cleanup` can find and fail, never a timeline of
+        // events pointing at a turn that was never written. This commit is also where two
+        // concurrent sends for the same case collide (same revision → ConcurrencyConflictException)
+        // before either has published anything.
+        await unitOfWork.SaveChangesAsync(ct);
+
         var context = new KnowledgeRequestContext(Guid.NewGuid(), @case.Id, turn.Id);
         var timings = new StageTimingsAccumulator();
 
@@ -71,6 +84,36 @@ public sealed class TurnOrchestrator(
                 answerMarkdown: null, evidenceFragmentIds: null, snapshotId: null, routing: null, errorCategory: ex.Category.ToString());
             return TurnOutcome.TechnicalError(turn.Id, turn.Revision, @case.ModerationWarningCount, ex.Category);
         }
+        catch (Exception) when (!ct.IsCancellationRequested)
+        {
+            // Not a classified knowledge failure — a defect or an infrastructure error the caller
+            // must still see (it propagates). But the QUEUED row from the first commit would
+            // otherwise sit there until `stale-turn cleanup`'s TTL; close it now so the user gets
+            // TECHNICAL_ERROR immediately. Best effort: if this second commit fails too, the
+            // cleanup worker remains the fallback.
+            await TryFailTurnBestEffortAsync(@case, turn, now);
+            throw;
+        }
+    }
+
+    private async Task TryFailTurnBestEffortAsync(Case @case, Turn turn, DateTimeOffset now)
+    {
+        if (!@case.TryFailTurn(turn.Id, turn.Revision))
+        {
+            return;
+        }
+
+        try
+        {
+            await PublishAsync(@case.Id, turn.Id, turn.Revision, "TECHNICAL_ERROR", now,
+                new Dictionary<string, object?> { ["category"] = InternalErrorCategory }, CancellationToken.None);
+            await unitOfWork.SaveChangesAsync(CancellationToken.None);
+        }
+        catch (Exception)
+        {
+            // Swallowed on purpose: the original exception is the one worth surfacing, and the
+            // persisted QUEUED turn is still recoverable by `stale-turn cleanup`.
+        }
     }
 
     /// <summary>
@@ -92,7 +135,7 @@ public sealed class TurnOrchestrator(
         }
 
         var assessment = await knowledge.AssessModerationContextAsync(
-            new ModerationContextRequest(messageText, match.RuleId, match.RuleVersion, match.MatchedTerm), context, ct);
+            new ModerationContextRequest(messageText, match.RuleId, match.RuleVersion, match.MatchedTerm, match.Start, match.End), context, ct);
         return assessment.Ambiguity == ModerationAmbiguity.Offensive;
     }
 

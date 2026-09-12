@@ -15,6 +15,7 @@ services:
         condition: service_healthy
 
   api:
+    restart: unless-stopped
     build:
       context: ./src/support-core
       dockerfile: Dockerfile
@@ -37,6 +38,7 @@ services:
       retries: 6
 
   api-worker:
+    restart: unless-stopped
     build:
       context: ./src/support-core
       dockerfile: Dockerfile

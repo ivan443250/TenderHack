@@ -9,7 +9,7 @@ namespace TenderHack.Infrastructure.Persistence;
 /// effect — this is a best-effort record of "that already happened", not part of the same
 /// transaction (architecture.md §7: "no exactly-once claim").
 /// </summary>
-public sealed class IdempotencyStore(TenderHackDbContext db) : IIdempotencyStore
+public sealed class IdempotencyStore(TenderHackDbContext db, TimeProvider clock) : IIdempotencyStore
 {
     public async Task<IdempotencyRecord?> FindAsync(string ownerId, string scope, string idempotencyKey, CancellationToken ct)
     {
@@ -28,7 +28,7 @@ public sealed class IdempotencyStore(TenderHackDbContext db) : IIdempotencyStore
             Key = idempotencyKey,
             PayloadHash = payloadHash,
             EntityId = entityId,
-            CreatedAt = DateTimeOffset.UtcNow,
+            CreatedAt = clock.GetUtcNow(),
         });
 
         try

@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using TenderHack.Application.Exceptions;
 using TenderHack.Application.Ports;
 using TenderHack.Domain.Cases;
 using TenderHack.Domain.Handoffs;
@@ -35,5 +37,27 @@ public sealed class CaseRepository(TenderHackDbContext db) : ICaseRepository
 
 public sealed class UnitOfWork(TenderHackDbContext db) : IUnitOfWork
 {
-    public Task SaveChangesAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
+    private const string PostgresUniqueViolation = "23505";
+
+    /// <summary>
+    /// Translates the two ways a commit loses a race into one Application-level signal
+    /// (<see cref="ConcurrencyConflictException"/>): EF's optimistic token (`xmin` on `cases`) and
+    /// Postgres unique violations (`turns(case_id, revision)`) — the latter is what actually fires
+    /// for two concurrent sends, since starting a turn never touches the `cases` row itself.
+    /// </summary>
+    public async Task SaveChangesAsync(CancellationToken ct)
+    {
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            throw new ConcurrencyConflictException("The case was modified concurrently.", ex);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresUniqueViolation })
+        {
+            throw new ConcurrencyConflictException("A concurrent write already claimed this revision.", ex);
+        }
+    }
 }
