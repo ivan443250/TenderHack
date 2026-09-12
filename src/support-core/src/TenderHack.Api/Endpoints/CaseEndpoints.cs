@@ -34,7 +34,8 @@ public static class CaseEndpoints
         });
 
         app.MapGet("/api/v0/cases/{caseId}", async (
-            HttpContext context, string caseId, GetCaseSnapshotUseCase useCase, ICaseEventReader events, CancellationToken ct) =>
+            HttpContext context, string caseId, GetCaseSnapshotUseCase useCase, ICaseEventReader events,
+            IFeedbackRepository feedbackRepository, CancellationToken ct) =>
         {
             if (!CaseEndpointHelpers.TryRequireCaseId(caseId, out var id, out var badRequest))
             {
@@ -44,7 +45,8 @@ public static class CaseEndpoints
             var ownerId = CaseEndpointHelpers.RequireOwner(context);
             var @case = await useCase.ExecuteAsync(id, ownerId, ct);
             var history = await events.ListAsync(id, after: 0, ct);
-            return Results.Ok(CaseMapper.ToSnapshot(@case, history));
+            var feedback = @case.FeedbackId is not null ? await feedbackRepository.FindByCaseIdAsync(id, ct) : null;
+            return Results.Ok(CaseMapper.ToSnapshot(@case, history, feedback));
         });
 
         app.MapPost("/api/v0/cases/{caseId}/messages", async (

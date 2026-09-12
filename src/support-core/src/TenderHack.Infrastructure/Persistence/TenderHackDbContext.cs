@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TenderHack.Domain.Cases;
+using TenderHack.Domain.Feedback;
 
 namespace TenderHack.Infrastructure.Persistence;
 
@@ -14,6 +15,10 @@ public sealed class TenderHackDbContext(DbContextOptions<TenderHackDbContext> op
     public DbSet<CaseEventEntity> CaseEvents => Set<CaseEventEntity>();
 
     public DbSet<OutboxMessageEntity> OutboxMessages => Set<OutboxMessageEntity>();
+
+    public DbSet<Feedback> Feedbacks => Set<Feedback>();
+
+    public DbSet<NotificationEntity> Notifications => Set<NotificationEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -1,4 +1,5 @@
 using TenderHack.Domain;
+using TenderHack.Domain.Feedback;
 using TenderHack.Domain.Handoffs;
 using TenderHack.Domain.Moderation;
 
@@ -29,6 +30,8 @@ public sealed class Case
     public DateTimeOffset? CompletedAt { get; private set; }
 
     public Handoff? Handoff { get; private set; }
+
+    public FeedbackId? FeedbackId { get; private set; }
 
     public IReadOnlyList<Turn> Turns => _turns;
 
@@ -178,6 +181,31 @@ public sealed class Case
         ResolutionStatus = solved ? ResolutionStatus.Resolved : ResolutionStatus.Unresolved;
     }
 
+    /// <summary>
+    /// One feedback per case, only after completion — the widget appears on `FEEDBACK_REQUESTED`
+    /// or on reload when `completed_at != null &amp;&amp; feedback == null` (web-api-v0.md §9.3). The
+    /// `solved` signal (never rating signals) may still move resolution from `UNKNOWN`.
+    /// </summary>
+    public void RecordFeedback(FeedbackId feedbackId, bool? solved)
+    {
+        if (CompletedAt is null)
+        {
+            throw new CaseNotCompletedException(Id);
+        }
+
+        if (FeedbackId is not null)
+        {
+            throw new FeedbackAlreadySubmittedException(Id);
+        }
+
+        FeedbackId = feedbackId;
+
+        if (solved is { } value)
+        {
+            ApplyFeedbackSolvedSignal(value);
+        }
+    }
+
     public Handoff PrepareHandoff()
     {
         if (ConversationStatus != ConversationStatus.Active)
@@ -221,7 +249,8 @@ public sealed class Case
     }
 
     /// <summary>Single write path for status facts, whichever channel (poll or webhook) delivered them.</summary>
-    public void IngestHandoffStatus(
+    /// <returns>false when the update duplicated an already-applied external revision and was ignored.</returns>
+    public bool IngestHandoffStatus(
         HandoffId handoffId,
         long externalRevision,
         HandoffStage? stage,
@@ -233,13 +262,15 @@ public sealed class Case
         var applied = handoff.IngestStatus(handoffId, Id, externalRevision, stage, assignedSpecialist, terminal);
         if (!applied)
         {
-            return;
+            return false;
         }
 
         if (terminal is { } outcome)
         {
             CompleteBySupport(outcome, now);
         }
+
+        return true;
     }
 
     private Handoff RequireHandoff() =>

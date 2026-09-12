@@ -31,6 +31,10 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IOutbox, Outbox>();
         services.AddScoped<IOutboxReader, OutboxReader>();
+        services.AddScoped<IFeedbackRepository, FeedbackRepository>();
+        services.AddScoped<NotificationStore>();
+        services.AddScoped<INotificationSink>(provider => provider.GetRequiredService<NotificationStore>());
+        services.AddScoped<INotificationReader>(provider => provider.GetRequiredService<NotificationStore>());
         services.AddSingleton<ITurnEventStream, CaseEventStore>();
         services.AddSingleton<IModerationRuleEngine, DeterministicModerationRuleEngine>();
 

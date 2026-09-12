@@ -1,6 +1,7 @@
 using System.Text.Json;
 using TenderHack.Application.Knowledge;
 using TenderHack.Domain.Cases;
+using TenderHack.Domain.Feedback;
 using TenderHack.Domain.Handoffs;
 
 namespace TenderHack.Api.Contracts;
@@ -47,7 +48,34 @@ public sealed record CaseSnapshotResponse(
     string LastEventId,
     DateTimeOffset? CompletedAt,
     CompletionReason? CompletionReason,
-    object? Feedback);
+    FeedbackView? Feedback);
+
+public sealed record FeedbackView(
+    FeedbackRating? SpecialistRating,
+    FeedbackRating? InformationQualityRating,
+    bool? Solved,
+    string? CommentText,
+    DateTimeOffset SubmittedAt);
+
+public sealed record CompleteCaseRequest(bool? Solved);
+
+public sealed record SubmitFeedbackRequest(
+    FeedbackRating? SpecialistRating,
+    FeedbackRating? InformationQualityRating,
+    bool? Solved,
+    string? CommentText);
+
+public sealed record NotificationResponse(
+    string NotificationId,
+    string CaseId,
+    string Type,
+    DateTimeOffset OccurredAt,
+    DateTimeOffset? ReadAt,
+    string Title,
+    string Body,
+    string? IntegrationMode);
+
+public sealed record AckNotificationsRequest(IReadOnlyList<string> Ids);
 
 public sealed record TimelineItemResponse(
     string ItemId,

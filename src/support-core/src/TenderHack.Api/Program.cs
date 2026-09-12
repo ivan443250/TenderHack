@@ -24,6 +24,11 @@ builder.Services.AddScoped<PrepareHandoffUseCase>();
 builder.Services.AddScoped<ConfirmHandoffUseCase>();
 builder.Services.AddScoped<RetryHandoffUseCase>();
 builder.Services.AddScoped<IngestHandoffStatusUseCase>();
+builder.Services.AddScoped<CaseCompletionPublisher>();
+builder.Services.AddScoped<CompleteCaseUseCase>();
+builder.Services.AddScoped<SubmitFeedbackUseCase>();
+builder.Services.AddScoped<ListNotificationsUseCase>();
+builder.Services.AddScoped<AckNotificationsUseCase>();
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -45,6 +50,8 @@ app.MapSessionEndpoints();
 app.MapCaseEndpoints();
 app.MapSourceEndpoints();
 app.MapHandoffEndpoints();
+app.MapCompletionEndpoints();
+app.MapNotificationEndpoints();
 
 var supportOptions = app.Services.GetRequiredService<IOptions<SupportOptions>>().Value;
 app.MapSupportWebhookEndpoints(supportOptions);

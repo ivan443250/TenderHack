@@ -10,7 +10,7 @@ public static class CaseMapper
     public static CaseListItemResponse ToListItem(Case @case) =>
         new(@case.Id.ToString(), @case.ConversationStatus, @case.ResolutionStatus, @case.LastActivityAt, UnreadNotifications: 0);
 
-    public static CaseSnapshotResponse ToSnapshot(Case @case, IReadOnlyList<PersistedCaseEvent> events)
+    public static CaseSnapshotResponse ToSnapshot(Case @case, IReadOnlyList<PersistedCaseEvent> events, TenderHack.Domain.Feedback.Feedback? feedback = null)
     {
         var activeTurn = @case.ActiveTurn is { } turn
             ? new ActiveTurnView(turn.Id.ToString(), turn.Revision, turn.Status)
@@ -30,7 +30,9 @@ public static class CaseMapper
             LastEventId: (events.Count > 0 ? events[^1].EventId : 0).ToString(),
             @case.CompletedAt,
             @case.CompletionReason,
-            Feedback: null);
+            feedback is { } f
+                ? new FeedbackView(f.SpecialistRating, f.InformationQualityRating, f.Solved, f.CommentText, f.SubmittedAt)
+                : null);
     }
 
     public static HandoffView? ToHandoffView(TenderHack.Domain.Handoffs.Handoff? handoff)

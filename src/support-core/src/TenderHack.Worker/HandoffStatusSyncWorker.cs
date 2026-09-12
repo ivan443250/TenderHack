@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TenderHack.Application.Ports;
+using TenderHack.Application.UseCases;
 using TenderHack.Domain.Cases;
 using TenderHack.Infrastructure.Handoff;
 
@@ -11,8 +12,9 @@ namespace TenderHack.Worker;
 /// <summary>
 /// `handoff-status-sync` (support-adapter-v0.md §6.1): polls every accepted, non-terminal, non-stale
 /// handoff and applies whatever <see cref="IHandoffAdapter.GetStatusAsync"/> reports through the same
-/// `IngestHandoffStatus` write path the inbound webhook uses. A case past `Support:StatusPoll:Ttl`
-/// is marked stale and dropped from future polling.
+/// `IngestHandoffStatusUseCase` write path the inbound webhook uses — so `HANDOFF_STATUS`
+/// events/notifications and completion fire identically regardless of channel. A case past
+/// `Support:StatusPoll:Ttl` is marked stale and dropped from future polling.
 /// </summary>
 public sealed class HandoffStatusSyncWorker(IServiceScopeFactory scopeFactory, ILogger<HandoffStatusSyncWorker> logger) : BackgroundService
 {
@@ -47,18 +49,19 @@ public sealed class HandoffStatusSyncWorker(IServiceScopeFactory scopeFactory, I
         var adapter = scope.ServiceProvider.GetRequiredService<IHandoffAdapter>();
         var clock = scope.ServiceProvider.GetRequiredService<TimeProvider>();
         var options = scope.ServiceProvider.GetRequiredService<IOptions<SupportOptions>>().Value;
+        var ingest = scope.ServiceProvider.GetRequiredService<IngestHandoffStatusUseCase>();
 
         var pending = await cases.ListPendingHandoffPollsAsync(ct);
 
         foreach (var @case in pending)
         {
-            await PollOneAsync(@case, adapter, clock, options, ct);
+            await PollOneAsync(@case, adapter, clock, options, ingest, unitOfWork, ct);
         }
-
-        await unitOfWork.SaveChangesAsync(ct);
     }
 
-    private async Task PollOneAsync(Case @case, IHandoffAdapter adapter, TimeProvider clock, SupportOptions options, CancellationToken ct)
+    private async Task PollOneAsync(
+        Case @case, IHandoffAdapter adapter, TimeProvider clock, SupportOptions options,
+        IngestHandoffStatusUseCase ingest, IUnitOfWork unitOfWork, CancellationToken ct)
     {
         var handoff = @case.Handoff!;
         var acceptedAt = handoff.AcceptedAt ?? clock.GetUtcNow();
@@ -66,6 +69,7 @@ public sealed class HandoffStatusSyncWorker(IServiceScopeFactory scopeFactory, I
         if (clock.GetUtcNow() - acceptedAt > options.StatusPoll.Ttl)
         {
             @case.MarkHandoffStale();
+            await unitOfWork.SaveChangesAsync(ct);
             return;
         }
 
@@ -78,8 +82,8 @@ public sealed class HandoffStatusSyncWorker(IServiceScopeFactory scopeFactory, I
                 return;
             }
 
-            @case.IngestHandoffStatus(
-                handoff.Id, snapshot.ExternalRevision, snapshot.Stage, snapshot.AssignedSpecialist, snapshot.Terminal, clock.GetUtcNow());
+            await ingest.ExecuteAsync(
+                @case.Id, handoff.Id, snapshot.ExternalRevision, snapshot.Stage, snapshot.AssignedSpecialist, snapshot.Terminal, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

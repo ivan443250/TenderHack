@@ -1,5 +1,6 @@
 using TenderHack.Application.Exceptions;
 using TenderHack.Application.Handoff;
+using TenderHack.Application.Orchestration;
 using TenderHack.Application.Tests.Fakes;
 using TenderHack.Application.UseCases;
 using TenderHack.Domain.Cases;
@@ -78,6 +79,10 @@ public sealed class HandoffUseCasesTests
         Assert.Equal(originalHandoffId.ToString(), payload.HandoffId);
     }
 
+    private static IngestHandoffStatusUseCase CreateIngestUseCase(
+        FakeCaseRepository repository, FakeUnitOfWork unitOfWork, FakeTurnEventStream events, FakeNotificationSink notifications) =>
+        new(repository, unitOfWork, events, notifications, new CaseCompletionPublisher(events, notifications), TimeProvider.System);
+
     [Fact]
     public async Task IngestHandoffStatusAppliesFactsThroughTheCase()
     {
@@ -88,7 +93,9 @@ public sealed class HandoffUseCasesTests
         @case.AcknowledgeHandoff(simulated: true, "ext-1", DateTimeOffset.UtcNow);
         repository.Add(@case);
         var unitOfWork = new FakeUnitOfWork();
-        var sut = new IngestHandoffStatusUseCase(repository, unitOfWork, TimeProvider.System);
+        var events = new FakeTurnEventStream();
+        var notifications = new FakeNotificationSink();
+        var sut = CreateIngestUseCase(repository, unitOfWork, events, notifications);
 
         await sut.ExecuteAsync(
             @case.Id, @case.Handoff!.Id, externalRevision: 1,
@@ -96,5 +103,52 @@ public sealed class HandoffUseCasesTests
 
         Assert.Equal("IN_PROGRESS", @case.Handoff.Stage!.Code);
         Assert.Equal(1, unitOfWork.SaveChangesCallCount);
+        Assert.Contains(events.Published, e => e.Event.Type == "HANDOFF_STATUS");
+        Assert.Contains(notifications.Enqueued, n => n.Type == "HANDOFF_UPDATED");
+    }
+
+    [Fact]
+    public async Task DuplicateRevisionPublishesNothingAndDoesNotSave()
+    {
+        var repository = new FakeCaseRepository();
+        var @case = NewCase();
+        @case.PrepareHandoff();
+        @case.ConfirmHandoff();
+        @case.AcknowledgeHandoff(simulated: true, "ext-1", DateTimeOffset.UtcNow);
+        @case.IngestHandoffStatus(@case.Handoff!.Id, 1, new HandoffStage("QUEUED", null), null, null, DateTimeOffset.UtcNow);
+        repository.Add(@case);
+        var unitOfWork = new FakeUnitOfWork();
+        var events = new FakeTurnEventStream();
+        var notifications = new FakeNotificationSink();
+        var sut = CreateIngestUseCase(repository, unitOfWork, events, notifications);
+
+        await sut.ExecuteAsync(@case.Id, @case.Handoff.Id, externalRevision: 1, new HandoffStage("ASSIGNED", null), null, null, CancellationToken.None);
+
+        Assert.Equal(0, unitOfWork.SaveChangesCallCount);
+        Assert.Empty(events.Published);
+        Assert.Empty(notifications.Enqueued);
+    }
+
+    [Fact]
+    public async Task TerminalFactOnAnActiveCasePublishesCompletionAndFeedbackRequested()
+    {
+        var repository = new FakeCaseRepository();
+        var @case = NewCase();
+        @case.PrepareHandoff();
+        @case.ConfirmHandoff();
+        @case.AcknowledgeHandoff(simulated: true, "ext-1", DateTimeOffset.UtcNow);
+        repository.Add(@case);
+        var unitOfWork = new FakeUnitOfWork();
+        var events = new FakeTurnEventStream();
+        var notifications = new FakeNotificationSink();
+        var sut = CreateIngestUseCase(repository, unitOfWork, events, notifications);
+
+        await sut.ExecuteAsync(@case.Id, @case.Handoff!.Id, externalRevision: 1, null, null, HandoffTerminalOutcome.Resolved, CancellationToken.None);
+
+        Assert.Equal(ConversationStatus.ClosedSupport, @case.ConversationStatus);
+        Assert.Equal(ResolutionStatus.Resolved, @case.ResolutionStatus);
+        Assert.Contains(events.Published, e => e.Event.Type == "CASE_COMPLETED");
+        Assert.Contains(events.Published, e => e.Event.Type == "FEEDBACK_REQUESTED");
+        Assert.Contains(notifications.Enqueued, n => n.Type == "CASE_COMPLETED");
     }
 }

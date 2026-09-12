@@ -16,6 +16,20 @@ public sealed class CaseAlreadyCompletedException(CaseId caseId)
     public CaseId CaseId { get; } = caseId;
 }
 
+/// <summary>One feedback per case (web-api-v0.md §9.3) — a second submit is rejected, not overwritten.</summary>
+public sealed class FeedbackAlreadySubmittedException(CaseId caseId)
+    : InvalidOperationException($"Case {caseId} already has feedback.")
+{
+    public CaseId CaseId { get; } = caseId;
+}
+
+/// <summary>The feedback widget only ever appears after completion (web-api-v0.md §9.3).</summary>
+public sealed class CaseNotCompletedException(CaseId caseId)
+    : InvalidOperationException($"Case {caseId} is not completed yet.")
+{
+    public CaseId CaseId { get; } = caseId;
+}
+
 public sealed class InvalidHandoffTransitionException(HandoffId handoffId, HandoffStatus from, HandoffStatus to)
     : InvalidOperationException($"Handoff {handoffId} cannot transition from {from} to {to}.")
 {
