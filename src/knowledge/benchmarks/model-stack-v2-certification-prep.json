@@ -1,0 +1,115 @@
+{
+  "report_version": "model-stack-v2-certification-prep",
+  "audit_date": "2026-09-12",
+  "starting_head": "444d409",
+  "status": "PREPARED_WITH_CERTIFICATION_GATES",
+  "infra_readme_fixed": true,
+  "target_profiles": {
+    "cloud-a100": {
+      "purpose": "high-performance team-controlled Cloud.ru Docker RUN profile",
+      "target_hardware": "A100 80 GB accelerator profile",
+      "runtime_intent": "canonical/BF16 Giga + Querit + Qwen3.8 where compatibility is proven",
+      "product_requirement": false,
+      "status": "TARGET_NOT_CERTIFIED"
+    },
+    "portable": {
+      "purpose": "materially weaker hardware with explicit reduced capability",
+      "embedding": "Giga Q8_0 GGUF, 2048 dimensions",
+      "generator": "Qwen3.8 Q6_K GGUF on recent llama.cpp",
+      "reranker": "optional; disable until a portable Querit artifact/runtime is verified",
+      "fallbacks": {
+        "reranker_unavailable": "exact + PostgreSQL FTS + pg_trgm + Giga dense + RRF",
+        "embedding_unavailable": "exact + PostgreSQL FTS + pg_trgm",
+        "generator_unavailable": "no hallucinated generation; grounded/extractive behavior or handoff"
+      },
+      "status": "TARGET_NOT_CERTIFIED"
+    }
+  },
+  "cloud_profile_status": "TARGET_NOT_CERTIFIED",
+  "portable_profile_status": "TARGET_NOT_CERTIFIED",
+  "known_model_artifacts": {
+    "embedding": {
+      "source_model": "ai-sage/Giga-Embeddings-instruct-3B-0826",
+      "source_revision": "ed7db5c91b900b39381b27b6e9c0a3d31137cd29",
+      "runtime_repo": "ai-babai/giga-embeddings-0826-3b-gguf",
+      "runtime_file": "giga-embeddings-0826-3b-q8_0.gguf",
+      "quantization": "Q8_0",
+      "dimension": 2048,
+      "query_instruction_version": "giga_portal_support_v1",
+      "runtime": "llama.cpp /v1/embeddings",
+      "sha256": "429f2d04a968ffe73137fe65c2e458a08236056168b905d208b4d81ecab08c22",
+      "provenance": "third-party GGUF conversion; not an official ai-sage release"
+    },
+    "reranker": {
+      "source_model": "Querit/Querit-4B",
+      "source_revision": "e557bb5ce6555f16b33dbb7d2ca62e8d27c14c13",
+      "canonical_runtime": "allowed for strong GPU profile only after feasibility checks",
+      "portable_runtime_artifact": null,
+      "portable_runtime_status": "TBD_UNVERIFIED"
+    },
+    "generator": {
+      "source_model": "empero-ai/Qwen3.8-4B-Distill",
+      "source_revision": "c83cb7aa2999d2f35c43e9ae0634a30eb8985a1e",
+      "runtime_repo": "empero-ai/Qwen3.8-4B-Distill-GGUF",
+      "runtime_file": "Qwen3.8-4B-Q6_K.gguf",
+      "quantization": "Q6_K",
+      "runtime": "recent llama.cpp /v1/chat/completions",
+      "sha256": null,
+      "reasoning_policy": "strip <think>; fail closed; never expose reasoning"
+    }
+  },
+  "embedding_space_requirement": {
+    "severity": "HIGH",
+    "required_before_production_backfill": true,
+    "field": "embedding_space_id",
+    "minimum_components": [
+      "source model",
+      "source revision",
+      "runtime artifact/precision",
+      "dimension",
+      "query instruction version"
+    ],
+    "example_values": ["giga-0826-bf16-v1", "giga-0826-q8_0-v1"],
+    "rule": "Never silently mix document and query vectors from different model/runtime variants; measure interchangeability first.",
+    "implementation_status": "DOCUMENTED_ONLY; no schema or code change in preparation task"
+  },
+  "querit_runtime_status": "SOURCE_PINNED_BUT_PORTABLE_ARTIFACT_UNVERIFIED; B3 is gated on actual runtime certification",
+  "certification_runbook_path": "docs/plans/active/model-stack-v2-real-certification.md",
+  "organizer_question_status": {
+    "status": "ADDED_ONCE",
+    "path": "src/knowledge/benchmarks/organizer-questions.md",
+    "topic": "permission for self-hosted open-model inference in a team-controlled Cloud.ru Docker deployment"
+  },
+  "files_changed": [
+    "infra/inference/README.md",
+    "docs/plans/active/model-stack-v2-real-certification.md",
+    "src/knowledge/benchmarks/organizer-questions.md",
+    "src/knowledge/benchmarks/model-stack-v2-certification-prep.json"
+  ],
+  "high_findings": [
+    {
+      "finding": "A100 BF16 and portable Giga Q8_0 may represent different embedding spaces.",
+      "resolution": "Added mandatory embedding_space_id and an explicit no-mixing certification gate to the runbook; no production backfill may proceed until measured."
+    }
+  ],
+  "medium_findings": [],
+  "remaining_blockers": [
+    "environment inventory on the target Linux/Cloud.ru and portable hosts",
+    "exact artifact verification and local offline smoke",
+    "six-manual corpus identity of 6 documents, 830 pages and 3899 fragments",
+    "3899 active Giga embeddings with space metadata and durable readback",
+    "B1/B2 retrieval measurements and optional B3 Querit certification",
+    "Qwen3.8 structured-generation, latency, memory and offline checks",
+    "explicit Cloud.ru open-model/self-hosting permission from organizers"
+  ],
+  "verification": {
+    "model_downloads": "NOT RUN",
+    "real_certification": "NOT RUN",
+    "embedding_backfill": "NOT RUN",
+    "benchmarks": "NOT RUN",
+    "git_diff_check": "PASS: git diff --check",
+    "scope_check": "PASS: only infra/inference/README.md, docs/plans/** and src/knowledge/benchmarks/** changed",
+    "referenced_files": "PASS: runbook, organizer questions and prep report exist; final certification report path is intentionally planned, not created"
+  },
+  "next_task": "MODEL_STACK_V2_REAL_CERTIFICATION"
+}
