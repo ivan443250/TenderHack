@@ -1,6 +1,7 @@
 using System.Text.Json;
 using TenderHack.Application.Knowledge;
 using TenderHack.Domain.Cases;
+using TenderHack.Domain.Handoffs;
 
 namespace TenderHack.Api.Contracts;
 
@@ -18,6 +19,22 @@ public sealed record CaseListItemResponse(
 
 public sealed record ActiveTurnView(string TurnId, int Revision, TurnStatus Status);
 
+/// <summary>web-api-v0.md §4.4. All fields after `Status`/`IntegrationMode` are optional — a null
+/// stays null, the browser hides the row rather than showing a placeholder.</summary>
+public sealed record HandoffView(
+    HandoffStatus Status,
+    IntegrationMode? IntegrationMode,
+    string? ExternalCaseId,
+    HandoffSpecialistView? AssignedSpecialist,
+    HandoffStageView? Stage,
+    HandoffTerminalOutcome? Terminal,
+    bool Stale,
+    DateTimeOffset? UpdatedAt);
+
+public sealed record HandoffStageView(string Code, string? DisplayName);
+
+public sealed record HandoffSpecialistView(string Ref, string? DisplayName);
+
 public sealed record CaseSnapshotResponse(
     string CaseId,
     ConversationStatus ConversationStatus,
@@ -25,7 +42,7 @@ public sealed record CaseSnapshotResponse(
     Decision? LastDecision,
     int ModerationWarningCount,
     ActiveTurnView? ActiveTurn,
-    object? Handoff,
+    HandoffView? Handoff,
     IReadOnlyList<TimelineItemResponse> Timeline,
     string LastEventId,
     DateTimeOffset? CompletedAt,
@@ -40,6 +57,13 @@ public sealed record TimelineItemResponse(
     JsonElement Payload);
 
 public sealed record SendMessageRequest(string Text, string? ClientMessageId);
+
+/// <summary>`Summary` is the only field the caller edits — `DispatchQueue`/`ReasonCodes`/
+/// `EngineeringReviewSuggested` are re-derived server-side from the case's own last `HANDOFF_OFFER`
+/// event, never trusted from the client (web-api-v0.md §5.5, "routing is a Domain policy").</summary>
+public sealed record ConfirmHandoffRequest(string Summary);
+
+public sealed record RetryHandoffRequest(string Summary);
 
 public sealed record AnswerView(string Markdown, IReadOnlyList<SourceRefView> Sources);
 

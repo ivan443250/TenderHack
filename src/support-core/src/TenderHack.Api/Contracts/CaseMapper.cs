@@ -25,7 +25,7 @@ public static class CaseMapper
             lastDecision,
             @case.ModerationWarningCount,
             activeTurn,
-            Handoff: null,
+            ToHandoffView(@case.Handoff),
             Timeline: [.. events.Select(ToTimelineItem)],
             LastEventId: (events.Count > 0 ? events[^1].EventId : 0).ToString(),
             @case.CompletedAt,
@@ -33,8 +33,46 @@ public static class CaseMapper
             Feedback: null);
     }
 
+    public static HandoffView? ToHandoffView(TenderHack.Domain.Handoffs.Handoff? handoff)
+    {
+        if (handoff is null)
+        {
+            return null;
+        }
+
+        return new HandoffView(
+            handoff.Status,
+            handoff.IntegrationMode,
+            handoff.ExternalCaseId,
+            handoff.AssignedSpecialist is { } specialist ? new HandoffSpecialistView(specialist.Ref, specialist.DisplayName) : null,
+            handoff.Stage is { } stage ? new HandoffStageView(stage.Code, stage.DisplayName) : null,
+            handoff.Terminal,
+            handoff.Stale,
+            handoff.AcceptedAt);
+    }
+
     public static TimelineItemResponse ToTimelineItem(PersistedCaseEvent e) =>
         new(e.EventId.ToString(), e.Type, e.OccurredAt, e.TurnId?.ToString(), JsonDocument.Parse(e.PayloadJson).RootElement);
+
+    /// <summary>
+    /// Re-derives routing from the case's own last `HANDOFF_OFFER` event rather than trusting the
+    /// client — the frontend only ever gets to edit the human-written summary text.
+    /// </summary>
+    public static RoutingFacts? ExtractLastRouting(IReadOnlyList<PersistedCaseEvent> events)
+    {
+        var last = events.LastOrDefault(e => e.Type == "HANDOFF_OFFER");
+        if (last is null)
+        {
+            return null;
+        }
+
+        using var document = JsonDocument.Parse(last.PayloadJson);
+        var root = document.RootElement;
+        var dispatchQueue = root.GetProperty("dispatch_queue").GetString() ?? "l1-general";
+        var reasonCodes = root.GetProperty("reason_codes").EnumerateArray().Select(e => e.GetString()!).ToArray();
+        var engineeringReviewSuggested = root.GetProperty("engineering_review_suggested").GetBoolean();
+        return new RoutingFacts(dispatchQueue, reasonCodes, engineeringReviewSuggested);
+    }
 
     public static SendMessageResponse ToSendMessageResponse(string caseId, TurnOutcome outcome) =>
         new(
@@ -49,3 +87,5 @@ public static class CaseMapper
             outcome.MissingConditions,
             outcome.FailureCategory);
 }
+
+public sealed record RoutingFacts(string DispatchQueue, IReadOnlyList<string> ReasonCodes, bool EngineeringReviewSuggested);

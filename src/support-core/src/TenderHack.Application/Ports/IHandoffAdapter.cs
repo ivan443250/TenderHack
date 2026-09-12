@@ -3,28 +3,35 @@ using TenderHack.Domain.Handoffs;
 
 namespace TenderHack.Application.Ports;
 
-/// <summary>
-/// Port for the frozen `support-adapter-v0` boundary (architecture.md §15). Not yet called by any
-/// use-case in this stage — `HandoffPrepare`/`Confirm`/status-sync land in a later phase — but
-/// defined now because it is one of the six ports `Application` owns (architecture.md §4.1).
-/// </summary>
+/// <summary>Port for the frozen `support-adapter-v0` boundary (architecture.md §15, support-adapter-v0.md).</summary>
 public interface IHandoffAdapter
 {
     Task<HandoffAck> SubmitAsync(HandoffRequest request, string idempotencyKey, CancellationToken ct);
 
-    /// <summary>Null when the adapter has no status API for this handoff.</summary>
+    /// <summary>Null when the adapter has no status API for this handoff, or has nothing new to report this poll.</summary>
     Task<HandoffStatusSnapshot?> GetStatusAsync(HandoffStatusQuery query, CancellationToken ct);
 }
 
+/// <summary>
+/// support-adapter-v0.md §2. Fields the adapter cannot know (verified Portal state, real SLA/contact)
+/// are simply absent — "unknown stays unknown", never fabricated.
+/// </summary>
 public sealed record HandoffRequest(
     CaseId CaseId,
     HandoffId HandoffId,
     string Summary,
-    IReadOnlyList<string> EvidenceFragmentIds);
+    string DispatchQueue,
+    IReadOnlyList<string> ReasonCodes,
+    bool EngineeringReviewSuggested);
 
-public sealed record HandoffAck(bool Accepted, bool Simulated, string? ExternalCaseId);
+public sealed record HandoffAck(bool Accepted, bool Simulated, string? ExternalCaseId, string? SafeMessage = null);
 
-public sealed record HandoffStatusQuery(CaseId CaseId, HandoffId HandoffId, string? ExternalCaseId);
+public sealed record HandoffStatusQuery(
+    CaseId CaseId,
+    HandoffId HandoffId,
+    string? ExternalCaseId,
+    long? LastKnownExternalRevision,
+    DateTimeOffset AcceptedAt);
 
 public sealed record HandoffStatusSnapshot(
     string ExternalCaseId,

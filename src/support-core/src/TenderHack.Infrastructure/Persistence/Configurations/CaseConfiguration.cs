@@ -53,6 +53,8 @@ public sealed class CaseConfiguration : IEntityTypeConfiguration<Case>
             handoff.Property(h => h.ExternalCaseId);
             handoff.Property(h => h.Terminal).HasConversion<string>();
             handoff.Property(h => h.LastExternalRevision).IsRequired();
+            handoff.Property(h => h.AcceptedAt);
+            handoff.Property(h => h.Stale).IsRequired();
 
             handoff.OwnsOne(h => h.Stage, stage =>
             {

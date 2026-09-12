@@ -199,9 +199,9 @@ public sealed class Case
         RequireHandoff().Confirm();
     }
 
-    public void AcknowledgeHandoff(bool simulated, string? externalCaseId)
+    public void AcknowledgeHandoff(bool simulated, string? externalCaseId, DateTimeOffset now)
     {
-        RequireHandoff().Acknowledge(simulated, externalCaseId);
+        RequireHandoff().Acknowledge(simulated, externalCaseId, now);
     }
 
     public void FailHandoff()
@@ -212,6 +212,12 @@ public sealed class Case
     public void RetryHandoff()
     {
         RequireHandoff().Retry();
+    }
+
+    /// <summary>Status polling reached TTL without a terminal fact — UI shows «статус не обновляется».</summary>
+    public void MarkHandoffStale()
+    {
+        RequireHandoff().MarkStale();
     }
 
     /// <summary>Single write path for status facts, whichever channel (poll or webhook) delivered them.</summary>

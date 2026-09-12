@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using TenderHack.Application.Knowledge;
 using TenderHack.Application.Ports;
+using TenderHack.Infrastructure.Handoff;
 using TenderHack.Infrastructure.KnowledgeClient;
 using TenderHack.Infrastructure.Moderation;
 using TenderHack.Infrastructure.Persistence;
@@ -29,8 +30,12 @@ public static class DependencyInjection
         services.AddScoped<ICaseEventReader, CaseEventReader>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IOutbox, Outbox>();
+        services.AddScoped<IOutboxReader, OutboxReader>();
         services.AddSingleton<ITurnEventStream, CaseEventStore>();
         services.AddSingleton<IModerationRuleEngine, DeterministicModerationRuleEngine>();
+
+        services.Configure<SupportOptions>(configuration.GetSection(SupportOptions.SectionName));
+        services.AddSingleton<IHandoffAdapter, DemoHandoffAdapter>();
 
         services.Configure<KnowledgeServiceOptions>(configuration.GetSection(KnowledgeServiceOptions.SectionName));
         services.AddHttpClient<Generated.IKnowledgeApiClient, Generated.KnowledgeApiClient>((provider, client) =>
