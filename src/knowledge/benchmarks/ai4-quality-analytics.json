@@ -1,0 +1,142 @@
+{
+  "stage": "AI-4",
+  "status": "CERTIFIED_WITH_LIMITATIONS",
+  "starting_head": "26a3e56c3c726553eb2c72fb784fab9b126a6b5d",
+  "ai1_commit_present": true,
+  "audit": {
+    "finding": "quality endpoints acknowledge payload, but useful durable analytics was absent/incomplete",
+    "confirmed": true,
+    "evidence": [
+      "quality push handlers discarded payloads and returned AcceptedResponse(status=stored)",
+      "quality evaluation and issue-group read handlers always returned empty arrays",
+      "knowledge-worker had no quality persistence/evaluation loop",
+      "migrations 0001-0007 contained no quality analytics tables"
+    ]
+  },
+  "migration": {
+    "filename": "migrations/versions/0008_quality_analytics.py",
+    "revision": "0008_quality_analytics",
+    "down_revision": "0007_giga_2048_embeddings",
+    "single_head": true,
+    "tables": [
+      "quality_cases",
+      "quality_feedback",
+      "quality_completions",
+      "quality_evaluations",
+      "issue_groups",
+      "issue_group_members"
+    ],
+    "api_foreign_keys_or_reads": false,
+    "indexes": [
+      "quality_cases(case_id, occurred_at)",
+      "quality_feedback(case_id, occurred_at)",
+      "quality_completions(resolution_status, completed_at)",
+      "quality_evaluations(case_id, evaluated_at)",
+      "issue_groups(sample_size)",
+      "issue_group_members(case_id)"
+    ],
+    "idempotency_constraints": [
+      "quality_cases.delivery_key primary key and turn_id+revision unique",
+      "quality_feedback.feedback_id primary key",
+      "quality_completions.case_id primary key",
+      "quality_evaluations.evaluation_id primary key and turn_id+revision unique"
+    ]
+  },
+  "schema_objects": {
+    "quality_cases": "pushed turn facts, opaque labels, evidence references, provenance and payload hash",
+    "quality_feedback": "independent specialist/information-quality ratings, solved and comment",
+    "quality_completions": "completion and opaque resolution/outcome facts",
+    "quality_evaluations": "deterministic dimension records and separate critical_error",
+    "issue_groups": "deterministic repeated-attribute read model with limitations/hypotheses",
+    "issue_group_members": "stable group membership for provenance"
+  },
+  "intake": {
+    "turn": "implemented in QualityRepository and InMemoryQualityStore; received_at, source_type, stable identity, payload hash and provenance persisted",
+    "feedback": "implemented; feedback_id identity",
+    "completion": "implemented; case_id identity",
+    "duplicate": "same identity and same payload returns idempotent result",
+    "conflict": "turn/feedback same identity with different payload raises QualityPayloadConflict; completion accepts a strictly later adapter terminal fact and rejects stale/equal conflicting content",
+    "raw_pii": "only contract facts are retained; provenance allow-list excludes arbitrary headers"
+  },
+  "evaluator": {
+    "type": "deterministic rubric; no external model",
+    "dimensions": ["factual_support", "completeness", "clarity", "next_step"],
+    "values": ["0", "1", "2", "UNKNOWN", "NOT_APPLICABLE"],
+    "evidence_rule": "factual_support is UNKNOWN without evidence references; references produce a supported-reference score, not an entailment claim",
+    "unknown_not_zero": true,
+    "not_applicable_not_zero": true,
+    "critical_error": "separate boolean/reason populated from an explicitly supplied error_category",
+    "stored_fields": ["value", "evidence", "reason", "limitation", "improvement_suggestion"]
+  },
+  "feedback_semantics": {
+    "independent_fields": ["specialist_rating", "information_quality_rating", "solved", "comment_text"],
+    "forbidden_inferences": [
+      "information-quality feedback is not specialist fault",
+      "specialist rating does not prove resolution",
+      "comment does not prove a product defect"
+    ],
+    "resolution_outcome_separate": true
+  },
+  "issue_groups": {
+    "algorithm": "deterministic grouping by supplied service_need, error_category, reason_codes or opaque decision label",
+    "minimum_group_size": 2,
+    "examples": [
+      {
+        "label": "Repeated service_need: UPD status",
+        "n": 3,
+        "representative_case_ids": ["case-1", "case-2", "case-3"],
+        "limitation": "repeated supplied attributes are not proof of a product defect"
+      }
+    ],
+    "hypothesis_marked": true,
+    "historical_resolution_as_normative": false
+  },
+  "read_models": ["evaluations_for_case", "issue_groups_query", "rebuild_issue_groups", "summary"],
+  "employee_safety": {
+    "ranking": false,
+    "leaderboard": false,
+    "specialist_slices": "only supplied distributions/counts can be aggregated; no causal employee score"
+  },
+  "tests": {
+    "quality_test_file": "tests/test_quality_foundation.py",
+    "passed": 13,
+    "skipped": 1,
+    "covered": [
+      "first intake and provenance",
+      "turn/feedback/completion idempotency",
+      "conflicting duplicate",
+      "independent feedback and outcome",
+      "UNKNOWN and NOT_APPLICABLE",
+      "critical_error independence",
+      "deterministic evaluation",
+      "deterministic groups and limitations",
+      "employee-safety guard",
+      "historical non-promotion",
+      "0008 single-head/no-FK shape"
+    ],
+    "real_postgres": "skipped: AI4_TEST_DATABASE_URL not configured; no normal development DB was modified",
+    "full_knowledge_suite": "not rerun in this checkpoint"
+  },
+  "limitations": [
+    "Existing HTTP routes still acknowledge pushes and are intentionally not wired in AI-4; AI-5 must call QualityRepository and map conflicts/errors.",
+    "knowledge-worker scheduling and retry loop remain to be wired by AI-5.",
+    "Real PostgreSQL upgrade/downgrade and cross-session durability require an explicitly disposable AI4_TEST_DATABASE_URL.",
+    "The deterministic rubric cannot prove factual entailment without source text; it records this limitation rather than claiming correctness."
+  ],
+  "untouched": {
+    "contracts_openapi": true,
+    "api_routes_settings": true,
+    "retrieval_inference_generation": true,
+    "corpus_snapshot_conditions": true,
+    "support_core_web": true,
+    "push": false
+  },
+  "changed_files": [
+    "src/knowledge/src/tenderhack_knowledge/quality/__init__.py",
+    "src/knowledge/src/tenderhack_knowledge/quality/schema.py",
+    "src/knowledge/src/tenderhack_knowledge/quality/service.py",
+    "src/knowledge/migrations/versions/0008_quality_analytics.py",
+    "src/knowledge/tests/test_quality_foundation.py",
+    "src/knowledge/benchmarks/ai4-quality-analytics.json"
+  ]
+}
