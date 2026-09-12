@@ -33,6 +33,7 @@ node_modules/
 dist/
 .vite/
 coverage/
+*.tsbuildinfo
 
 # Local models / ML artifacts
 models/

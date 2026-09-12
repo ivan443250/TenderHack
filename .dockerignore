@@ -1,0 +1,9 @@
+.git/
+docs/
+**/bin/
+**/obj/
+**/.vs/
+src/web/node_modules/
+src/web/dist/
+src/web/.vite/
+src/knowledge/.venv/

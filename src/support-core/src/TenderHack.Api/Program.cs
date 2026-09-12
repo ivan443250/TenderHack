@@ -58,8 +58,11 @@ using (var startupScope = app.Services.CreateScope())
 
 app.UseExceptionHandler();
 
-// Dev-only manual test console (wwwroot/) — same-origin static files so the owner_id cookie works
-// without any CORS setup. Not part of the product surface.
+// Same-origin static files so the owner_id cookie works without any CORS setup (web-api-v0.md §13).
+// `wwwroot/` holds the built React SPA at its root (copied in during `dotnet publish`/Docker build,
+// see src/web/README.md); the pre-existing manual test console moved to wwwroot/dev-console/ so it
+// doesn't collide with the SPA's own index.html/assets. Neither exists in a plain `dotnet run` from
+// source — only after a build step populates wwwroot.
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
@@ -82,6 +85,10 @@ app.MapAnalyticsEndpoints();
 
 var supportOptions = app.Services.GetRequiredService<IOptions<SupportOptions>>().Value;
 app.MapSupportWebhookEndpoints(supportOptions);
+
+// SPA fallback must be mapped last: it only catches GET requests that missed every route above
+// (i.e. never /api/v0/*, /health/*), and serves the SPA's own client-side router for e.g. /cases/123.
+app.MapFallbackToFile("index.html");
 
 app.Run();
 
