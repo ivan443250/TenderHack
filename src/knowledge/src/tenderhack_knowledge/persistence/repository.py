@@ -35,6 +35,7 @@ from tenderhack_knowledge.inference.errors import (
     EmbeddingRevisionMismatchError,
     EmbeddingUnavailableError,
 )
+from tenderhack_knowledge.conditions.cards import ConditionCard
 
 
 metadata = sa.MetaData()
@@ -117,6 +118,27 @@ kb_fragment_embeddings = sa.Table(
     # extension; writes/searches cast explicitly in SQL below.
     sa.Column("embedding", sa.Text(), nullable=False),
     sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+)
+kb_condition_cards = sa.Table(
+    "kb_condition_cards",
+    metadata,
+    sa.Column("card_id", sa.String(128), nullable=False),
+    sa.Column("version", sa.String(64), nullable=False),
+    sa.Column("snapshot_id", sa.String(128), nullable=False),
+    sa.Column("title", sa.Text(), nullable=False),
+    sa.Column("applicability", sa.JSON(), nullable=False),
+    sa.Column("required_slots", sa.JSON(), nullable=False),
+    sa.Column("allowed_action", sa.Text(), nullable=False),
+    sa.Column("forbidden_generalization", sa.Text(), nullable=False),
+    sa.Column("handoff_condition", sa.Text(), nullable=False),
+    sa.Column("risk_level", sa.String(8), nullable=False),
+    sa.Column("source_fragment_ids", sa.JSON(), nullable=False),
+    sa.Column("source_quotes", sa.JSON(), nullable=False),
+    sa.Column("source_anchors", sa.JSON(), nullable=False),
+    sa.Column("review_status", sa.String(32), nullable=False),
+    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+    sa.PrimaryKeyConstraint("card_id", "version"),
+    sa.CheckConstraint("risk_level IN ('LOW', 'MEDIUM', 'HIGH')", name="ck_kb_condition_cards_risk"),
 )
 kb_ingestion_runs = sa.Table(
     "kb_ingestion_runs",
@@ -307,6 +329,92 @@ class PostgresKnowledgeRepository:
                 _fragment_from_row(row).model_copy(update={"snapshot_id": snapshot_id})
                 for row in result.mappings()
             )
+
+    async def store_condition_cards(self, cards: Iterable[ConditionCard]) -> int:
+        """Persist immutable card versions after a normative provenance check."""
+
+        values = tuple(cards)
+        if not values:
+            return 0
+        by_snapshot: dict[str, list[ConditionCard]] = {}
+        for card in values:
+            by_snapshot.setdefault(card.snapshot_id, []).append(card)
+
+        # Validate every source reference before writing.  This deliberately
+        # does not use the moving "current" snapshot: cards are pinned to the
+        # snapshot recorded in their seed artifact.
+        for card_snapshot_id, snapshot_cards in by_snapshot.items():
+            snapshot = await self.get_snapshot(card_snapshot_id)
+            if snapshot is None:
+                raise UnknownSnapshotError(card_snapshot_id)
+            if snapshot.corpus != Corpus.NORMATIVE:
+                raise CorpusBoundaryError(
+                    f"condition cards may only attach to normative snapshots, got {snapshot.corpus.value}"
+                )
+            fragments = {fragment.fragment_id: fragment for fragment in await self.snapshot_fragments(card_snapshot_id)}
+            for card in snapshot_cards:
+                missing = sorted(set(card.source_fragment_ids) - set(fragments))
+                if missing:
+                    raise ValueError(
+                        f"condition card {card.card_id}@{card.version} references fragments outside snapshot: "
+                        + ", ".join(missing[:3])
+                    )
+                if any(not fragments[fragment_id].text.strip() for fragment_id in card.source_fragment_ids):
+                    raise ValueError(f"condition card {card.card_id}@{card.version} references empty source text")
+
+        async with self.engine.begin() as connection:
+            for card in values:
+                payload = _condition_card_values(card)
+                await connection.execute(
+                    pg_insert(kb_condition_cards).values(**payload).on_conflict_do_nothing(
+                        index_elements=[kb_condition_cards.c.card_id, kb_condition_cards.c.version]
+                    )
+                )
+                row = await self._one(
+                    connection,
+                    select(kb_condition_cards).where(
+                        kb_condition_cards.c.card_id == card.card_id,
+                        kb_condition_cards.c.version == card.version,
+                    ),
+                )
+                if row is None:  # pragma: no cover - insert/select share a transaction
+                    raise RuntimeError(f"condition card was not stored: {card.card_id}@{card.version}")
+                stored = _condition_card_from_row(row)
+                if stored != card:
+                    raise ValueError(f"condition card identity collision for {card.card_id}@{card.version}")
+        return len(values)
+
+    async def condition_cards(
+        self,
+        snapshot_id: str,
+        *,
+        review_status: str | None = "VERIFIED",
+    ) -> tuple[ConditionCard, ...]:
+        async with self.engine.connect() as connection:
+            statement = select(kb_condition_cards).where(kb_condition_cards.c.snapshot_id == snapshot_id)
+            if review_status is not None:
+                statement = statement.where(kb_condition_cards.c.review_status == review_status)
+            result = await connection.execute(
+                statement.order_by(kb_condition_cards.c.card_id, kb_condition_cards.c.version)
+            )
+            return tuple(_condition_card_from_row(row) for row in result.mappings())
+
+    async def get_condition_card(
+        self,
+        card_id: str,
+        version: str,
+        *,
+        snapshot_id: str | None = None,
+    ) -> ConditionCard | None:
+        async with self.engine.connect() as connection:
+            statement = select(kb_condition_cards).where(
+                kb_condition_cards.c.card_id == card_id,
+                kb_condition_cards.c.version == version,
+            )
+            if snapshot_id is not None:
+                statement = statement.where(kb_condition_cards.c.snapshot_id == snapshot_id)
+            row = await self._one(connection, statement)
+            return _condition_card_from_row(row) if row is not None else None
 
     async def snapshot_counts(self, snapshot_id: str) -> tuple[int, int]:
         async with self.engine.connect() as connection:
@@ -746,6 +854,45 @@ def _fragment_values(fragment: KnowledgeFragment) -> dict[str, object]:
     payload = fragment.model_dump(mode="json")
     payload.pop("snapshot_id", None)
     return payload
+
+
+def _condition_card_values(card: ConditionCard) -> dict[str, object]:
+    return {
+        "card_id": card.card_id,
+        "version": card.version,
+        "snapshot_id": card.snapshot_id,
+        "title": card.title,
+        "applicability": card.applicability.model_dump(mode="json"),
+        "required_slots": list(card.required_slots),
+        "allowed_action": card.allowed_action,
+        "forbidden_generalization": card.forbidden_generalization,
+        "handoff_condition": card.handoff_condition,
+        "risk_level": card.risk_level.value,
+        "source_fragment_ids": list(card.source_fragment_ids),
+        "source_quotes": list(card.source_quotes),
+        "source_anchors": list(card.source_anchors),
+        "review_status": card.review_status,
+        "created_at": datetime.now().astimezone(),
+    }
+
+
+def _condition_card_from_row(row: object) -> ConditionCard:
+    return ConditionCard(
+        card_id=row["card_id"],
+        version=row["version"],
+        snapshot_id=row["snapshot_id"],
+        title=row["title"],
+        applicability=row["applicability"],
+        required_slots=tuple(row["required_slots"] or ()),
+        allowed_action=row["allowed_action"],
+        forbidden_generalization=row["forbidden_generalization"],
+        handoff_condition=row["handoff_condition"],
+        risk_level=row["risk_level"],
+        source_fragment_ids=tuple(row["source_fragment_ids"] or ()),
+        source_quotes=tuple(row["source_quotes"] or ()),
+        source_anchors=tuple(row["source_anchors"] or ()),
+        review_status=row["review_status"],
+    )
 
 
 def _escape_like(value: str) -> str:
