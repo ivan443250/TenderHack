@@ -1,0 +1,160 @@
+{
+  "report_version": "cloudru-a100-deployment-prep",
+  "audit_date": "2026-09-12",
+  "starting_head": "abfaad6",
+  "status": "READY_FOR_TARGET_BUILD",
+  "files_created": [
+    "infra/inference/cloudru/Dockerfile",
+    "infra/inference/cloudru/.dockerignore",
+    "infra/inference/cloudru/entrypoint.sh",
+    "infra/inference/cloudru/cloud-a100.env.example",
+    "infra/inference/cloudru/gateway/app.py",
+    "infra/inference/cloudru/gateway/tests/test_app.py",
+    "infra/inference/cloudru/scripts/verify-models.sh",
+    "infra/inference/cloudru/scripts/smoke.sh",
+    "infra/inference/cloudru/deployment-prep-report.json"
+  ],
+  "files_modified": [
+    "infra/inference/README.md"
+  ],
+  "container": {
+    "platform": "linux/amd64",
+    "port": 8080,
+    "uid": 1000,
+    "gid": 1000,
+    "weights_baked_in": false,
+    "volume_instruction": false,
+    "models_mount": "/models:ro"
+  },
+  "runtime": {
+    "family": "llama.cpp / llama-server",
+    "image": "ghcr.io/ggml-org/llama.cpp:server-cuda13-b10902@sha256:3a88f3dba5f665c0dcb51f68ec990293758ac518b433556013a2e849694c8cd8",
+    "image_source": "official ggml-org container registry",
+    "cuda_variant": "CUDA 13",
+    "version_command": "/app/llama-server --version (record on target image)",
+    "build_strategy": "single pinned CUDA server base plus Python standard-library gateway",
+    "external_ai_api": false,
+    "model_download_at_runtime": false
+  },
+  "llama_cpp_pin": {
+    "tag": "server-cuda13-b10902",
+    "manifest_digest": "sha256:3a88f3dba5f665c0dcb51f68ec990293758ac518b433556013a2e849694c8cd8",
+    "server_binary": "/app/llama-server",
+    "pin_verification": "official tag/digest recorded; target build must record --version and re-check digest"
+  },
+  "providers": {
+    "embedding": {
+      "model": "ai-sage/Giga-Embeddings-instruct-3B-0826",
+      "artifact": "giga-embeddings-0826-3b-q8_0.gguf",
+      "internal_bind": "127.0.0.1:8081",
+      "endpoint": "POST /v1/embeddings",
+      "dimension": 2048,
+      "giga_sha256": "429f2d04a968ffe73137fe65c2e458a08236056168b905d208b4d81ecab08c22",
+      "status": "IMPLEMENTED_NOT_RUNTIME_VERIFIED"
+    },
+    "generator": {
+      "model": "empero-ai/Qwen3.8-4B-Distill",
+      "artifact": "Qwen3.8-4B-Q6_K.gguf",
+      "internal_bind": "127.0.0.1:8082",
+      "endpoint": "POST /v1/chat/completions",
+      "context_limit": 8192,
+      "qwen_sha256": null,
+      "status": "IMPLEMENTED_NOT_RUNTIME_VERIFIED"
+    },
+    "reranker": {
+      "model": "Querit/Querit-4B",
+      "status": "DISABLED_BY_DEFAULT",
+      "provider": null,
+      "reason": "No certified Querit artifact or llama.cpp-compatible interface; /v1/rerank returns MODEL_UNAVAILABLE"
+    }
+  },
+  "health": {
+    "live": "gateway process only; GET /health/live does not imply model readiness",
+    "ready": "bounded embedding (2048 finite vector) and generator (non-empty final response) smokes; optional reranker is reported separately",
+    "startup": "entrypoint waits for upstream /health then gateway /health/ready and exits on timeout",
+    "status": "STATICALLY_IMPLEMENTED_NOT_RUNTIME_VERIFIED"
+  },
+  "readiness": {
+    "required": ["embedding", "generator"],
+    "optional": ["reranker"],
+    "disabled_reranker_does_not_block": true,
+    "socket_open_is_insufficient": true,
+    "think_safety": "balanced reasoning blocks are stripped; malformed reasoning fails closed",
+    "status": "STATICALLY_IMPLEMENTED_NOT_RUNTIME_VERIFIED"
+  },
+  "auth": {
+    "boundary": "internal gateway; no end-user authentication",
+    "mechanism": "optional INFERENCE_API_TOKEN with Authorization: Bearer token on /v1/*",
+    "health_probe_exempt": true,
+    "token_logged": false
+  },
+  "logging": {
+    "raw_request_content": false,
+    "raw_evidence": false,
+    "authorization_headers": false,
+    "fields": ["request_id", "route", "status", "provider", "latency_ms"],
+    "debug_content": false
+  },
+  "signal_shutdown": {
+    "signals": ["SIGTERM", "SIGINT"],
+    "children_stopped": ["gateway", "qwen llama-server", "giga llama-server"],
+    "broad_kill_used": false,
+    "status": "STATICALLY_IMPLEMENTED_NOT_RUNTIME_VERIFIED"
+  },
+  "model_mount": {
+    "path": "/models",
+    "read_only_required": true,
+    "weights_in_image": false,
+    "download_status": "NOT_EXECUTED"
+  },
+  "build_validation": {
+    "status": "STATIC_VALIDATION_PASS_BUILD_NOT_EXECUTED_LOCALLY",
+    "reason": "Current workstation is not the target A100 and pulling the CUDA base is unnecessary for static package validation",
+    "dockerfile_static_review": "PASS: docker buildx build --check --platform linux/amd64",
+    "gateway_compile": "PASS: Python 3.12 compileall",
+    "gateway_unit_tests": "PASS: 5 unittest cases with fake upstream servers",
+    "shell_syntax": "PASS: bash -n on entrypoint, verify-models and smoke scripts",
+    "json_validation": "PASS: Python JSON parser",
+    "image_size": null
+  },
+  "cloudru_push_status": "NOT_EXECUTED",
+  "model_download_status": "NOT_EXECUTED",
+  "high_findings": [],
+  "medium_findings": [
+    {
+      "id": "RUNTIME_VERSION_TARGET_CHECK",
+      "status": "MITIGATED_BY_STARTUP_GATE",
+      "finding": "The official CUDA image tag/digest is pinned, but llama-server --version and flag support can only be confirmed on the target image.",
+      "mitigation": "Entrypoint checks --help before launch; record --version during target build and smoke."
+    },
+    {
+      "id": "PYTHON_BASE_PACKAGE_REPRODUCIBILITY",
+      "status": "CONTROLLED_LIMITATION",
+      "finding": "Python is installed from the pinned CUDA image's Ubuntu package repository during image build; package snapshot is not separately pinned.",
+      "mitigation": "Capture and deploy the final immutable image digest from Artifact Registry; tighten apt snapshot pinning if Cloud policy requires it."
+    }
+  ],
+  "low_findings": [
+    {
+      "id": "LOCAL_CUDA_BUILD_NOT_RUN",
+      "finding": "No local image size or CUDA execution measurement was produced by design.",
+      "mitigation": "Measure on the Cloud.ru A100 target after push."
+    }
+  ],
+  "next_steps": [
+    "On a disposable Linux A100 host, verify the pinned base digest and record /app/llama-server --version.",
+    "Provision the two exact GGUF files outside Git; verify Giga SHA256 before starting the container and record Qwen SHA256.",
+    "Build linux/amd64 image from infra/inference/cloudru and capture the final image digest/size.",
+    "Push the image to Cloud.ru Artifact Registry using secret injection, never committing credentials.",
+    "Run one Docker RUN instance with /models:ro, only port 8080 published and INFERENCE_API_TOKEN configured.",
+    "Run scripts/smoke.sh and then the separate Model Stack v2 real certification; do not enable Querit until independently certified."
+  ],
+  "verification": {
+    "scope": "infra/inference/** only",
+    "forbidden_paths_touched": [],
+    "model_binaries_added": false,
+    "push_executed": false,
+    "downloads_executed": false
+  },
+  "next_task": "CLOUD.RU A100 DEPLOYMENT + MODEL PROVISIONING"
+}

@@ -1,0 +1,11 @@
+.git
+.gitignore
+*.gguf
+*.bin
+*.safetensors
+models/
+__pycache__/
+*.pyc
+*.pyo
+*.log
+tests/
