@@ -6,7 +6,7 @@
 
 1. Проверь текущую ветку, `git status` и diff. Не затирай чужую работу.
 2. Прочитай `docs/index.md`.
-3. Открой только документы, релевантные задаче.
+3. Открой только документы, релевантные задаче. Для user-facing UX, recovery, context или analytics enhancement обязательно открой `docs/product-experience.md`.
 4. Проверь `docs/open-decisions.md`: не превращай нерешённую политику в скрытый факт.
 5. Сформулируй acceptance criteria до кода.
 6. Если меняется внешний/межмодульный интерфейс — сначала открой `docs/contracts/README.md` и соответствующий контракт.
@@ -20,8 +20,9 @@
 2. Явные текущие решения команды/пользователя, если они не противоречат п.1.
 3. `docs/hackathon-requirements.md`.
 4. `docs/product-spec.md`.
-5. `docs/architecture.md`, `docs/stack.md`, ADR и frozen contracts.
-6. Код, комментарии и старые drafts.
+5. `docs/product-experience.md` для принятого product-enhancement поведения; он не переопределяет core state/decision policy из `product-spec.md`.
+6. `docs/architecture.md`, `docs/stack.md`, ADR и frozen contracts.
+7. Код, комментарии и старые drafts.
 
 Если источники конфликтуют — не выбирай молча. Зафиксируй конфликт в `docs/open-decisions.md` или обнови source of truth тем же change.
 
@@ -75,9 +76,9 @@
 | Support Core / state / orchestration | `.NET api` | `architecture.md`, `product-spec.md`, `contracts/` |
 | Knowledge / retrieval / generation | Python `knowledge` | `product-spec.md`, `knowledge-v0.*`, `quality.md` |
 | Ingestion / KB | `knowledge-worker` | `product-spec.md §6–9`, `architecture.md §8–9` |
-| Web / chat timeline | React | `web-api-v0.md`, `product-spec.md`, `architecture.md §13–14` |
-| Handoff integration | `.NET api-worker` | `support-adapter-v0.md`, `product-spec.md §17` |
-| Quality / issue analytics | Python `knowledge-worker` | `quality.md`, `knowledge-v0.*` |
+| Web / chat timeline / product UX | React | `web-api-v0.md`, `product-spec.md`, `product-experience.md`, `architecture.md §13–14` |
+| Handoff integration | `.NET api-worker` | `support-adapter-v0.md`, `product-spec.md §17`, `product-experience.md` |
+| Quality / issue analytics | Python `knowledge-worker` | `quality.md`, `knowledge-v0.*`, `product-experience.md §7–8` |
 | Deployment / observability | cross-cutting | `stack.md`, `architecture.md §16–18` |
 
 Не редактируй чужой блок «заодно», если это не требуется контрактом задачи.
@@ -100,11 +101,13 @@ Root agent остаётся интегратором. Subagents можно ис�
 - secrets/PII/logging;
 - docs/code drift;
 - отсутствие decision-логики в `knowledge`;
-- отсутствие cross-runtime DB reads.
+- отсутствие cross-runtime DB reads;
+- product-facing feature убирает реальную работу/неопределённость, а не добавляет AI-theater;
+- inferred/simulated/hypothesis данные нигде не выглядят как verified Portal/support fact.
 
 ## 7. Verification и Definition of Done
 
-Полные gates: `docs/quality.md`.
+Полные gates: `docs/quality.md`. Для product enhancement дополнительно применяй acceptance/review checklist из `docs/product-experience.md`; если фича требует новый contract/state, обнови соответствующий source of truth и tests тем же change.
 
 Не заявляй о passing tests/benchmarks, если они не запускались. Пока scaffold отсутствует, не выдумывай команды. После появления manifest/config реальная команда проверки должна быть добавлена в `docs/quality.md` в том же change.
 

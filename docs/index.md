@@ -8,6 +8,7 @@
 |---|---|---|
 | [`hackathon-requirements.md`](hackathon-requirements.md) | Формальные функции, ограничения, scoring/defense layer без старой архитектуры | Scope/приоритеты/спор о требованиях |
 | [`product-spec.md`](product-spec.md) | Что строим, P0/P1/non-goals, decision/state semantics, knowledge/routing/quality rules | Любое изменение поведения |
+| [`product-experience.md`](product-experience.md) | Принятый вектор продуктовой доработки: 7 полезных фич, UX-поведение, ограничения и acceptance | User-facing UX, product differentiation, recovery, context, analytics improvements |
 | [`architecture.md`](architecture.md) | Модули, boundaries, state, persistence, worker, handoff | Backend/API/data/frontend boundaries |
 | [`stack.md`](stack.md) | Зафиксированный стек, версии, модели, rejected alternatives | Новые dependencies/runtime/infrastructure |
 | [`adr/`](adr/) | Architecture decision records; ADR-0001 — граница .NET `api` / Python `knowledge`; ADR-0002 — inbound handoff status sync + in-app notifications; ADR-0003 — Model Stack v2 | Смена ownership/runtime/service/queue/DB/state dimension |
@@ -36,8 +37,9 @@
 3. Реальные предоставленные данные и инструкции.
 4. `hackathon-requirements.md` — сохраненная фиксация формального слоя.
 5. `product-spec.md` — принятая продуктовая политика для неоднозначных мест.
-6. `architecture.md`, `stack.md`, ADR и frozen contracts — инженерная реализация политики.
-7. Остальные документы/комментарии/код.
+6. `product-experience.md` — принятый слой product enhancement; он расширяет UX/аналитику, но не может молча переопределять core state/decision policy из `product-spec.md`.
+7. `architecture.md`, `stack.md`, ADR и frozen contracts — инженерная реализация политики.
+8. Остальные документы/комментарии/код.
 
 Если новое официальное требование противоречит docs, не защищать старый документ: обновить решение, причину и зависимые документы/код. Если конфликт ещё не разрешён — записать его в `open-decisions.md` и не выбирать вариант скрыто.
 
@@ -48,14 +50,15 @@
 - **Цель** — критерий будущей проверки, не уже достигнутый результат.
 - **Гипотеза** — объяснение, которое еще нужно доказать.
 
-Не превращать target architecture, план или model confidence в факт реализации.
+Не превращать target architecture, план, product enhancement или model confidence в факт реализации.
 
 ## Документационная дисциплина
 
 Если задача меняет:
 
 - формальный scope/constraints → `hackathon-requirements.md`;
-- product behavior/state policy → `product-spec.md`;
+- core product behavior/state policy → `product-spec.md`;
+- product UX/differentiation/recovery/context/analytics enhancement → `product-experience.md`, а при изменении core behavior также `product-spec.md`;
 - module ownership/data/state boundary → `architecture.md`;
 - shared transport/interface → соответствующий файл `contracts/` + обе стороны + contract tests;
 - runtime ownership/new service/queue/DB/state dimension → новый ADR;
