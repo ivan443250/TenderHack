@@ -15,6 +15,8 @@ One aggregate accuracy is not sufficient. The system must be evaluated at the sa
 
 A system that refuses every question can look «safe» and still be useless. Always measure precision/safety together with useful coverage.
 
+Historical benchmark artifacts apply only to the model/corpus/config recorded in them; pre-ADR-0003 measurements are not Model Stack v2 certification evidence.
+
 ## 2. Gold data
 
 Target, if labeling capacity allows:
@@ -203,6 +205,8 @@ A group card must expose:
 
 A cluster is not automatically an incident or bug.
 
+For implemented product enhancements from `product-experience.md`, preserve the same evidence discipline: Knowledge Gap Radar must distinguish knowledge insufficiency from technical/model failure, and Emerging Issue Detector must expose `n`, time window/examples and remain a hypothesis until externally confirmed.
+
 ## 11. Critical E2E suite
 
 Keep a small suite that can run before demo/release:
@@ -329,9 +333,9 @@ Done only if:
 
 ## 13. Verification commands
 
-The foundation scaffold now contains executable manifests and deterministic health/stub checks. Product behavior remains intentionally unimplemented; report each command result rather than inferring a pass.
+The repository now contains executable .NET/Python/Web manifests and substantial Support Core/Knowledge behavior. Do **not** describe the whole product as «intentionally unimplemented». The current Web remains a minimal shell, and Model Stack v2 runtime/quality certification remains an explicit active gap.
 
-Scaffold baseline commands:
+Baseline commands:
 
 ```bash
 # .NET support core (src/support-core)
@@ -343,10 +347,9 @@ uv sync --extra test --project src/knowledge
 uv run --project src/knowledge pytest
 
 # Contract v0
-# The scaffold test checks that every frozen path/method is exposed.
 uv run --project src/knowledge pytest src/knowledge/tests/test_contract_paths.py
-# Exact FastAPI schema export and NSwag regeneration are intentionally deferred
-# until request models and the generated Infrastructure client are introduced.
+# Exact FastAPI/OpenAPI export and generated-client parity may be claimed only when
+# the corresponding current-commit check actually runs.
 
 # Web
 pnpm --dir src/web install
@@ -354,14 +357,13 @@ pnpm --dir src/web typecheck
 pnpm --dir src/web test
 pnpm --dir src/web build
 
-# Integration/e2e
+# Integration/e2e baseline
 docker compose config --quiet
 docker compose build web knowledge api api-worker
-docker compose up -d --wait
-docker compose down
+# Start/run only with the required env/model/data mounts for the profile being verified.
 ```
 
-Exact commands must match real manifests/configs before becoming mandatory.
+A documented command is not evidence of a pass. Report what actually ran, on which commit/config/profile, including failures/skips.
 
 ## 14. Release gate
 

@@ -1,6 +1,6 @@
 # Support adapter contract v0
 
-Статус: **semantic freeze for G2**. Контракт определяет boundary между `.NET Application` и внешней/демонстрационной системой поддержки. Реализация может быть demo adapter сегодня и реальный Portal adapter позже, но Domain/Application semantics не меняются.
+Статус: **frozen v0 semantics**. Контракт определяет boundary между `.NET Application` и внешней/демонстрационной системой поддержки. Историческая привязка к Gate G2 объясняет порядок первоначальной реализации, но не делает контракт временным: demo adapter сегодня и реальный Portal adapter позже должны соблюдать эту семантику либо явно версионировать boundary.
 
 ## 1. Ownership
 

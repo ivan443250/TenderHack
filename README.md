@@ -1,85 +1,86 @@
 # TenderHack 2026 — интеллектуальная поддержка Портала поставщиков
 
-Репозиторий команды для кейса TenderHack НН 2026: локальная система поддержки, которая отвечает только по проверяемым знаниям, умеет честно уточнять/отказываться/предлагать передачу специалисту и отдельно анализирует качество ответов и повторяющиеся проблемы.
+Локальная система поддержки Портала поставщиков: отвечает только по проверяемым знаниям, умеет уточнять существенные условия, честно abstain/предлагать передачу специалисту и отдельно анализирует качество ответов и повторяющиеся проблемы.
 
-## Статус
+## Текущее состояние репозитория
 
-`master` намеренно очищен от раннего .NET-шаблона (`1b57aa1`): его доменная модель фиксировала архитектуру до финального ревью требований. Текущая база — **docs-first, agent-first**: сначала зафиксированы формальные ограничения, продуктовые инварианты, архитектура, стек, quality gates и правила работы coding agents; реализация должна строиться поверх них.
+`master` — уже не foundation-only scaffold. В репозитории существуют три runtime-блока (`src/support-core`, `src/knowledge`, `src/web`), PostgreSQL/Compose-инфраструктура, замороженные контракты и существенная реализация Support Core/Knowledge. Web пока остаётся минимальным shell и является одним из основных незавершённых product surfaces.
 
-Backend разделён на .NET support core и Python knowledge-сервис по [`docs/adr/0001-dotnet-support-core-python-knowledge-service.md`](docs/adr/0001-dotnet-support-core-python-knowledge-service.md). Новый `src/support-core` пишется по текущему `architecture.md`, а не восстанавливается из старого scaffold.
+Исторический .NET-шаблон из `1b57aa1` не используется. Текущая архитектура — .NET Support Core + Python Knowledge/Inference по [`ADR-0001`](docs/adr/0001-dotnet-support-core-python-knowledge-service.md). Исторические plans/benchmarks сохраняются как provenance и не должны читаться как описание текущей реализации.
 
 ## Что строим
 
-Два равноправных контура:
+Два связанных контура:
 
-1. **Пользовательский (чат-first):** вопрос → контекст → поиск и проверка знаний → `ANSWER` с кнопкой источника / `CLARIFY` / «подтверждённого ответа нет» + кнопка оператора / `ANSWER_AND_HANDOFF` → предупреждение и закрытие при мате → виджет статуса передачи (этап/специалист только из фактов адаптера) → завершение с уведомлением → архив + feedback из четырёх сигналов.
-2. **Аналитический:** доступные обращения/ответы/отзывы → раздельная оценка качества текста, результата и обратной связи → объяснимые группы повторяющихся проблем.
+1. **Пользовательский, chat-first:** сообщение → moderation/context → retrieval → answerability → проверенный `ANSWER`, полезный `CLARIFY` или честный `HANDOFF_OFFER` / `ANSWER_AND_HANDOFF` → при передаче статус только из фактов адаптера → completion/archive/feedback.
+2. **Аналитический:** turns/completions/feedback → раздельная оценка качества текста, результата и пользовательских сигналов → read-only группы повторяющихся проблем и гипотезы.
+
+Поверх core принят отдельный product-enhancement слой: Context Passport, Resolution Plan, Applicability Card, Smart Recovery, Emerging Issue Detector, Knowledge Gap Radar и presentation controls. Их точная семантика и ограничения: [`docs/product-experience.md`](docs/product-experience.md).
 
 Не строим полноценный helpdesk, автономное изменение сущностей Портала, voice, GraphRAG «для инновационности» или swarm автономных runtime-агентов.
 
 ## Принятый стек
 
 - **Web:** React + TypeScript + Vite, Node.js 24 LTS, pnpm.
-- **Support core (`api`, `api-worker`):** C# / .NET 10 LTS, ASP.NET Core Minimal API, EF Core + Npgsql. Владеет cases, state machine, `Decision`, moderation rules, routing, handoff/outbox + status sync с адаптером, завершением/архивом, уведомлениями, feedback, HTTP/SSE.
-- **Knowledge & inference (`knowledge`, `knowledge-worker`):** Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, Alembic, asyncpg. Владеет ingestion, retrieval, моделями, answerability/verify, quality analytics.
-- **Контракт между ними:** внутренний HTTP `v0`, OpenAPI → сгенерированный C#-клиент; Python возвращает факты/скоры, решения принимает .NET.
-- **Persistence:** PostgreSQL 16, одна БД, строгое владение таблицами по runtime.
-- **Search:** PostgreSQL FTS + `pg_trgm` + `pgvector`; сначала exact vector search.
-- **Parsing:** `pdfplumber` baseline; Docling/OCR адресно после измерения качества.
-- **Embeddings:** `ai-sage/Giga-Embeddings-instruct-3B-0826`, normalized 2048 dimensions; query instruction `giga_portal_support_v1`.
-- **Reranker:** `Querit/Querit-4B`; custom adapter, quantized runtime `TBD_UNVERIFIED`; fallback exact + PostgreSQL FTS + Giga dense + RRF.
-- **Generation:** `empero-ai/Qwen3.8-4B-Distill`, `Qwen3.8-4B-Q6_K.gguf`, local-only.
-- **Inference:** recent llama.cpp via separate internal embedding/generator endpoints; no external AI/search API.
-- **Deployment:** Docker Compose; `web`, `api`, `api-worker`, `knowledge`, `knowledge-worker`, `postgres` plus profile-gated local inference services.
+- **Support Core (`api`, `api-worker`):** C# / .NET 10 LTS, ASP.NET Core Minimal API, EF Core + Npgsql. Владеет cases/state machine/`Decision`, moderation, routing, handoff/outbox/status sync, completion/archive, notifications, feedback, HTTP/SSE.
+- **Knowledge & inference (`knowledge`, `knowledge-worker`):** Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, Alembic, asyncpg. Владеет ingestion, retrieval, answerability/draft/verify, model adapters и read-only quality analytics.
+- **Контракт:** внутренний HTTP `v0`; Python возвращает facts/scores/evidence, финальные product decisions принимает .NET.
+- **Persistence/retrieval:** PostgreSQL 16 + FTS + `pg_trgm` + `pgvector`; отдельной vector DB нет.
+- **Embeddings:** `ai-sage/Giga-Embeddings-instruct-3B-0826`, 2048 dimensions; выбор принят ADR-0003, runtime/quality подтверждаются отдельной certification-процедурой.
+- **Reranker:** `Querit/Querit-4B`; включается только после сертификации runtime/scoring path, иначе safe fallback без reranker.
+- **Generation:** `empero-ai/Qwen3.8-4B-Distill`, Q6_K GGUF, local-only через llama.cpp.
+- **Deployment:** Docker Compose; model artifacts и organizer data монтируются снаружи git.
 
-Подробности и обоснования: [`docs/stack.md`](docs/stack.md) и [`docs/architecture.md`](docs/architecture.md).
+Подробности и актуальные ограничения: [`docs/stack.md`](docs/stack.md), [`docs/architecture.md`](docs/architecture.md), [`docs/adr/0003-model-stack-v2.md`](docs/adr/0003-model-stack-v2.md).
 
 ## Карта документации
 
-Начинать с [`AGENTS.md`](AGENTS.md), затем открывать только нужные документы:
+Начинать с [`AGENTS.md`](AGENTS.md) и [`docs/index.md`](docs/index.md). Основные sources of truth:
 
-- [`docs/index.md`](docs/index.md) — карта источников истины;
-- [`docs/hackathon-requirements.md`](docs/hackathon-requirements.md) — стабильный слой требований, ограничений, критериев и защиты;
-- [`docs/product-spec.md`](docs/product-spec.md) — продуктовые границы и логика решений;
-- [`docs/architecture.md`](docs/architecture.md) — модули, состояния, data boundaries;
-- [`docs/stack.md`](docs/stack.md) — выбранный стек и rejected alternatives;
-- [`docs/adr/`](docs/adr/) — architecture decision records; ADR-0001 — граница .NET `api` / Python `knowledge`; ADR-0002 — inbound handoff status sync и in-app уведомления; ADR-0003 — Model Stack v2;
-- [`docs/contracts/`](docs/contracts/) — замороженные контракты границ (`knowledge-v0`, `web-api-v0`, `support-adapter-v0`);
-- [`docs/open-decisions.md`](docs/open-decisions.md) — нерешённые вопросы, которые нельзя выбирать молча;
-- [`docs/agent-workflow.md`](docs/agent-workflow.md) — обязательный цикл coding agents, subagents и skeptic review;
-- [`docs/quality.md`](docs/quality.md) — тестирование, evals и Definition of Done;
-- [`docs/execution-plan.md`](docs/execution-plan.md) — порядок реализации и gates;
-- [`docs/references.md`](docs/references.md) — первичные источники и OpenAI guidance.
+- [`docs/hackathon-requirements.md`](docs/hackathon-requirements.md) — формальный слой требований;
+- [`docs/product-spec.md`](docs/product-spec.md) — core product policy/state/decisions;
+- [`docs/product-experience.md`](docs/product-experience.md) — принятый product-enhancement вектор;
+- [`docs/architecture.md`](docs/architecture.md) — ownership, state, boundaries, persistence/workers;
+- [`docs/stack.md`](docs/stack.md) — стек/model/runtime policy;
+- [`docs/contracts/`](docs/contracts/) — frozen boundaries;
+- [`docs/open-decisions.md`](docs/open-decisions.md) — реально открытые external/policy gaps;
+- [`docs/quality.md`](docs/quality.md) — tests/evals/DoD;
+- [`docs/plans/active/`](docs/plans/active/) — только незавершённые execution/certification plans;
+- [`docs/plans/completed/`](docs/plans/completed/) — исторические завершённые планы;
+- [`docs/references.md`](docs/references.md) — внешние первичные источники, включая OpenAI guidance и model/runtime sources.
 
 ## Главные инженерные правила
 
-- Внешние AI API не используются в интеллектуальном контуре.
+- Browser ходит только в `.NET api`; `knowledge` не является вторым публичным backend.
+- `.NET` принимает product/business decisions; Knowledge возвращает evidence/facts/scores.
 - Исторические решения тикетов — аналитический корпус, **не** нормативная база ответов.
 - Наличие похожего фрагмента не означает answerability.
-- `ANSWER` не означает `RESOLVED`; `RESOLVED` ставит только пользователь (`complete`) или терминальный факт адаптера.
-- `handoff prepared` не означает `handoff accepted`; этап и специалист показываются только если их сообщил адаптер.
-- Пользовательские факты не превращаются в verified Portal state.
-- Нельзя показывать chain-of-thought как «прозрачность»; показываем source, condition, reason code, route и observable event.
-- Для рискованных/неподтвержденных условий безопасный отказ или передача лучше уверенной галлюцинации.
+- `ANSWER != RESOLVED`; positive feedback тоже не означает resolution.
+- `handoff prepared != accepted`; stage/specialist/terminal — только факты адаптера, simulated всегда помечен.
+- Infrastructure/model failure != «в базе нет ответа».
+- Пользовательские/inferred данные не превращаются в verified Portal state.
+- Chain-of-thought не является прозрачностью: показываем источники, условия, observable events, route/reason и limitations.
+- Product-enhancement функция не может молча расширить frozen contract или создать новый authoritative state в frontend.
 
-## Repository structure after foundation scaffold
+## Структура репозитория
 
 ```text
 src/
-  support-core/ .NET solution: Domain / Application / Infrastructure / Api / Worker + tests
-  knowledge/    Python FastAPI knowledge & inference service + worker entrypoint
-  web/          React/Vite UI
-evals/          retrieval, decision, moderation, quality and E2E suites
-tests/e2e/      cross-runtime smoke scenarios
-infra/          Compose and controlled-inference configuration
-scripts/        ingestion/dev/reproducibility helpers
-docs/           repository knowledge system of record (+ docs/adr/)
+  support-core/   .NET Domain / Application / Infrastructure / Api / Worker + tests
+  knowledge/      Python Knowledge/Inference + worker + migrations + benchmarks
+  web/            React/Vite UI (сейчас минимальный shell)
+evals/            repository-level evaluation workspace
+tests/e2e/        cross-runtime smoke/E2E workspace
+infra/            Compose/bootstrap/inference configuration
+scripts/          ingestion/dev/reproducibility helpers
+docs/             system of record + ADR/contracts/plans
 ```
 
-Foundation verification commands:
+## Базовые проверки
+
+Актуальный список и интерпретация результатов — [`docs/quality.md`](docs/quality.md). Основные команды:
 
 ```text
-copy .env.example .env
 dotnet build src/support-core/TenderHack.sln -c Release
 dotnet test src/support-core/TenderHack.sln -c Release
 uv sync --extra test --project src/knowledge
@@ -88,29 +89,11 @@ pnpm --dir src/web install
 pnpm --dir src/web typecheck
 pnpm --dir src/web test
 pnpm --dir src/web build
-docker compose config
-powershell -ExecutionPolicy Bypass -File scripts/check-structure.ps1
+docker compose config --quiet
 ```
 
-The repository now includes the six-manual ingestion/provenance foundation, lexical and hybrid retrieval, answerability, grounded draft/verification and quality foundations. Real V2 model backfill and runtime certification remain pending; documented target behavior is not a claim that all runtime profiles are currently provisioned.
-
-Не создавать эти каталоги пустыми ради вида. Первый implementation change должен создать только реально используемый scaffold и одновременно обновить команды в `AGENTS.md`/docs.
-
-## Первый implementation gate
-
-До расширения функций должен работать один вертикальный путь на реальных документах:
-
-```text
-реальный вопрос
-→ локальный retrieval
-→ применимый fragment/source
-→ проверенный ответ или честный abstain
-→ состояние сохраняется
-→ UI открывает источник
-```
-
-После этого добавляются routing/moderation/handoff, затем quality analytics, затем улучшения retrieval и polish.
+Не переносить historical benchmark на новый model stack и не называть выбранный runtime/model `certified`, пока соответствующий active certification plan не дал measured evidence.
 
 ## Работа coding agents
 
-Для нетривиальных задач root-agent действует как manager: читает карту docs, формирует короткий план, параллелит независимые исследования/проверки через subagents, интегрирует изменения, делает self-review, затем запускает независимый skeptic review и только после исправлений/проверок считает работу завершенной. Подробный протокол: [`docs/agent-workflow.md`](docs/agent-workflow.md).
+Для нетривиальных задач root-agent действует как manager: сначала source-of-truth/acceptance, затем ограниченное параллельное делегирование, интеграция, self-review, независимый skeptic review, verification и docs sync. Подробный протокол: [`docs/agent-workflow.md`](docs/agent-workflow.md).

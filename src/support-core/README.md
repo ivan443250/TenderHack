@@ -1,9 +1,9 @@
-# Support Core scaffold
+# Support Core
 
-The .NET runtime owns business state, orchestration, decisions, moderation/routing policy, handoff, feedback, idempotency and the public HTTP/SSE boundary.
+The .NET runtime owns business state, orchestration, decisions, moderation/routing policy, handoff, completion/archive, notifications, feedback, idempotency and the public HTTP/SSE boundary.
 
-`TenderHack.Domain` has no framework dependency. `TenderHack.Application` depends on Domain; Infrastructure implements application ports; Api and Worker compose the runtime. The generated Knowledge client belongs in Infrastructure when contract generation is wired.
+`TenderHack.Domain` has no framework dependency. `TenderHack.Application` depends on Domain; Infrastructure implements application ports; Api and Worker compose the runtime. Knowledge/inference remains behind `IKnowledgeService`; business decisions stay in .NET.
 
-This foundation contains process health endpoints and a long-running worker host only. `/health/ready` is explicitly process-only (`dependencies=not_checked`) until API-owned persistence and the generated Knowledge client are wired in. Case behavior is intentionally not implemented yet.
+Current code includes the case/turn state machine, `TurnOrchestrator`, moderation/routing paths, handoff/outbox/status handling, completion/feedback/notifications and API/worker infrastructure. Do not treat this directory as a health-only scaffold. Exact implemented-vs-target semantics are documented in `../../docs/architecture.md`, `../../docs/product-spec.md` and the contracts; documentation must not claim an unverified runtime capability merely because it is specified.
 
 Run `dotnet build TenderHack.sln` and `dotnet test TenderHack.sln` from this directory. Start the API with `dotnet run --project src/TenderHack.Api`; start the worker with `dotnet run --project src/TenderHack.Worker`.

@@ -1,6 +1,6 @@
 # Browser ↔ API contract v0
 
-Статус: **semantic freeze for G0/G1**. До появления `.NET` scaffold это нормативная семантика публичной browser boundary. После scaffold ASP.NET OpenAPI становится machine-readable artifact и должен оставаться совместимым с этим документом.
+Статус: **frozen v0 semantics**. `.NET api` и React `web` уже существуют; этот документ фиксирует публичную browser boundary и остаётся нормативным по семантике. Фактическая ASP.NET OpenAPI/route surface должна оставаться совместимой с ним; расхождение — contract drift, а не повод молча «подстроить» frontend.
 
 Browser ходит **только** в `api`. Он не знает адреса `knowledge`, PostgreSQL, inference runtime или support adapter.
 
@@ -21,6 +21,8 @@ UserMessage
 
 Frontend не выводит lifecycle state из анимации/текста ответа. Authoritative state приходит из `CaseSnapshot` + `case_events`/SSE. Уведомления — отдельный owner-level поток (§12), чтобы пользователь узнал о завершении и об обновлении статуса, даже если открыт другой чат или вкладка скрыта.
 
+Product-enhancement UI из `../product-experience.md` строится поверх этой server-driven модели. Context Passport, Applicability Card, Smart Recovery, Resolution Plan и presentation controls не имеют права изобретать lifecycle/Portal facts локально; если им нужны новые поля или команды, сначала меняется этот контракт отдельным coordinated change.
+
 ## 2. State vocabulary
 
 Authority: `docs/architecture.md §6` / Domain enums.
@@ -40,9 +42,9 @@ Moderation is warning-first (`product-spec.md §14`): the first confirmed violat
 
 ## 3. Public endpoint surface
 
-Exact route names may be adjusted once Minimal API is scaffolded, but these capabilities and semantics are frozen.
+Route names and semantics below are the `v0` public contract. A rename/removal or semantic change is a contract change and follows `contracts/README.md §2`; do not treat implemented routes as provisional scaffold suggestions.
 
-| Capability | Suggested route | Semantics |
+| Capability | Route | Semantics |
 |---|---|---|
 | Owner session | `POST /api/v0/session` | issues/refreshes the anonymous owner cookie (§13); idempotent |
 | List cases | `GET /api/v0/cases?status=active\|archived` | owner-scoped list with `last_activity_at`, `unread_notifications` |
