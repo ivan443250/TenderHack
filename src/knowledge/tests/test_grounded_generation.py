@@ -114,7 +114,27 @@ async def test_grounded_draft_uses_fake_generator_and_projects_only_frozen_claim
     assert "applies_if" not in result.response.claims[0].model_dump()
     assert result.response.model_version.startswith(f"{DRAFT_PROMPT_VERSION}:fake-generator@fixture")
     assert generator.prompts and DRAFT_PROMPT_VERSION in generator.prompts[0]
-    assert generator.response_formats == [{"type": "json_object"}]
+    assert len(generator.response_formats) == 1
+    response_format = generator.response_formats[0]
+    assert response_format is not None
+    assert response_format["type"] == "json_object"
+    schema = response_format["schema"]
+    assert isinstance(schema, Mapping)
+    assert schema["type"] == "object"
+    assert schema["required"] == ["draft_markdown", "claims"]
+    assert schema["additionalProperties"] is False
+    properties = schema["properties"]
+    assert isinstance(properties, Mapping)
+    assert set(properties) == {"draft_markdown", "claims"}
+    claims = properties["claims"]
+    assert isinstance(claims, Mapping)
+    claim_items = claims["items"]
+    assert isinstance(claim_items, Mapping)
+    claim_properties = claim_items["properties"]
+    assert isinstance(claim_properties, Mapping)
+    assert set(claim_properties) == {"claim_id", "text", "fragment_ids", "applies_if", "requires_human_check"}
+    assert claim_items["required"] == ["claim_id", "text", "fragment_ids"]
+    assert claim_items["additionalProperties"] is False
 
 
 @pytest.mark.asyncio
