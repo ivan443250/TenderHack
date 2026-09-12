@@ -1,0 +1,192 @@
+{
+  "status": "PASS",
+  "database": {
+    "runtime": "Docker Desktop 4.87.0; pgvector/pgvector:pg16 pinned digest ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b",
+    "container": "tenderhack-k1c1-postgres",
+    "database_name": "tenderhack_k1c1",
+    "host_port": 55432,
+    "postgres_version": "PostgreSQL 16.15 (Debian 16.15-1.pgdg12+2) on x86_64-pc-linux-gnu",
+    "alembic_head": "0003_document_version_semantics",
+    "fresh_database": true,
+    "connection_verified": true,
+    "knowledge_schema_verified": true,
+    "extensions_verified": ["pg_trgm", "vector"]
+  },
+  "corpus": {
+    "corpus": "NORMATIVE",
+    "documents": 6,
+    "document_versions": 6,
+    "pages": 830,
+    "fragments": 3899,
+    "nonempty_pages": 830
+  },
+  "first_ingestion": {
+    "documents": 6,
+    "document_versions": 6,
+    "pages": 830,
+    "fragments": 3899,
+    "snapshot_id": "snap_0e979dfef376faff41f7c76416fda457",
+    "persisted_to_postgres": true,
+    "document_version_ids": [
+      "ver_1d25303e9029726204bc99413b66135b",
+      "ver_4918b5db1bc006fafc56db9876bc5104",
+      "ver_500943380ccb418a8df30b509e9ec4f0",
+      "ver_844eb9c8fe9160d2ba46836d7b88a73e",
+      "ver_b07b7d3f277e77945a397c4b3af9bc9f",
+      "ver_eaf6f826ac609c35c6663ac43c372c1c"
+    ]
+  },
+  "sql_counts_after_first_and_second_ingestion": {
+    "kb_documents": 6,
+    "kb_document_versions": 6,
+    "kb_fragments": 3899,
+    "kb_snapshots": 1,
+    "kb_snapshot_document_versions": 6,
+    "kb_snapshot_fragments": 3899,
+    "kb_ingestion_runs": 6
+  },
+  "snapshot": {
+    "snapshot_id": "snap_0e979dfef376faff41f7c76416fda457",
+    "corpus": "NORMATIVE",
+    "document_version_memberships": 6,
+    "fragment_memberships": 3899,
+    "historical_versions_included": 0,
+    "orphan_fragments": 0,
+    "orphan_versions": 0
+  },
+  "durability": {
+    "engine_disposed_after_ingestion": true,
+    "new_engine_readback": true,
+    "new_repository_readback": true,
+    "current_snapshot_readback": true,
+    "source_resolution_readback": true,
+    "sample_count": 6,
+    "samples": [
+      {
+        "fragment_id": "frag_86e5412cd36d7ab91e297aa1a1fa83e4",
+        "document_id": "doc_4fd64269638081d7aa288790577958ce",
+        "document_version_id": "ver_1d25303e9029726204bc99413b66135b",
+        "title": "Инструкция по созданию оферты и СТЕ.pdf",
+        "declared_version": null,
+        "page": 1,
+        "kind": "paragraph",
+        "review_status": "PENDING_REVIEW",
+        "source_anchor_present": true,
+        "text_present": true
+      },
+      {
+        "fragment_id": "frag_bb5c16cdd5f31403ebf204145ce41bcd",
+        "document_id": "doc_e554b4e2e1dbed6e43f9f0948505b7a8",
+        "document_version_id": "ver_4918b5db1bc006fafc56db9876bc5104",
+        "title": "Инструкция по работе с машиночитаемыми доверенностями.pdf",
+        "declared_version": null,
+        "page": 1,
+        "kind": "definition",
+        "review_status": "PENDING_REVIEW",
+        "source_anchor_present": true,
+        "text_present": true
+      },
+      {
+        "fragment_id": "frag_eaac1e2fee209b4d0ff460772b8ebd22",
+        "document_id": "doc_83e759e189a5d368ec5fca08e83f44d8",
+        "document_version_id": "ver_500943380ccb418a8df30b509e9ec4f0",
+        "title": "Инструкция по электронному актированию.pdf",
+        "declared_version": "v11",
+        "page": 1,
+        "kind": "paragraph",
+        "review_status": "PENDING_REVIEW",
+        "source_anchor_present": true,
+        "text_present": true
+      },
+      {
+        "fragment_id": "frag_afba1599469486a990ee0c5154423226",
+        "document_id": "doc_f90e8a5c85a63af410d2126becff5f7a",
+        "document_version_id": "ver_844eb9c8fe9160d2ba46836d7b88a73e",
+        "title": "Инструкция по работе с Порталом для заказчика.pdf",
+        "declared_version": "v65",
+        "page": 1,
+        "kind": "paragraph",
+        "review_status": "PENDING_REVIEW",
+        "source_anchor_present": true,
+        "text_present": true
+      },
+      {
+        "fragment_id": "frag_28b7f107f5f1790fdc14dd9ecdcd0103",
+        "document_id": "doc_f29c96501ac73d655736cb15c72cbf68",
+        "document_version_id": "ver_b07b7d3f277e77945a397c4b3af9bc9f",
+        "title": "Инструкция по работе с Порталом для поставщика.pdf",
+        "declared_version": "v87",
+        "page": 1,
+        "kind": "paragraph",
+        "review_status": "PENDING_REVIEW",
+        "source_anchor_present": true,
+        "text_present": true
+      },
+      {
+        "fragment_id": "frag_cbb393b47a01cb4255ab6d7b6ef4eb67",
+        "document_id": "doc_9771ba79689567975e6e9e38f817cd53",
+        "document_version_id": "ver_eaf6f826ac609c35c6663ac43c372c1c",
+        "title": "Инструкция по формированию YML.pdf",
+        "declared_version": null,
+        "page": 1,
+        "kind": "paragraph",
+        "review_status": "PENDING_REVIEW",
+        "source_anchor_present": true,
+        "text_present": true
+      }
+    ],
+    "warning_table_sample": {
+      "fragment_id": "frag_07b1ba211b5d2e8c95af84db7be9f0c5",
+      "title": "Инструкция по работе с Порталом для заказчика.pdf",
+      "document_version_id": "ver_844eb9c8fe9160d2ba46836d7b88a73e",
+      "page": 5,
+      "kind": "table_row",
+      "review_status": "NEEDS_REVIEW",
+      "source_anchor_present": true,
+      "text_present": true
+    }
+  },
+  "api": {
+    "current_snapshot": "PASS",
+    "current_snapshot_id": "snap_0e979dfef376faff41f7c76416fda457",
+    "current_document_count": 6,
+    "current_fragment_count": 3899,
+    "real_source": "PASS",
+    "real_source_fragment_id": "frag_07b1ba211b5d2e8c95af84db7be9f0c5",
+    "real_source_page": 5,
+    "real_source_kind": "table_row",
+    "real_source_snapshot_id": "snap_0e979dfef376faff41f7c76416fda457",
+    "real_source_text_length": 385,
+    "unknown_source_404": "PASS",
+    "unknown_source_code": "UNKNOWN_FRAGMENT",
+    "valid_trace_id": true,
+    "filesystem_path_exposed": false
+  },
+  "idempotency": {
+    "second_ingestion_completed": true,
+    "same_snapshot_id": true,
+    "normative_counts_unchanged": true,
+    "duplicate_logical_documents": 0,
+    "duplicate_document_versions": 0,
+    "duplicate_fragments": 0,
+    "duplicate_snapshot_memberships": 0
+  },
+  "atomicity": {
+    "bad_manifest_entry_exit_code": 1,
+    "failure_before_final_publish": true,
+    "new_partial_snapshot_created": false,
+    "counts_unchanged_after_failure": true
+  },
+  "tests": {
+    "passed": 40,
+    "failed": 0,
+    "skipped": 0,
+    "command": "K1C_TEST_DATABASE_URL=<temporary> uv run pytest -q"
+  },
+  "findings": [],
+  "limitations": [
+    "Certification used a disposable local Docker container, not a production database.",
+    "Database was not downgraded after certification to preserve the certified corpus; clean upgrade was verified on a fresh database.",
+    "The report contains no credentials; the temporary container and database are local test resources."
+  ]
+}
