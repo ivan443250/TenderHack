@@ -30,7 +30,7 @@ public sealed class TurnOrchestrator(
             return await HandleModerationViolationAsync(@case, turn, now, ct);
         }
 
-        var context = new KnowledgeRequestContext(@case.Id, turn.Id);
+        var context = new KnowledgeRequestContext(Guid.NewGuid(), @case.Id, turn.Id);
 
         try
         {

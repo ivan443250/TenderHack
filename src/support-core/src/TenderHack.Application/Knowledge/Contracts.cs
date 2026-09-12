@@ -2,8 +2,11 @@ using TenderHack.Domain.Cases;
 
 namespace TenderHack.Application.Knowledge;
 
-/// <summary>Trace context every staged `knowledge` call carries (knowledge-v0.md §2: X-Case-Id / X-Turn-Id).</summary>
-public sealed record KnowledgeRequestContext(CaseId CaseId, TurnId TurnId);
+/// <summary>
+/// Trace context every staged `knowledge` call carries (knowledge-v0.md §2). One <see cref="TraceId"/>
+/// per turn end-to-end — the same value on every stage call for that turn, not a fresh one per call.
+/// </summary>
+public sealed record KnowledgeRequestContext(Guid TraceId, CaseId CaseId, TurnId TurnId);
 
 public sealed record UnderstandRequest(string Text, string? PriorTurnSummary);
 
@@ -13,7 +16,7 @@ public sealed record UnderstandResult(
     IReadOnlyList<string> ExactCodes,
     IReadOnlyList<string> LanguageFlags);
 
-public sealed record ModerationContextRequest(string Text, string RuleMatchDescription);
+public sealed record ModerationContextRequest(string Text, string RuleId, string RuleVersion, string MatchedTerm);
 
 public enum ModerationAmbiguity
 {
