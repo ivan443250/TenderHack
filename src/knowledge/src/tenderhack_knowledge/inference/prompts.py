@@ -41,8 +41,8 @@ def build_draft_prompt(
         "Never invent codes, numbers, statuses, button names, URLs, or steps.\n"
         "Cite one or more supplied fragment_id values for every substantive claim.\n"
         "Respect applies_if and required conditions; if evidence is incomplete, do not fill the gap.\n"
-        "Return JSON only with draft_markdown (or answer_blocks) and claims. Each claim has claim_id, text, and fragment_ids;\n"
-        "you may include evidence_quote, evidence_reference, applies_if, and requires_human_check.\n"
+        "Return JSON only with exactly draft_markdown and claims. Each claim must have claim_id, text, and fragment_ids;\n"
+        "a claim may additionally include applies_if and requires_human_check. Do not include any other keys.\n"
         "Do not output Decision, should_handoff, HandoffStatus, ResolutionStatus, reason_codes, or chain-of-thought.\n"
         "INPUT DATA:\n"
         + json.dumps(instructions, ensure_ascii=False, separators=(",", ":"))

@@ -31,6 +31,51 @@ class GeneratorModelError(DraftGenerationError):
     """The generator returned an unusable structured response."""
 
 
+MAX_GENERATION_TOKENS = 800
+
+
+def _validate_output_budget(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= MAX_GENERATION_TOKENS:
+        raise GeneratorModelError(f"grounded draft max_output_tokens must be between 1 and {MAX_GENERATION_TOKENS}")
+    return value
+
+
+def _grounded_draft_response_format() -> dict[str, object]:
+    """Return the minimal llama.cpp JSON schema for an internal draft.
+
+    This is intentionally narrower than :class:`GroundedDraft`: optional
+    post-check fields are populated by the parser/verifier, while the model
+    only needs to emit the grounded markdown and its cited claims.  Keeping
+    the schema explicit avoids Pydantic ``$defs``/union constructs that are
+    not consistently understood by local OpenAI-compatible runtimes.
+    """
+
+    claim_schema: dict[str, object] = {
+        "type": "object",
+        "properties": {
+            "claim_id": {"type": "string"},
+            "text": {"type": "string"},
+            "fragment_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+            "applies_if": {"type": "array", "items": {"type": "string"}},
+            "requires_human_check": {"type": "boolean"},
+        },
+        "required": ["claim_id", "text", "fragment_ids"],
+        "additionalProperties": False,
+    }
+    return {
+        "type": "json_object",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "draft_markdown": {"type": "string"},
+                "claims": {"type": "array", "items": claim_schema},
+            },
+            "required": ["draft_markdown", "claims"],
+            "additionalProperties": False,
+        },
+    }
+
+
 @dataclass(frozen=True)
 class DraftGenerationResult:
     response: DraftResponse
@@ -52,6 +97,7 @@ class GroundedDraftService:
         self.generator_factory = generator_factory
 
     async def generate(self, payload: DraftRequest) -> DraftGenerationResult:
+        max_tokens = _validate_output_budget(payload.constraints.max_output_tokens)
         assessment = await assess_answerability(
             payload.query,
             payload.snapshot_id,
@@ -77,7 +123,14 @@ class GroundedDraftService:
         fragments = await _normative_fragments(self.repository, payload.snapshot_id, payload.evidence_fragment_ids)
         prompt = build_draft_prompt(payload.query, fragments, payload.constraints)
         try:
-            raw = await generator.draft(prompt)
+            # Request the smallest structured-output mode supported by the
+            # OpenAI-compatible local runtime.  The parser below remains
+            # strict: this hint never turns prose into a grounded draft.
+            raw = await generator.draft(
+                prompt,
+                response_format=_grounded_draft_response_format(),
+                max_tokens=max_tokens,
+            )
         except GeneratorClientError as exc:
             if _is_unavailable(exc):
                 raise GeneratorUnavailableError("local generator is unavailable") from exc

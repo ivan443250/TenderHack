@@ -34,7 +34,7 @@ class LocalOpenAIChatGenerator:
         client: Any | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
-        if timeout_seconds <= 0 or max_tokens < 1 or not 0 <= temperature <= 2:
+        if timeout_seconds <= 0 or not 0 <= temperature <= 2:
             raise ValueError("invalid generator runtime settings")
         if not 0 < top_p <= 1 or top_k < 1:
             raise ValueError("invalid generator sampling settings")
@@ -45,7 +45,7 @@ class LocalOpenAIChatGenerator:
         self.temperature = temperature
         self.top_p = top_p
         self.top_k = top_k
-        self.max_tokens = max_tokens
+        self.max_tokens = _validate_max_tokens(max_tokens)
         self.system_prompt = system_prompt
         self._bearer_token = bearer_token if bearer_token is not None else (os.getenv("KNOWLEDGE_INFERENCE_BEARER_TOKEN") or None)
         self._client = client
@@ -76,9 +76,11 @@ class LocalOpenAIChatGenerator:
         prompt: str,
         *,
         response_format: Mapping[str, object] | None = None,
+        max_tokens: int | None = None,
     ) -> str:
         if not isinstance(prompt, str):
             raise TypeError("prompt must be a string")
+        effective_max_tokens = self.max_tokens if max_tokens is None else _validate_max_tokens(max_tokens)
         payload: dict[str, object] = {
             "model": self.model_id,
             "messages": [
@@ -88,7 +90,7 @@ class LocalOpenAIChatGenerator:
             "temperature": self.temperature,
             "top_p": self.top_p,
             "top_k": self.top_k,
-            "max_tokens": self.max_tokens,
+            "max_tokens": effective_max_tokens,
         }
         if response_format is not None:
             payload["response_format"] = dict(response_format)
@@ -173,12 +175,19 @@ class VllmGeneratorClient(LocalOpenAIChatGenerator):
     def endpoint(self) -> str:
         return f"{self.base_url}{self.completion_path}"
 
-    async def draft(self, prompt: str, *, response_format: Mapping[str, object] | None = None) -> str:
+    async def draft(
+        self,
+        prompt: str,
+        *,
+        response_format: Mapping[str, object] | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
+        effective_max_tokens = self.max_tokens if max_tokens is None else _validate_max_tokens(max_tokens)
         payload: dict[str, object] = {
             "model": self.model_id,
             "prompt": prompt,
             "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
+            "max_tokens": effective_max_tokens,
         }
         if response_format is not None:
             payload["response_format"] = dict(response_format)
@@ -196,3 +205,11 @@ def _extract_legacy_text(body: Mapping[str, object]) -> str:
     if isinstance(text, str):
         return text
     raise GeneratorClientError("vLLM response choice has no text content")
+
+
+def _validate_max_tokens(value: object) -> int:
+    """Enforce the project-wide generation output budget."""
+
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 800:
+        raise ValueError("max_tokens must be an integer between 1 and 800")
+    return value

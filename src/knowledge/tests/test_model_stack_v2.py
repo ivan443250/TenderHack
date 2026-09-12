@@ -214,12 +214,30 @@ class _GeneratorClient:
 @pytest.mark.asyncio
 async def test_local_generator_uses_chat_completions_and_reasoning_boundary() -> None:
     fake = _GeneratorClient({"choices": [{"message": {"content": "<think>secret</think>{\"claims\":[]}"}}]})
-    generator = LocalOpenAIChatGenerator(client=fake, base_url="http://generator")
+    generator = LocalOpenAIChatGenerator(client=fake, base_url="http://generator", max_tokens=321)
     assert await generator.draft("evidence") == '{"claims":[]}'
     assert fake.calls[0][0] == "http://generator/v1/chat/completions"
     assert fake.calls[0][1]["messages"][0]["role"] == "system"
+    assert fake.calls[0][1]["max_tokens"] == 321
+    assert "<think>" not in await generator.draft("evidence", max_tokens=300)
+    assert fake.calls[1][1]["max_tokens"] == 300
     assert "<think>" not in await generator.draft("evidence")
-    assert fake.headers == [None, None]
+    assert fake.calls[2][1]["max_tokens"] == 321
+    assert fake.headers == [None, None, None]
+
+
+def test_local_generator_rejects_output_budget_above_hard_cap() -> None:
+    with pytest.raises(ValueError, match="between 1 and 800"):
+        LocalOpenAIChatGenerator(max_tokens=801)
+
+
+@pytest.mark.asyncio
+async def test_local_generator_rejects_per_call_budget_above_hard_cap() -> None:
+    fake = _GeneratorClient({"choices": [{"message": {"content": "answer"}}]})
+    generator = LocalOpenAIChatGenerator(client=fake)
+    with pytest.raises(ValueError, match="between 1 and 800"):
+        await generator.draft("evidence", max_tokens=801)
+    assert fake.calls == []
 
 
 @pytest.mark.asyncio
