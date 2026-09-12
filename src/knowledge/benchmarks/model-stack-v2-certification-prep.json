@@ -4,11 +4,23 @@
   "starting_head": "444d409",
   "status": "PREPARED_WITH_CERTIFICATION_GATES",
   "infra_readme_fixed": true,
+  "primary_runtime_family": "llama.cpp / llama-server",
+  "vllm_critical_path": false,
+  "cloud_model_format": "GGUF",
+  "portable_model_format": "GGUF",
+  "bf16_default_a100": false,
+  "backend_portability_test": "ADDED: same Giga Q8_0 artifact on A100 CUDA llama.cpp versus portable CPU/GPU llama.cpp",
+  "embedding_space_strategy": "same Giga Q8_0 artifact across hardware; backend portability requires certification",
+  "resident_model_policy": "all enabled and certified models remain resident when memory allows; no request-time loading or normal LRU unloading",
+  "a100_offload_target": "full CUDA offload for Giga Q8_0 and Qwen3.8 Q6_K after compatibility/readiness smoke; not yet measured",
+  "warmup_before_readiness": true,
+  "generator_context_limit": 8192,
+  "initial_a100_parallel_candidate": 4,
   "target_profiles": {
     "cloud-a100": {
       "purpose": "high-performance team-controlled Cloud.ru Docker RUN profile",
       "target_hardware": "A100 80 GB accelerator profile",
-      "runtime_intent": "canonical/BF16 Giga + Querit + Qwen3.8 where compatibility is proven",
+      "runtime_intent": "same verified Giga Q8_0 + Qwen3.8 Q6_K GGUF artifacts via llama-server; full CUDA offload candidate; Querit only after runtime certification",
       "product_requirement": false,
       "status": "TARGET_NOT_CERTIFIED"
     },
@@ -36,14 +48,14 @@
       "quantization": "Q8_0",
       "dimension": 2048,
       "query_instruction_version": "giga_portal_support_v1",
-      "runtime": "llama.cpp /v1/embeddings",
+      "runtime": "llama-server (llama.cpp) /v1/embeddings",
       "sha256": "429f2d04a968ffe73137fe65c2e458a08236056168b905d208b4d81ecab08c22",
       "provenance": "third-party GGUF conversion; not an official ai-sage release"
     },
     "reranker": {
       "source_model": "Querit/Querit-4B",
       "source_revision": "e557bb5ce6555f16b33dbb7d2ca62e8d27c14c13",
-      "canonical_runtime": "allowed for strong GPU profile only after feasibility checks",
+      "candidate_runtime": "verified Querit GGUF + llama-server, canonical source through a separate local provider, or disabled",
       "portable_runtime_artifact": null,
       "portable_runtime_status": "TBD_UNVERIFIED"
     },
@@ -53,7 +65,7 @@
       "runtime_repo": "empero-ai/Qwen3.8-4B-Distill-GGUF",
       "runtime_file": "Qwen3.8-4B-Q6_K.gguf",
       "quantization": "Q6_K",
-      "runtime": "recent llama.cpp /v1/chat/completions",
+      "runtime": "recent llama-server (llama.cpp) /v1/chat/completions",
       "sha256": null,
       "reasoning_policy": "strip <think>; fail closed; never expose reasoning"
     }
@@ -69,16 +81,36 @@
       "dimension",
       "query instruction version"
     ],
-    "example_values": ["giga-0826-bf16-v1", "giga-0826-q8_0-v1"],
-    "rule": "Never silently mix document and query vectors from different model/runtime variants; measure interchangeability first.",
+    "example_values": ["giga-0826-q8_0-v1"],
+    "future_experiment_id": "giga-0826-bf16-v1",
+    "hardware_backend_creates_new_id": false,
+    "portability_test": "same test set on A100 CUDA llama.cpp versus portable CPU/GPU llama.cpp; compare dimension, norm, cosine agreement and retrieval ordering",
+    "rule": "Use one Giga Q8_0 space across hardware only after numerical portability is within documented tolerance; any BF16 experiment gets a separate ID.",
     "implementation_status": "DOCUMENTED_ONLY; no schema or code change in preparation task"
   },
   "querit_runtime_status": "SOURCE_PINNED_BUT_PORTABLE_ARTIFACT_UNVERIFIED; B3 is gated on actual runtime certification",
+  "runtime_policy": {
+    "same_gguf_across_profiles": true,
+    "startup_only_hardware_policy": ["GPU offload", "backend", "batch sizes", "parallelism", "KV cache type", "threads"],
+    "no_request_time_model_loading": true,
+    "readiness": "process alive is distinct from capability ready; warm-up smoke every enabled provider",
+    "continuous_batching": "desired generator capability; verify against pinned llama.cpp build",
+    "prompt_prefix_cache": "optional performance optimization; never cache user-specific answers or correctness-critical state"
+  },
+  "measurement_plan": {
+    "embedding_batch_sizes": [8, 16, 32, 64],
+    "embedding_report_fields": ["batch_size", "number_of_batches", "total_time", "fragments_per_second"],
+    "reranker_shortlist": "up to approximately 20 candidates in one provider call",
+    "generation_concurrency": [1, 2, 4],
+    "initial_a100_parallel_candidate": 4,
+    "resource_metrics": ["model_load_time", "warm_up_time", "cold_readiness_time", "warm_request_latency", "TTFT", "tokens_per_second", "VRAM", "RAM"]
+  },
   "certification_runbook_path": "docs/plans/active/model-stack-v2-real-certification.md",
   "organizer_question_status": {
-    "status": "ADDED_ONCE",
+    "status": "EXISTING_REUSED",
     "path": "src/knowledge/benchmarks/organizer-questions.md",
-    "topic": "permission for self-hosted open-model inference in a team-controlled Cloud.ru Docker deployment"
+    "topic": "permission for self-hosted open-model inference in a team-controlled Cloud.ru Docker deployment",
+    "changed_in_this_patch": false
   },
   "files_changed": [
     "infra/inference/README.md",
@@ -88,8 +120,8 @@
   ],
   "high_findings": [
     {
-      "finding": "A100 BF16 and portable Giga Q8_0 may represent different embedding spaces.",
-      "resolution": "Added mandatory embedding_space_id and an explicit no-mixing certification gate to the runbook; no production backfill may proceed until measured."
+      "finding": "The same Giga Q8_0 artifact still requires numerical portability evidence across A100 CUDA and portable CPU/GPU llama.cpp backends.",
+      "resolution": "Added a mandatory backend comparison and one preferred embedding_space_id; split only if measured differences exceed documented tolerance."
     }
   ],
   "medium_findings": [],
@@ -98,6 +130,7 @@
     "exact artifact verification and local offline smoke",
     "six-manual corpus identity of 6 documents, 830 pages and 3899 fragments",
     "3899 active Giga embeddings with space metadata and durable readback",
+    "backend portability measurements before accepting one Giga Q8_0 embedding space",
     "B1/B2 retrieval measurements and optional B3 Querit certification",
     "Qwen3.8 structured-generation, latency, memory and offline checks",
     "explicit Cloud.ru open-model/self-hosting permission from organizers"
