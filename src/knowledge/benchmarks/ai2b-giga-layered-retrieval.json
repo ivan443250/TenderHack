@@ -1,0 +1,281 @@
+{
+  "benchmark": "ai2b-giga-layered-retrieval",
+  "status": "COMPLETE_WITH_LIMITATIONS",
+  "git_head": "5f1bad49d5d642502bf64cf84df4676979eb9c0f",
+  "scope": "src/knowledge/**",
+  "experiment": {
+    "goal": "Measure Giga as a secondary semantic layer without changing the lexical primary ranking.",
+    "gold_set": {
+      "path": "src/knowledge/evals/k2a-gold.json",
+      "query_count": 44,
+      "labels_changed": false,
+      "label_source": "manual source/page review of the six organizer PDFs"
+    },
+    "snapshot": {
+      "snapshot_id": "snap_0e979dfef376faff41f7c76416fda457",
+      "corpus": "NORMATIVE",
+      "documents": 6,
+      "pages": 830,
+      "fragments": 3899,
+      "snapshot_review_status": "PENDING_REVIEW"
+    },
+    "embedding_precondition": {
+      "model_id": "ai-sage/Giga-Embeddings-instruct-3B-0826",
+      "model_revision": "ed7db5c91b900b39381b27b6e9c0a3d31137cd29",
+      "dimension": 2048,
+      "persisted_embeddings": 3899,
+      "snapshot_memberships": 3899,
+      "metadata_consistent": true,
+      "runtime": "llama.cpp /v1/embeddings",
+      "query_instruction_version": "giga_portal_support_v1",
+      "backfill_repeated": false,
+      "canary": {
+        "ping_status": 200,
+        "query_embedding_status": 200,
+        "query_embedding_dimension": 2048
+      }
+    }
+  },
+  "lexical_baseline": {
+    "config_version": "lexical-v1",
+    "channels": ["exact", "fts", "trigram"],
+    "ranking_preserved": true,
+    "recall_at_5": 0.6136,
+    "recall_at_10": 0.75,
+    "mrr_at_30": 0.4018,
+    "exact_code_recall_at_10": 0.6875,
+    "typo_recall_at_10": 1.0,
+    "latency_ms": {
+      "p50": 288.944,
+      "p95": 347.171,
+      "mean": 291.397
+    }
+  },
+  "dense_only": {
+    "config_version": "giga-dense-only-2048",
+    "fusion": false,
+    "reranker": false,
+    "fallback_as_dense": false,
+    "recall_at_5": 0.4545,
+    "recall_at_10": 0.5682,
+    "recall_at_20": 0.6136,
+    "recall_at_30": 0.7045,
+    "mrr_at_30": 0.3226,
+    "exact_code_recall_at_10": 0.5625,
+    "typo_recall_at_10": 0.0,
+    "typo_recall_at_30": 0.0,
+    "latency_ms": {
+      "scope": "query embedding plus dense PostgreSQL exact scan",
+      "p50": 469.163,
+      "p95": 860.948,
+      "mean": 541.615
+    }
+  },
+  "lexical_miss_rescue": {
+    "lexical_misses_at_10": 11,
+    "lexical_miss_query_ids": [
+      "act-03",
+      "act-07",
+      "yml-06",
+      "supplier-01",
+      "supplier-02",
+      "supplier-04",
+      "supplier-05",
+      "supplier-08",
+      "supplier-09",
+      "offer-01",
+      "mcd-05"
+    ],
+    "semantic_rescue_potential": {
+      "at_5": {"count": 0, "rate_of_lexical_misses": 0.0},
+      "at_10": {"count": 0, "rate_of_lexical_misses": 0.0},
+      "at_20": {"count": 0, "rate_of_lexical_misses": 0.0},
+      "at_30": {"count": 2, "rate_of_lexical_misses": 0.1818}
+    },
+    "rescued_query_ids_at_30": ["act-03", "supplier-08"],
+    "interpretation": "Giga provides no top-20 rescue and only two top-30 candidates for eleven lexical misses; this is insufficient justification for a semantic layer on the critical path."
+  },
+  "candidate_union": {
+    "ranking_semantics": "Pool for later answerability only; lexical top-10 remains first and dense candidates never displace it.",
+    "A_lexical_top10": {
+      "candidate_pool_recall": 0.75,
+      "average_pool_size": 10.0,
+      "max_pool_size": 10,
+      "exact_code_recall": 0.6875,
+      "typo_recall": 1.0,
+      "lexical_miss_recall": 0.0
+    },
+    "B_lexical_top10_plus_dense3": {
+      "candidate_pool_recall": 0.75,
+      "average_pool_size": 10.795,
+      "max_pool_size": 13,
+      "exact_code_recall": 0.6875,
+      "typo_recall": 1.0,
+      "lexical_miss_recall": 0.0
+    },
+    "C_lexical_top10_plus_dense5": {
+      "candidate_pool_recall": 0.75,
+      "average_pool_size": 12.091,
+      "max_pool_size": 15,
+      "exact_code_recall": 0.6875,
+      "typo_recall": 1.0,
+      "lexical_miss_recall": 0.0
+    },
+    "D_lexical_top10_plus_dense10": {
+      "candidate_pool_recall": 0.75,
+      "average_pool_size": 15.682,
+      "max_pool_size": 20,
+      "exact_code_recall": 0.6875,
+      "typo_recall": 1.0,
+      "lexical_miss_recall": 0.0
+    }
+  },
+  "protected_policies": {
+    "P0": {
+      "protected_lexical_prefix": 10,
+      "recall_at_5": 0.6136,
+      "recall_at_10": 0.75,
+      "mrr_at_10": 0.401,
+      "exact_code_recall_at_10": 0.6875,
+      "typo_recall_at_10": 1.0,
+      "regressed_queries": [],
+      "rescued_queries": []
+    },
+    "P1": {
+      "protected_lexical_prefix": 8,
+      "dense_fill_slots": 2,
+      "recall_at_5": 0.6136,
+      "recall_at_10": 0.7045,
+      "mrr_at_10": 0.3962,
+      "exact_code_recall_at_10": 0.6875,
+      "typo_recall_at_10": 1.0,
+      "regressed_queries": ["customer-02", "customer-07"],
+      "rescued_queries": []
+    },
+    "P2": {
+      "protected_lexical_prefix": 7,
+      "dense_fill_slots": 3,
+      "recall_at_5": 0.6136,
+      "recall_at_10": 0.7045,
+      "mrr_at_10": 0.3962,
+      "exact_code_recall_at_10": 0.6875,
+      "typo_recall_at_10": 1.0,
+      "regressed_queries": ["customer-02", "customer-07"],
+      "rescued_queries": []
+    },
+    "P3": {
+      "protected_lexical_prefix": 5,
+      "dense_fill_slots": 5,
+      "recall_at_5": 0.6136,
+      "recall_at_10": 0.6818,
+      "mrr_at_10": 0.3909,
+      "exact_code_recall_at_10": 0.6875,
+      "typo_recall_at_10": 1.0,
+      "regressed_queries": ["customer-01", "customer-02", "customer-07"],
+      "rescued_queries": []
+    }
+  },
+  "per_query_ranks": [
+    {"query_id":"act-01","lexical_rank":1,"dense_rank":1,"subsets":[],"exact_code":false},
+    {"query_id":"act-02","lexical_rank":3,"dense_rank":4,"subsets":[],"exact_code":false},
+    {"query_id":"act-03","lexical_rank":null,"dense_rank":22,"subsets":["exact_code"],"exact_code":true},
+    {"query_id":"act-04","lexical_rank":8,"dense_rank":1,"subsets":[],"exact_code":false},
+    {"query_id":"act-05","lexical_rank":3,"dense_rank":null,"subsets":["typo"],"exact_code":false},
+    {"query_id":"act-06","lexical_rank":2,"dense_rank":1,"subsets":["exact_code"],"exact_code":true},
+    {"query_id":"act-07","lexical_rank":29,"dense_rank":null,"subsets":["exact_code"],"exact_code":true},
+    {"query_id":"yml-01","lexical_rank":1,"dense_rank":3,"subsets":["exact_code"],"exact_code":true},
+    {"query_id":"yml-02","lexical_rank":1,"dense_rank":2,"subsets":["exact_code"],"exact_code":true},
+    {"query_id":"yml-03","lexical_rank":1,"dense_rank":12,"subsets":["exact_code"],"exact_code":true},
+    {"query_id":"yml-04","lexical_rank":2,"dense_rank":1,"subsets":[],"exact_code":false},
+    {"query_id":"yml-05","lexical_rank":3,"dense_rank":null,"subsets":[],"exact_code":false},
+    {"query_id":"yml-06","lexical_rank":null,"dense_rank":null,"subsets":["exact_code"],"exact_code":true},
+    {"query_id":"yml-07","lexical_rank":4,"dense_rank":6,"subsets":[],"exact_code":false},
+    {"query_id":"supplier-01","lexical_rank":null,"dense_rank":null,"subsets":[],"exact_code":false},
+    {"query_id":"supplier-02","lexical_rank":null,"dense_rank":null,"subsets":[],"exact_code":false},
+    {"query_id":"supplier-03","lexical_rank":2,"dense_rank":3,"subsets":[],"exact_code":false},
+    {"query_id":"supplier-04","lexical_rank":null,"dense_rank":null,"subsets":[],"exact_code":false},
+    {"query_id":"supplier-05","lexical_rank":null,"dense_rank":null,"subsets":[],"exact_code":false},
+    {"query_id":"supplier-06","lexical_rank":1,"dense_rank":3,"subsets":[],"exact_code":false},
+    {"query_id":"supplier-07","lexical_rank":4,"dense_rank":3,"subsets":["exact_code"],"exact_code":true},
+    {"query_id":"supplier-08","lexical_rank":null,"dense_rank":22,"subsets":[],"exact_code":false},
+    {"query_id":"supplier-09","lexical_rank":null,"dense_rank":null,"subsets":[],"exact_code":false},
+    {"query_id":"offer-01","lexical_rank":null,"dense_rank":null,"subsets":["exact_code"],"exact_code":true},
+    {"query_id":"offer-02","lexical_rank":4,"dense_rank":1,"subsets":["exact_code"],"exact_code":true},
+    {"query_id":"offer-03","lexical_rank":1,"dense_rank":6,"subsets":["exact_code"],"exact_code":true},
+    {"query_id":"offer-04","lexical_rank":1,"dense_rank":1,"subsets":[],"exact_code":false},
+    {"query_id":"offer-05","lexical_rank":6,"dense_rank":6,"subsets":[],"exact_code":false},
+    {"query_id":"offer-06","lexical_rank":1,"dense_rank":22,"subsets":[],"exact_code":false},
+    {"query_id":"offer-07","lexical_rank":4,"dense_rank":1,"subsets":[],"exact_code":false},
+    {"query_id":"offer-08","lexical_rank":3,"dense_rank":1,"subsets":[],"exact_code":false},
+    {"query_id":"mcd-01","lexical_rank":1,"dense_rank":2,"subsets":["exact_code"],"exact_code":true},
+    {"query_id":"mcd-02","lexical_rank":1,"dense_rank":4,"subsets":["exact_code"],"exact_code":true},
+    {"query_id":"mcd-03","lexical_rank":2,"dense_rank":1,"subsets":["exact_code"],"exact_code":true},
+    {"query_id":"mcd-04","lexical_rank":3,"dense_rank":27,"subsets":["exact_code"],"exact_code":true},
+    {"query_id":"mcd-05","lexical_rank":null,"dense_rank":null,"subsets":["exact_code"],"exact_code":true},
+    {"query_id":"customer-01","lexical_rank":7,"dense_rank":15,"subsets":[],"exact_code":false},
+    {"query_id":"customer-02","lexical_rank":9,"dense_rank":null,"subsets":[],"exact_code":false},
+    {"query_id":"customer-03","lexical_rank":3,"dense_rank":2,"subsets":[],"exact_code":false},
+    {"query_id":"customer-04","lexical_rank":1,"dense_rank":2,"subsets":[],"exact_code":false},
+    {"query_id":"customer-05","lexical_rank":6,"dense_rank":7,"subsets":[],"exact_code":false},
+    {"query_id":"customer-06","lexical_rank":3,"dense_rank":7,"subsets":[],"exact_code":false},
+    {"query_id":"customer-07","lexical_rank":10,"dense_rank":null,"subsets":[],"exact_code":false},
+    {"query_id":"customer-08","lexical_rank":2,"dense_rank":4,"subsets":[],"exact_code":false}
+  ],
+  "latency_analysis": {
+    "normal_path": "lexical exact + PostgreSQL FTS + trigram, before answerability",
+    "normal_path_p50_ms": 288.944,
+    "normal_path_p95_ms": 347.171,
+    "semantic_layer_additional_latency_ms": {
+      "p50": 469.163,
+      "p95": 860.948,
+      "mean": 541.615,
+      "definition": "Giga query embedding plus dense PostgreSQL scan; not mixed into normal-path latency"
+    },
+    "sequential_fallback_total_p50_ms": 758.107,
+    "theoretical_trigger_queries": 11,
+    "trigger_policy": "SECOND_LAYER_TRIGGER_PENDING_AI3; no score/confidence threshold invented",
+    "load_note": "A semantic call would add RunPod and database load only when the future answerability layer establishes insufficient primary evidence."
+  },
+  "decision": {
+    "best_policy": "P0",
+    "selection_reason": "P0 is the lexical control and is the only policy that preserves Recall@10, exact-code retrieval and typo retrieval without regressions.",
+    "weighted_experiment": "NOT_RUN",
+    "weighted_experiment_reason": "P0-P3 were unambiguous losers for dense fill; further tuning would risk overfitting the 44-query set.",
+    "exact_code_regression": false,
+    "typo_regression": false,
+    "giga_final_verdict": "GIGA_DROP",
+    "verdict_reason": "Dense Giga does not rescue any lexical miss through rank 20, rescues only two of eleven at rank 30, lowers standalone exact-code/typo recall, and adds substantial latency. Protected fusion always lowers lexical Recall@10 and introduces regressions.",
+    "production_design": "LEXICAL_PRIMARY_ONLY. Keep the certified Giga vectors/model as an experimental derived artifact; do not call Giga on the normal critical path, do not fuse or expose a semantic secondary layer, and revisit only after parser/chunking or answerability work supplies a new justified experiment."
+  },
+  "verification": {
+    "tests": {
+      "uv_lock_check": "PASS (uv lock --check --project src/knowledge)",
+      "relevant_retrieval_tests": "PASS (4 passed, 3 database-dependent tests skipped in local unit environment)",
+      "full_knowledge_pytest": "PASS (authoritative run from src/knowledge with writable basetemp; warnings only)",
+      "real_postgres_read_only_retrieval": "PASS (lexical and dense diagnostic ran against current snapshot; no writes)",
+      "alembic_heads": "PASS (0008_quality_analytics single head)",
+      "git_diff_check": "PASS"
+    },
+    "gold_labels_unchanged": true,
+    "lexical_channels_verified": ["exact", "PostgreSQL FTS", "pg_trgm"],
+    "dense_vectors_real": true,
+    "dense_dimension": 2048,
+    "synthetic_vectors": false,
+    "reranker_used": false,
+    "fallback_masquerading_as_dense": false,
+    "candidate_pool_not_final_recall": true,
+    "normal_and_fallback_latency_separate": true,
+    "model_or_runtime_changed": false,
+    "contracts_changed": false,
+    "retrieval_schema_changed": false,
+    "full_backfill_repeated": false
+  },
+  "limitations": [
+    "The 44-query gold set is a measured regression set, not a blind production test set.",
+    "The target Recall@10 of 0.90 is not met by the lexical baseline (0.75) or dense layer (0.5682); misses are reported rather than hidden.",
+    "The current answerability implementation does not provide a proven insufficient-evidence trigger, so no automatic second-layer trigger was implemented.",
+    "Dense retrieval uses an exact pgvector scan; no approximate index or reranker was introduced.",
+    "Snapshot remains PENDING_REVIEW and was not promoted.",
+    "No parser, ingestion, chunking, corpus, model, schema, backend, web or external contract change was made."
+  ]
+}
