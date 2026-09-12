@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "status": "PASS_WITH_LIMITATIONS",
+  "profile": "portable-nvidia-rtx3060",
+  "repository": {
+    "starting_head": "3c2f7ca6fbffd2429468005afea002574f85d0f5",
+    "head_before_local_commit": "4336815467ded46e411ada802971d63fd7d309c0",
+    "note": "A fast-forward to 4336815 was already present in reflog; no pull/reset/rebase was performed by this task."
+  },
+  "host": {
+    "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+    "vram_mib": 6144,
+    "driver": "581.83",
+    "cuda_compatibility": "13.0",
+    "docker_platform": "linux/amd64",
+    "docker_engine": "29.7.2",
+    "docker_memory_gib": 7.429
+  },
+  "old_image_failure": {
+    "image": "tenderhack-inference-bundled:f0d32d0",
+    "error": "nvidia-container-cli: requirement error: unsatisfied condition: cuda>=13.3",
+    "cause": "the A100 CUDA 13 image requires a newer host-compatible CUDA level than this driver reports"
+  },
+  "runtime": {
+    "portable_image_tag": "tenderhack-inference-portable:3c2f7ca-b9426",
+    "image": "ghcr.io/ggml-org/llama.cpp:server-cuda12-b9426@sha256:e694ec5a1b19456e340fea9a28ffa169d6952c0019f39b6c09f7e92f08bc5014",
+    "cuda": "12.8.1",
+    "llama_cpp_revision": "9426 (1738129be)",
+    "architecture": "linux/amd64",
+    "official": true,
+    "rejected_candidates": [
+      "server-cuda12-b9837: Giga initialization assertion n_outputs_max <= cparams.n_outputs_max",
+      "server-cuda12-b9538: Giga initialization assertion n_outputs_max <= cparams.n_outputs_max"
+    ]
+  },
+  "models": {
+    "giga": {
+      "status": "LOADED",
+      "file": "giga-embeddings-0826-3b-q8_0.gguf",
+      "sha256": "429f2d04a968ffe73137fe65c2e458a08236056168b905d208b4d81ecab08c22",
+      "embedding_dimension": 2048
+    },
+    "qwen": {
+      "status": "LOADED",
+      "file": "Qwen3.8-4B-Q6_K.gguf",
+      "sha256": "529393d9f7859122da727a8b662ea063127fb4320af8f58496a794b9bbf46e65"
+    }
+  },
+  "configuration": {
+    "gpu_layers": 1,
+    "generator_parallel": 1,
+    "generator_context": 4096,
+    "embedding_batch": 2048,
+    "giga_extra_args": [
+      "--ctx-size",
+      "2048",
+      "--parallel",
+      "1",
+      "--no-warmup"
+    ],
+    "qwen_extra_args": ["--reasoning", "off"],
+    "reranker_enabled": false
+  },
+  "measurements": {
+    "cold_readiness_seconds": 74.2,
+    "embedding": {
+      "status": "PASS",
+      "latency_ms": 1441,
+      "dimension": 2048,
+      "finite": true,
+      "non_zero": true,
+      "l2_norm": 1.0000000065
+    },
+    "generation": {
+      "status": "PASS",
+      "latency_ms": 1277,
+      "non_empty_content": true,
+      "reasoning_content_present": false,
+      "think_tags_present": false
+    },
+    "vram": {
+      "used_mib": 2624,
+      "free_mib": 3373,
+      "total_mib": 6144
+    },
+    "ram": {
+      "container_usage_gib": 4.907,
+      "docker_limit_gib": 7.429
+    }
+  },
+  "endpoint_checks": {
+    "health_live": "PASS",
+    "health_ready": "PASS",
+    "capabilities": "PASS",
+    "embeddings": "PASS",
+    "chat_completions": "PASS"
+  },
+  "limitations": [
+    "Giga with this official runtime requires embedding_batch=2048 during slot initialization; embedding requests remain single-request and this differs from the initial batch=1 candidate.",
+    "One GPU layer is the measured conservative setting; higher offload was not claimed or tuned.",
+    "Reranker is disabled, matching the existing bundled profile.",
+    "Cold readiness is model-load plus an active generator health smoke and takes about 74 seconds on this laptop.",
+    "This is a local portable smoke result, not an A100 performance benchmark."
+  ],
+  "verification": {
+    "docker_buildx_check": "PASS",
+    "linux_amd64_build": "PASS",
+    "runtime_uid_gid": "1000:1000",
+    "opt_tenderhack_owned_by_runtime": true,
+    "gguf_tracked_by_git": false,
+    "external_ai_api": false,
+    "a100_image_unchanged": true,
+    "git_push": false
+  }
+}

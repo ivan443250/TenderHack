@@ -4,6 +4,8 @@
 **
 !bundled/
 !bundled/**
+!portable/
+!portable/**
 !cloudru/
 !cloudru/gateway/
 !cloudru/gateway/app.py
