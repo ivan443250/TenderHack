@@ -307,7 +307,7 @@
           </tr>
           <tr>
             <td class="abs-name">State Store</td>
-            <td class="mono">cases, turns, case_events, handoffs, outbox, feedback, api_jobs, idempotency_keys</td>
+            <td class="mono">cases, turns, case_events, handoffs, outbox, feedback, notifications, idempotency_keys</td>
             <td><span class="tag a">api_rw</span></td>
             <td>PostgreSQL 16 — single instance</td>
           </tr>
@@ -452,7 +452,7 @@
           <tr>
             <td class="flow"><span class="dot" style="background:var(--accent-a)"></span><b>api-worker → State Store</b></td>
             <td class="api">SQL через EF Core, роль <span class="mono">api_rw</span></td>
-            <td><span class="mono">SELECT ... FOR UPDATE SKIP LOCKED</span> по таблицам <span class="mono">outbox</span>/<span class="mono">api_jobs</span> — забрать очередную задачу, пометить как отправленную/проваленную.</td>
+            <td>Обычный <span class="mono">SELECT ... WHERE delivered_at IS NULL</span> по таблице <span class="mono">outbox</span> на каждый tick (без блокировки строк — единственный экземпляр воркера), пометить как отправленную/проваленную.</td>
           </tr>
           <tr>
             <td class="flow"><span class="dot" style="background:var(--accent-b)"></span><b>knowledge / knowledge-worker → Knowledge Store</b></td>
@@ -471,7 +471,7 @@
           </tr>
           <tr>
             <td class="flow"><span class="dot" style="background:var(--ink-muted)"></span><b>Portal support system → api-worker</b></td>
-            <td class="api">интерфейс <span class="mono">IHandoffAdapter.GetStatusAsync(...)</span>, job <span class="mono">handoff-status-sync</span> (poll с backoff 15 с → 5 мин)</td>
+            <td class="api">интерфейс <span class="mono">IHandoffAdapter.GetStatusAsync(...)</span>, job <span class="mono">handoff-status-sync</span> (фиксированный интервал 15 с на все активные передачи, TTL 7 дней → stale)</td>
             <td>«Что там с моей заявкой?» — worker сам опрашивает адаптер по принятым передачам и получает <span class="mono">HandoffStatusSnapshot</span>: этап, специалист, терминальный исход. Идемпотентно по <span class="mono">handoff_id + external_revision</span>. Терминальный статус завершает обращение (<span class="mono">CLOSED_SUPPORT</span>) и порождает уведомление. Demo-адаптер отдаёт заранее заданный сценарий.</td>
           </tr>
           <tr>

@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using TenderHack.Api.Endpoints;
 using TenderHack.Api.ExceptionHandling;
@@ -6,6 +7,7 @@ using TenderHack.Application.Orchestration;
 using TenderHack.Application.UseCases;
 using TenderHack.Infrastructure;
 using TenderHack.Infrastructure.Handoff;
+using TenderHack.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,10 +43,24 @@ builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 
 var app = builder.Build();
 
+// `api` owns its schema outright (architecture.md §8) — applying its own migrations on startup is
+// the only place that needs to happen; a fresh `docker compose up` must not require a manual step.
+// A failed migration should fail fast rather than start the process against a half-built schema.
+using (var startupScope = app.Services.CreateScope())
+{
+    await startupScope.ServiceProvider.GetRequiredService<TenderHackDbContext>().Database.MigrateAsync();
+}
+
 app.UseExceptionHandler();
 
 app.MapGet("/health/live", () => Results.Ok(new { status = "ok", service = "api" }));
-app.MapGet("/health/ready", () => Results.Ok(new { status = "ready", service = "api", dependencies = "not_checked" }));
+app.MapGet("/health/ready", async (TenderHackDbContext db, CancellationToken ct) =>
+{
+    var canConnect = await db.Database.CanConnectAsync(ct);
+    return canConnect
+        ? Results.Ok(new { status = "ready", service = "api", dependencies = "ok" })
+        : Results.Json(new { status = "not_ready", service = "api", dependencies = "postgres_unreachable" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+});
 
 app.MapSessionEndpoints();
 app.MapCaseEndpoints();
@@ -52,6 +68,7 @@ app.MapSourceEndpoints();
 app.MapHandoffEndpoints();
 app.MapCompletionEndpoints();
 app.MapNotificationEndpoints();
+app.MapAnalyticsEndpoints();
 
 var supportOptions = app.Services.GetRequiredService<IOptions<SupportOptions>>().Value;
 app.MapSupportWebhookEndpoints(supportOptions);

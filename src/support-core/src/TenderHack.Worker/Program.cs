@@ -13,8 +13,13 @@ builder.Services.AddSupportCoreInfrastructure(builder.Configuration);
 // the use-case the poll worker drives is wired here.
 builder.Services.AddScoped<CaseCompletionPublisher>();
 builder.Services.AddScoped<IngestHandoffStatusUseCase>();
+builder.Services.AddScoped<CleanUpStaleTurnsUseCase>();
+
+builder.Services.Configure<StaleTurnCleanupOptions>(builder.Configuration.GetSection(StaleTurnCleanupOptions.SectionName));
 
 builder.Services.AddHostedService<HandoffSubmitWorker>();
 builder.Services.AddHostedService<HandoffStatusSyncWorker>();
+builder.Services.AddHostedService<QualityPushWorker>();
+builder.Services.AddHostedService<StaleTurnCleanupWorker>();
 
 await builder.Build().RunAsync();

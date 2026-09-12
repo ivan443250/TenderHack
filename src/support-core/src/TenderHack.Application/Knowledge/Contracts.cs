@@ -10,9 +10,25 @@ public sealed record KnowledgeRequestContext(Guid TraceId, CaseId CaseId, TurnId
 
 public sealed record UnderstandRequest(string Text, string? PriorTurnSummary);
 
+/// <summary>
+/// knowledge-v0.md — a context slot (role, process, edo_provider, document_type, status, user_action,
+/// error_code, duration, already_tried, ...). Never flatten this to a bare string: `Provenance`
+/// distinguishes what the user actually said from what was inferred, and `Type` is what retrieval
+/// exact-matches against.
+/// </summary>
+public sealed record Entity(string Type, string Value, EntityProvenance Provenance);
+
+public enum EntityProvenance
+{
+    UserExplicit,
+    TrustedPortalContext,
+    Inferred,
+    Unknown,
+}
+
 public sealed record UnderstandResult(
     string NormalizedText,
-    IReadOnlyList<string> Entities,
+    IReadOnlyList<Entity> Entities,
     IReadOnlyList<string> ExactCodes,
     IReadOnlyList<string> LanguageFlags);
 
@@ -29,7 +45,7 @@ public sealed record ModerationContextResult(ModerationAmbiguity Ambiguity, stri
 
 public sealed record RetrieveRequest(
     string Query,
-    IReadOnlyList<string> Entities,
+    IReadOnlyList<Entity> Entities,
     IReadOnlyList<string> ExactCodes,
     Corpus Corpus,
     string? SnapshotId);

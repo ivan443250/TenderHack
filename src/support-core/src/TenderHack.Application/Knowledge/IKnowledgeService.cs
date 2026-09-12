@@ -20,4 +20,16 @@ public interface IKnowledgeService
     Task<VerifyResult> VerifyAsync(VerifyRequest request, KnowledgeRequestContext context, CancellationToken ct);
 
     Task<SourceFragment> GetSourceAsync(string fragmentId, CancellationToken ct);
+
+    // Quality push/read (knowledge-v0.md §10) — called by api-worker's outbox consumer and by the
+    // Api's read-only analytics proxy, never by TurnOrchestrator itself.
+    Task PushQualityTurnAsync(QualityTurnPush push, CancellationToken ct);
+
+    Task PushQualityFeedbackAsync(QualityFeedbackPush push, CancellationToken ct);
+
+    Task PushQualityCompletionAsync(QualityCompletionPush push, CancellationToken ct);
+
+    Task<QualityEvaluations> GetQualityEvaluationsAsync(string caseId, CancellationToken ct);
+
+    Task<IssueGroups> GetIssueGroupsAsync(CancellationToken ct);
 }

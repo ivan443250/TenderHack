@@ -12,7 +12,11 @@ public interface IOutboxReader
 
     Task MarkDeliveredAsync(long id, CancellationToken ct);
 
+    /// <summary>Terminates the row (e.g. a handoff submit — retry is a fresh user command, not an automatic redelivery).</summary>
     Task MarkFailedAsync(long id, string error, CancellationToken ct);
+
+    /// <summary>Records the attempt but leaves the row pending for redelivery (e.g. quality pushes — at-least-once, no user-triggered retry exists).</summary>
+    Task RecordAttemptFailureAsync(long id, string error, CancellationToken ct);
 }
 
 public sealed record OutboxEntry(long Id, string MessageType, string PayloadJson, int AttemptCount);

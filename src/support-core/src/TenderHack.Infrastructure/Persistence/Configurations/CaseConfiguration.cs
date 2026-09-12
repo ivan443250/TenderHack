@@ -16,6 +16,12 @@ public sealed class CaseConfiguration : IEntityTypeConfiguration<Case>
     {
         builder.ToTable("cases");
 
+        // A message-send turn completing and a handoff-status webhook arriving for the same case at
+        // the same moment must not silently lost-update each other (architecture.md §7 concurrency).
+        // Postgres's own `xmin` system column is a free optimistic-concurrency token — no extra
+        // migration column needed.
+        builder.Property<uint>("xmin").IsRowVersion();
+
         builder.HasKey(c => c.Id);
         builder.Property(c => c.Id).HasConversion(id => id.Value, value => new CaseId(value));
 

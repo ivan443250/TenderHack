@@ -32,6 +32,7 @@ public sealed class SupportOptions
         /// </summary>
         public TimeSpan Initial { get; set; } = TimeSpan.FromSeconds(15);
 
+        /// <summary>Reserved for the per-handoff backoff ceiling described above; not read by the current fixed-interval poll.</summary>
         public TimeSpan Max { get; set; } = TimeSpan.FromMinutes(5);
 
         public TimeSpan Ttl { get; set; } = TimeSpan.FromDays(7);

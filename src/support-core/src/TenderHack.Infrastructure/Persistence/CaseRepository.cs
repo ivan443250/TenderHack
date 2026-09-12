@@ -24,6 +24,12 @@ public sealed class CaseRepository(TenderHackDbContext db) : ICaseRepository
     public Task<Case?> FindByHandoffIdAsync(HandoffId handoffId, CancellationToken ct) =>
         db.Cases.FirstOrDefaultAsync(c => c.Handoff != null && c.Handoff.Id == handoffId, ct);
 
+    public async Task<IReadOnlyList<Case>> ListStaleActiveTurnCasesAsync(DateTimeOffset olderThan, CancellationToken ct) =>
+        await db.Cases
+            .Where(c => c.Turns.Any(t =>
+                (t.Status == TurnStatus.Queued || t.Status == TurnStatus.Running) && t.CreatedAt < olderThan))
+            .ToListAsync(ct);
+
     public void Add(Case @case) => db.Cases.Add(@case);
 }
 

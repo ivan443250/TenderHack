@@ -149,6 +149,47 @@ public sealed class CaseTests
     }
 
     [Fact]
+    public void PreparingASecondHandoffThrowsInsteadOfBypassingTheExistingOne()
+    {
+        var sut = NewCase();
+        sut.PrepareHandoff();
+
+        Assert.Throws<HandoffAlreadyExistsException>(() => sut.PrepareHandoff());
+    }
+
+    [Fact]
+    public void CommandsOnACaseWithNoHandoffYetThrowHandoffNotFound()
+    {
+        var sut = NewCase();
+
+        Assert.Throws<HandoffNotFoundException>(() => sut.ConfirmHandoff());
+        Assert.Throws<HandoffNotFoundException>(() => sut.RetryHandoff());
+        Assert.Throws<HandoffNotFoundException>(() => sut.FailHandoff());
+        Assert.Throws<HandoffNotFoundException>(() => sut.AcknowledgeHandoff(simulated: false, null, Now));
+        Assert.Throws<HandoffNotFoundException>(() => sut.MarkHandoffStale());
+        Assert.Throws<HandoffNotFoundException>(() => sut.IngestHandoffStatus(HandoffId.New(), 1, null, null, null, Now));
+    }
+
+    [Fact]
+    public void MarkingAHandoffStaleAfterTheTtlDoesNotConvertPendingToAccepted()
+    {
+        var sut = NewCase();
+        sut.PrepareHandoff();
+        sut.ConfirmHandoff();
+
+        // A status-poll timeout only flags staleness — acceptance still requires an explicit adapter
+        // acknowledgement, so a stale-but-pending handoff must remain Pending (support-adapter-v0.md §6.1).
+        sut.MarkHandoffStale();
+
+        Assert.Equal(HandoffStatus.Pending, sut.Handoff!.Status);
+        Assert.True(sut.Handoff.Stale);
+
+        // The adapter can still acknowledge a stale submission after the fact.
+        sut.AcknowledgeHandoff(simulated: false, "ext-1", Now);
+        Assert.Equal(HandoffStatus.Accepted, sut.Handoff.Status);
+    }
+
+    [Fact]
     public void HandoffStatusMustTargetTheSameHandoffAndCase()
     {
         var sut = NewCase();
@@ -174,6 +215,23 @@ public sealed class CaseTests
         sut.IngestHandoffStatus(sut.Handoff.Id, externalRevision: 1, new HandoffStage("RESOLVED", null), null, null, Now);
 
         Assert.Equal("IN_PROGRESS", sut.Handoff.Stage!.Code);
+    }
+
+    [Fact]
+    public void ALowerExternalRevisionArrivingAfterAHigherOneIsIgnored()
+    {
+        var sut = NewCase();
+        sut.PrepareHandoff();
+        sut.ConfirmHandoff();
+        sut.AcknowledgeHandoff(simulated: false, "ext-1", Now);
+        sut.IngestHandoffStatus(sut.Handoff!.Id, externalRevision: 5, new HandoffStage("IN_PROGRESS", null), null, null, Now);
+
+        // A poll and a webhook can race and deliver an older snapshot after a newer one already applied.
+        var applied = sut.IngestHandoffStatus(sut.Handoff.Id, externalRevision: 3, new HandoffStage("QUEUED", null), null, null, Now);
+
+        Assert.False(applied);
+        Assert.Equal("IN_PROGRESS", sut.Handoff.Stage!.Code);
+        Assert.Equal(5, sut.Handoff.LastExternalRevision);
     }
 
     [Fact]

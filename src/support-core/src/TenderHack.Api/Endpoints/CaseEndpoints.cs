@@ -14,10 +14,25 @@ public static class CaseEndpoints
 
     public static void MapCaseEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/api/v0/cases", async (HttpContext context, CreateCaseUseCase useCase, CancellationToken ct) =>
+        app.MapPost("/api/v0/cases", async (
+            HttpContext context, CreateCaseUseCase useCase, GetCaseSnapshotUseCase getSnapshot, IIdempotencyStore idempotency, CancellationToken ct) =>
         {
             var ownerId = OwnerSession.GetOrCreate(context);
+            var key = IdempotencyHelper.GetKey(context);
+
+            var cachedId = await IdempotencyHelper.CheckAsync(idempotency, ownerId, IdempotencyScopes.CreateCase, key, payload: new { }, ct);
+            if (cachedId is not null && CaseId.TryParse(cachedId, out var existingId))
+            {
+                var existing = await getSnapshot.ExecuteAsync(existingId, ownerId, ct);
+                return Results.Ok(CaseMapper.ToSnapshot(existing, []));
+            }
+
             var @case = await useCase.ExecuteAsync(ownerId, ct);
+            if (key is not null)
+            {
+                await idempotency.SaveAsync(ownerId, IdempotencyScopes.CreateCase, key, IdempotencyHelper.HashPayload(new { }), @case.Id.ToString(), ct);
+            }
+
             return Results.Created($"/api/v0/cases/{@case.Id}", CaseMapper.ToSnapshot(@case, []));
         });
 

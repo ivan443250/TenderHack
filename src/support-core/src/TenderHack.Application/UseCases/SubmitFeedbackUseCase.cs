@@ -1,4 +1,5 @@
 using TenderHack.Application.Exceptions;
+using TenderHack.Application.Knowledge;
 using TenderHack.Application.Ports;
 using TenderHack.Domain.Cases;
 using TenderHack.Domain.Feedback;
@@ -8,9 +9,11 @@ namespace TenderHack.Application.UseCases;
 /// <summary>
 /// Four independent signals, once per case, only after completion (web-api-v0.md §9.3). Only
 /// `solved` can move resolution — `Case.RecordFeedback` enforces that, this use-case never touches
-/// `ResolutionStatus` directly.
+/// `ResolutionStatus` directly. Also enqueues the `quality.feedback` push (knowledge-v0.md §10).
 /// </summary>
-public sealed class SubmitFeedbackUseCase(ICaseRepository cases, IFeedbackRepository feedbackRepository, IUnitOfWork unitOfWork, ITurnEventStream events, TimeProvider clock)
+public sealed class SubmitFeedbackUseCase(
+    ICaseRepository cases, IFeedbackRepository feedbackRepository, IUnitOfWork unitOfWork,
+    ITurnEventStream events, IOutbox outbox, TimeProvider clock)
 {
     public async Task<Feedback> ExecuteAsync(
         CaseId caseId,
@@ -39,6 +42,19 @@ public sealed class SubmitFeedbackUseCase(ICaseRepository cases, IFeedbackReposi
             ["information_quality_rating"] = informationQualityRating?.ToString(),
             ["solved"] = solved,
         }), ct);
+
+        var turnId = @case.Turns.Count > 0 ? @case.Turns[^1].Id.ToString() : caseId.ToString();
+        outbox.Enqueue(QualityOutboxMessages.Feedback, new QualityFeedbackPush(
+            feedback.Id.ToString(),
+            caseId.ToString(),
+            turnId,
+            now,
+            specialistRating,
+            informationQualityRating,
+            SpecialistRef: @case.Handoff?.AssignedSpecialist?.Ref,
+            IntegrationMode: @case.Handoff?.IntegrationMode?.ToString(),
+            solved,
+            commentText));
 
         await unitOfWork.SaveChangesAsync(ct);
         return feedback;

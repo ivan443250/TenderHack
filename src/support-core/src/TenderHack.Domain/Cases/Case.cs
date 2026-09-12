@@ -215,7 +215,7 @@ public sealed class Case
 
         if (Handoff is not null)
         {
-            throw new InvalidOperationException($"Case {Id} already has a handoff; use Retry, not a new prepare.");
+            throw new HandoffAlreadyExistsException(Id);
         }
 
         Handoff = new Handoff(HandoffId.New(), Id);
@@ -274,5 +274,5 @@ public sealed class Case
     }
 
     private Handoff RequireHandoff() =>
-        Handoff ?? throw new InvalidOperationException($"Case {Id} has no handoff.");
+        Handoff ?? throw new HandoffNotFoundException(Id);
 }

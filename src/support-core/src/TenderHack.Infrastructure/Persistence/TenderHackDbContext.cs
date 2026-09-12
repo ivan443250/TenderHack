@@ -20,6 +20,8 @@ public sealed class TenderHackDbContext(DbContextOptions<TenderHackDbContext> op
 
     public DbSet<NotificationEntity> Notifications => Set<NotificationEntity>();
 
+    public DbSet<IdempotencyKeyEntity> IdempotencyKeys => Set<IdempotencyKeyEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TenderHackDbContext).Assembly);

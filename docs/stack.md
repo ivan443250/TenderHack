@@ -242,12 +242,12 @@ Never silently truncate the part of a procedure containing an exception/forbidde
 
 ## 13. Background jobs
 
-One worker per runtime, each using its own PostgreSQL job table and the same application code as its API:
+One worker per runtime, using the same application code as its API:
 
-- `api-worker`: `outbox`, `api_jobs` — handoff delivery/retries, quality-turn and feedback payload pushes (`POST /v0/quality/turns`, `POST /v0/quality/feedback`), stale-turn cleanup;
-- `knowledge-worker`: `knowledge_jobs` — ingestion, embeddings, quality audit, issue groups.
+- `api-worker`: `outbox` table — handoff delivery/retries, `handoff-status-sync` polling, quality-turn and feedback payload pushes (`POST /v0/quality/turns`, `POST /v0/quality/feedback`), stale-turn cleanup;
+- `knowledge-worker`: `knowledge_jobs` table — ingestion, embeddings, quality audit, issue groups.
 
-Mechanism for both:
+`knowledge-worker` mechanism:
 
 - job table;
 - `FOR UPDATE SKIP LOCKED` claiming;
@@ -255,7 +255,14 @@ Mechanism for both:
 - retries with explicit attempt/error state;
 - idempotent effect key.
 
-Do not add Redis/Celery/Kafka/RabbitMQ/Hangfire/Quartz before a measured need.
+`api-worker` mechanism (single replica, hackathon scale — no lease table needed):
+
+- independent fixed-interval `BackgroundService` ticks, one per concern;
+- each tick re-derives its own work set from `cases`/`outbox` state rather than claiming rows;
+- idempotent effect key per write path instead of a lease (outbox delivery keyed by handoff id, status ingestion deduped by external revision, `xmin` optimistic concurrency on `cases`);
+- explicit attempt/error state on `outbox` (`AttemptCount`, `LastError`); handoff-status-sync and stale-turn cleanup log-and-retry-next-tick on failure.
+
+Do not add Redis/Celery/Kafka/RabbitMQ/Hangfire/Quartz before a measured need; likewise, do not add an `api_jobs` lease table to `api-worker` before it needs more than one replica.
 
 ## 14. Docker/deployment
 
