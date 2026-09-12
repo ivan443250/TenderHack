@@ -23,7 +23,7 @@ public sealed class TurnOrchestratorTests
     {
         var sut = CreateSut();
         var @case = NewCase();
-        _moderation.NextResult = new ModerationRuleMatch(Confirmed: true, "v1", ["слово"]);
+        _moderation.NextResult = new ModerationRuleMatch("PROFANITY_001", "v1", "слово", 0, 5, RequiresContextCheck: false);
 
         var outcome = await sut.RunAsync(@case, "оскорбление", CancellationToken.None);
 
@@ -38,7 +38,7 @@ public sealed class TurnOrchestratorTests
     {
         var sut = CreateSut(closeAfterWarnings: 1);
         var @case = NewCase();
-        _moderation.NextResult = new ModerationRuleMatch(Confirmed: true, "v1", ["слово"]);
+        _moderation.NextResult = new ModerationRuleMatch("PROFANITY_001", "v1", "слово", 0, 5, RequiresContextCheck: false);
         await sut.RunAsync(@case, "первое", CancellationToken.None);
 
         var outcome = await sut.RunAsync(@case, "второе", CancellationToken.None);
@@ -46,6 +46,80 @@ public sealed class TurnOrchestratorTests
         Assert.Equal(Decision.ModerationClose, outcome.Decision);
         Assert.Equal(ConversationStatus.ClosedModeration, @case.ConversationStatus);
         Assert.Contains(_events.Published, e => e.Event.Type == "CONVERSATION_CLOSED");
+    }
+
+    [Fact]
+    public async Task AmbiguousMatchConfirmedOffensiveByKnowledgeWarns()
+    {
+        var sut = CreateSut();
+        var @case = NewCase();
+        _moderation.NextResult = new ModerationRuleMatch("PROFANITY_A01", "v1", "дура", 0, 4, RequiresContextCheck: true);
+        _knowledge.ModerationContext = new ModerationContextResult(ModerationAmbiguity.Offensive, "stub-v0");
+
+        var outcome = await sut.RunAsync(@case, "ты дура", CancellationToken.None);
+
+        Assert.Equal(Decision.ModerationWarning, outcome.Decision);
+    }
+
+    [Theory]
+    [InlineData(ModerationAmbiguity.Uncertain)]
+    [InlineData(ModerationAmbiguity.NotOffensive)]
+    public async Task AmbiguousMatchNotConfirmedOffensiveContinuesAsNormalTurn(ModerationAmbiguity ambiguity)
+    {
+        var sut = CreateSut();
+        var @case = NewCase();
+        _moderation.NextResult = new ModerationRuleMatch("PROFANITY_A01", "v1", "тупой", 0, 5, RequiresContextCheck: true);
+        _knowledge.ModerationContext = new ModerationContextResult(ambiguity, "stub-v0");
+
+        var outcome = await sut.RunAsync(@case, "тупой баг в форме", CancellationToken.None);
+
+        Assert.Equal(Decision.Answer, outcome.Decision);
+        Assert.Equal(0, outcome.ModerationWarningCount);
+    }
+
+    [Fact]
+    public async Task ExplicitHumanRequestOffersHandoffWithoutCallingKnowledge()
+    {
+        var sut = CreateSut();
+        var @case = NewCase();
+
+        var outcome = await sut.RunAsync(@case, "соедините меня с оператором", CancellationToken.None);
+
+        Assert.Equal(Decision.HandoffOffer, outcome.Decision);
+        Assert.DoesNotContain(_events.Published, e => e.Event.Type == "TURN_STAGE"); // understand/retrieve never ran
+        var handoffEvent = _events.Published.First(e => e.Event.Type == "HANDOFF_OFFER");
+        var reasonCodes = Assert.IsAssignableFrom<IReadOnlyList<string>>(handoffEvent.Event.Payload["reason_codes"]);
+        Assert.Contains("EXPLICIT_HUMAN_REQUEST", reasonCodes);
+    }
+
+    [Fact]
+    public async Task SufficientEvidenceWithRiskFlagsAnswersAndOffersHandoff()
+    {
+        var sut = CreateSut();
+        var @case = NewCase();
+        _knowledge.Answerability = new AnswerabilityResult(EvidenceSufficiency.Sufficient, ["frag-1"], [], ["needs_portal_verification"]);
+
+        var outcome = await sut.RunAsync(@case, "вопрос", CancellationToken.None);
+
+        Assert.Equal(Decision.AnswerAndHandoff, outcome.Decision);
+        Assert.Equal("Ответ.", outcome.AnswerMarkdown);
+        Assert.Contains(_events.Published, e => e.Event.Type == "AI_ANSWER");
+        Assert.Contains(_events.Published, e => e.Event.Type == "HANDOFF_OFFER");
+    }
+
+    [Fact]
+    public async Task InsufficientEvidencePublishesHandoffOfferWithRoutingReasonCode()
+    {
+        var sut = CreateSut();
+        var @case = NewCase();
+        _knowledge.Answerability = new AnswerabilityResult(EvidenceSufficiency.Insufficient, [], [], []);
+
+        await sut.RunAsync(@case, "вопрос", CancellationToken.None);
+
+        var handoffEvent = _events.Published.First(e => e.Event.Type == "HANDOFF_OFFER");
+        var reasonCodes = Assert.IsAssignableFrom<IReadOnlyList<string>>(handoffEvent.Event.Payload["reason_codes"]);
+        Assert.Contains("INSUFFICIENT_EVIDENCE", reasonCodes);
+        Assert.Equal("L2", handoffEvent.Event.Payload["recommended_line"]);
     }
 
     [Fact]

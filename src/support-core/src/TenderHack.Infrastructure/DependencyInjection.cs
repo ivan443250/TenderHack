@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using TenderHack.Application.Knowledge;
 using TenderHack.Application.Ports;
 using TenderHack.Infrastructure.KnowledgeClient;
+using TenderHack.Infrastructure.Moderation;
 using TenderHack.Infrastructure.Persistence;
 using Generated = TenderHack.Infrastructure.KnowledgeClient.Generated;
 
@@ -29,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IOutbox, Outbox>();
         services.AddSingleton<ITurnEventStream, CaseEventStore>();
+        services.AddSingleton<IModerationRuleEngine, DeterministicModerationRuleEngine>();
 
         services.Configure<KnowledgeServiceOptions>(configuration.GetSection(KnowledgeServiceOptions.SectionName));
         services.AddHttpClient<Generated.IKnowledgeApiClient, Generated.KnowledgeApiClient>((provider, client) =>
