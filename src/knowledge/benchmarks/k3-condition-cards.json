@@ -1,0 +1,40 @@
+{
+  "stage": "K3",
+  "status": "PASS",
+  "snapshot_id": "snap_0e979dfef376faff41f7c76416fda457",
+  "snapshot_corpus": "NORMATIVE",
+  "snapshot_review_status": "PENDING_REVIEW",
+  "cards_total": 20,
+  "persisted_card_versions": 22,
+  "cards_by_risk": {
+    "LOW": 4,
+    "MEDIUM": 9,
+    "HIGH": 7
+  },
+  "cards_by_source_document": {
+    "Инструкция по электронному актированию.pdf": 12,
+    "Инструкция по работе с машиночитаемыми доверенностями.pdf": 4,
+    "Инструкция по формированию YML.pdf": 2,
+    "Инструкция по созданию оферты и СТЕ.pdf": 2
+  },
+  "unique_source_fragments": 21,
+  "review_status": "VERIFIED",
+  "verification_errors": [],
+  "historical_fragment_rejection": "PASS",
+  "persistence": {
+    "table": "kb_condition_cards",
+    "version_key": ["card_id", "version"],
+    "snapshot_pinned": true,
+    "idempotent_seed": true
+  },
+  "retrieval_integration": {
+    "mode": "adjacent_non_destructive",
+    "raw_fragments_preserved": true,
+    "unmet_required_conditions_selected": false
+  },
+  "unresolved_organizer_questions": 1,
+  "organizer_question_refs": [
+    "support request lifecycle is not defined by the six manuals"
+  ],
+  "source_of_truth": "six normative manuals only; STP historical data is excluded"
+}

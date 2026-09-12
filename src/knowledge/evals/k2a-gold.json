@@ -1,0 +1,485 @@
+{
+  "label_source": "manual source/page review of the six organizer PDFs; labels are not generated from retrieval output",
+  "snapshot_id": "snap_0e979dfef376faff41f7c76416fda457",
+  "queries": [
+    {
+      "query_id": "act-01",
+      "document": "act",
+      "query": "\u0430\u043d\u043d\u043e\u0442\u0430\u0446\u0438\u044f \u044d\u043b\u0435\u043a\u0442\u0440\u043e\u043d\u043d\u043e\u0433\u043e \u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u044f",
+      "expected_fragment_ids": [
+        "frag_0b0bf14799c1fa57ffa62f7aa5fc6877"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "act-02",
+      "document": "act",
+      "query": "\u0432\u0438\u0434\u0435\u043e\u0440\u043e\u043b\u0438\u043a\u0438 \u043c\u0430\u0442\u0435\u0440\u0438\u0430\u043b\u044b \u0432\u0435\u0431\u0438\u043d\u0430\u0440\u043e\u0432",
+      "expected_fragment_ids": [
+        "frag_25fcfd6cbebbf21f12038a71a305b3a4"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "act-03",
+      "document": "act",
+      "query": "\u043a\u0440\u0438\u043f\u0442\u043e\u043f\u0440\u043e CSP \u043f\u0440\u043e\u0444\u0438\u043b\u044c",
+      "expected_fragment_ids": [
+        "frag_24c41a85a9b23fb8c3352f6102e528d7"
+      ],
+      "exact_codes": [
+        "CSP"
+      ],
+      "subsets": [
+        "exact_code"
+      ]
+    },
+    {
+      "query_id": "act-04",
+      "document": "act",
+      "query": "\u0430\u0432\u0442\u043e\u0440\u0438\u0437\u0430\u0446\u0438\u044f Diadoc \u041a\u0430\u043b\u0443\u0433\u0430 \u0410\u0441\u0442\u0440\u0430\u043b",
+      "expected_fragment_ids": [
+        "frag_5db48a2ca0528ecce7df25839aca5baa"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "act-05",
+      "document": "act",
+      "query": "\u043f\u043e\u0434\u043f\u0438\u0441\u0430\u0442 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442 \u043e\u0442\u043f\u0440\u0430\u0432\u043a\u0430 CSP",
+      "expected_fragment_ids": [
+        "frag_169471962abed27f524212d252ca5a4e"
+      ],
+      "subsets": [
+        "typo"
+      ]
+    },
+    {
+      "query_id": "act-06",
+      "document": "act",
+      "query": "\u043e\u0442\u043f\u0440\u0430\u0432\u043a\u0430 \u0423\u041f\u0414 \u043e\u043f\u0435\u0440\u0430\u0442\u043e\u0440\u0443",
+      "expected_fragment_ids": [
+        "frag_203a8247e4ece0226564a5aba9864015"
+      ],
+      "exact_codes": [
+        "\u0423\u041f\u0414"
+      ],
+      "subsets": [
+        "exact_code"
+      ]
+    },
+    {
+      "query_id": "act-07",
+      "document": "act",
+      "query": "\u0441\u0442\u0430\u0442\u0443\u0441 \u0423\u041f\u0414 \u043f\u043e\u0434\u043f\u0438\u0441\u0430\u043d",
+      "expected_fragment_ids": [
+        "frag_0e1359979e301c356c29e0ba6c913a33"
+      ],
+      "exact_codes": [
+        "\u0423\u041f\u0414"
+      ],
+      "subsets": [
+        "exact_code"
+      ]
+    },
+    {
+      "query_id": "yml-01",
+      "document": "yml",
+      "query": "\u043c\u0430\u0441\u0441\u043e\u0432\u044b\u0439 \u0438\u043c\u043f\u043e\u0440\u0442 \u043f\u0440\u0430\u0439\u0441 \u043b\u0438\u0441\u0442\u0430 YML",
+      "expected_fragment_ids": [
+        "frag_9da391708842453db5f270b965ff5d79"
+      ],
+      "exact_codes": [
+        "YML"
+      ],
+      "subsets": [
+        "exact_code"
+      ]
+    },
+    {
+      "query_id": "yml-02",
+      "document": "yml",
+      "query": "YML \u043d\u0435\u043f\u0435\u0447\u0430\u0442\u0430\u0435\u043c\u044b\u0435 \u0441\u0438\u043c\u0432\u043e\u043b\u044b",
+      "expected_fragment_ids": [
+        "frag_061d302ff5c760a6c15ff59af50dae40"
+      ],
+      "exact_codes": [
+        "YML"
+      ],
+      "subsets": [
+        "exact_code"
+      ]
+    },
+    {
+      "query_id": "yml-03",
+      "document": "yml",
+      "query": "\u0441\u0442\u0440\u0443\u043a\u0442\u0443\u0440\u0430 YML XML UTF-8",
+      "expected_fragment_ids": [
+        "frag_05a1a2a126a797c5f11c9b8dcc2cd017"
+      ],
+      "exact_codes": [
+        "YML",
+        "XML"
+      ],
+      "subsets": [
+        "exact_code"
+      ]
+    },
+    {
+      "query_id": "yml-04",
+      "document": "yml",
+      "query": "\u0441\u043f\u0438\u0441\u043e\u043a \u044d\u043b\u0435\u043c\u0435\u043d\u0442\u043e\u0432 offers",
+      "expected_fragment_ids": [
+        "frag_0e70e18f1091a0176ab17907cbbcd047"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "yml-05",
+      "document": "yml",
+      "query": "\u043a\u043e\u043d\u0435\u0447\u043d\u0430\u044f \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f \u0442\u043e\u0432\u0430\u0440\u0430",
+      "expected_fragment_ids": [
+        "frag_ac1109e2ee615706f212a6903099d7ce"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "yml-06",
+      "document": "yml",
+      "query": "\u043e\u043f\u0438\u0441\u0430\u043d\u0438\u0435 \u044d\u043b\u0435\u043c\u0435\u043d\u0442\u043e\u0432 YML",
+      "expected_fragment_ids": [
+        "frag_4487a52a478c34a315dca40202083a3b"
+      ],
+      "exact_codes": [
+        "YML"
+      ],
+      "subsets": [
+        "exact_code"
+      ]
+    },
+    {
+      "query_id": "yml-07",
+      "document": "yml",
+      "query": "\u044d\u043b\u0435\u043c\u0435\u043d\u0442 delivery-options",
+      "expected_fragment_ids": [
+        "frag_20522a98289a5aec83d636df6a8f0d29"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "supplier-01",
+      "document": "supplier",
+      "query": "\u0442\u0435\u0440\u043c\u0438\u043d\u044b \u0441\u043e\u043a\u0440\u0430\u0449\u0435\u043d\u0438\u044f \u043f\u043e\u0441\u0442\u0430\u0432\u0449\u0438\u043a\u0430",
+      "expected_fragment_ids": [
+        "frag_027c03bcaa12ea33d06b8f50faa11f53"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "supplier-02",
+      "document": "supplier",
+      "query": "\u0442\u0440\u0435\u0431\u043e\u0432\u0430\u043d\u0438\u044f \u043f\u0440\u043e\u0433\u0440\u0430\u043c\u043c\u043d\u043e\u0435 \u0442\u0435\u0445\u043d\u0438\u0447\u0435\u0441\u043a\u043e\u0435 \u043e\u0431\u0435\u0441\u043f\u0435\u0447\u0435\u043d\u0438\u0435",
+      "expected_fragment_ids": [
+        "frag_14f96a059ad28e91a8436b195e438a84"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "supplier-03",
+      "document": "supplier",
+      "query": "\u0443\u0440\u043e\u0432\u0435\u043d\u044c \u043f\u043e\u0434\u0433\u043e\u0442\u043e\u0432\u043a\u0438 \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044f",
+      "expected_fragment_ids": [
+        "frag_1c30aeb3f9c1e2a50f5e74bee3e6c287"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "supplier-04",
+      "document": "supplier",
+      "query": "\u0440\u0435\u0435\u0441\u0442\u0440 \u043e\u0444\u0435\u0440\u0442 \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0438",
+      "expected_fragment_ids": [
+        "frag_1eb2e5c12d073ca83cc9175eb201a864"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "supplier-05",
+      "document": "supplier",
+      "query": "\u0443\u0434\u0430\u043b\u0435\u043d\u0438\u0435 \u0437\u0430\u043a\u0443\u043f\u043a\u0438",
+      "expected_fragment_ids": [
+        "frag_047958c75893fee373460149793414d0"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "supplier-06",
+      "document": "supplier",
+      "query": "\u0432\u0441\u0435 \u0437\u0430\u043a\u0443\u043f\u043a\u0438 \u043f\u043e\u0438\u0441\u043a",
+      "expected_fragment_ids": [
+        "frag_3d281a7e497366aedbc7a022872616ca"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "supplier-07",
+      "document": "supplier",
+      "query": "CSP \u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438 \u041a\u0440\u0438\u043f\u0442\u043e\u041f\u0440\u043e",
+      "expected_fragment_ids": [
+        "frag_2cac32a0232e2d3f2030fecaddbc6fba"
+      ],
+      "exact_codes": [
+        "CSP"
+      ],
+      "subsets": [
+        "exact_code"
+      ]
+    },
+    {
+      "query_id": "supplier-08",
+      "document": "supplier",
+      "query": "\u043a\u043e\u043d\u0442\u0430\u043a\u0442\u043d\u0430\u044f \u0438\u043d\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u044f",
+      "expected_fragment_ids": [
+        "frag_8bc2e1f87b9e44cdb8b38b0802c18ef8"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "supplier-09",
+      "document": "supplier",
+      "query": "\u043e\u0448\u0438\u0431\u043a\u0430 \u043e\u0442\u043f\u0440\u0430\u0432\u043a\u0438 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0430",
+      "expected_fragment_ids": [
+        "frag_9c36b21cfe94a6b8c8e889d847f5643a"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "offer-01",
+      "document": "offer",
+      "query": "\u0441\u043e\u0437\u0434\u0430\u043d\u0438\u0435 \u043e\u0444\u0435\u0440\u0442\u044b \u0421\u0422\u0415",
+      "expected_fragment_ids": [
+        "frag_275235804c1cae05ffd59653fd9e770a"
+      ],
+      "exact_codes": [
+        "\u0421\u0422\u0415"
+      ],
+      "subsets": [
+        "exact_code"
+      ]
+    },
+    {
+      "query_id": "offer-02",
+      "document": "offer",
+      "query": "\u043f\u043e\u0434\u0430\u0447\u0430 \u0446\u0435\u043d\u043e\u0432\u043e\u0433\u043e \u043f\u0440\u0435\u0434\u043b\u043e\u0436\u0435\u043d\u0438\u044f \u0421\u0422\u0415",
+      "expected_fragment_ids": [
+        "frag_1bd236393c5e79a6923fec71822c151a"
+      ],
+      "exact_codes": [
+        "\u0421\u0422\u0415"
+      ],
+      "subsets": [
+        "exact_code"
+      ]
+    },
+    {
+      "query_id": "offer-03",
+      "document": "offer",
+      "query": "\u0432\u0430\u0440\u0438\u0430\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c \u0421\u0422\u0415",
+      "expected_fragment_ids": [
+        "frag_d27f487174a862b1b9a313df37a9557f"
+      ],
+      "exact_codes": [
+        "\u0421\u0422\u0415"
+      ],
+      "subsets": [
+        "exact_code"
+      ]
+    },
+    {
+      "query_id": "offer-04",
+      "document": "offer",
+      "query": "\u0430\u0440\u0442\u0438\u043a\u0443\u043b \u043f\u043e\u0441\u0442\u0430\u0432\u0449\u0438\u043a\u0430",
+      "expected_fragment_ids": [
+        "frag_349106bce318ae4d10162c1a73d09524"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "offer-05",
+      "document": "offer",
+      "query": "\u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043d\u043d\u044b\u0435 \u043e\u0444\u0435\u0440\u0442\u044b",
+      "expected_fragment_ids": [
+        "frag_d42f47768f4faf2023fac070e7a080ff"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "offer-06",
+      "document": "offer",
+      "query": "\u043e\u0441\u043d\u043e\u0432\u043d\u044b\u0435 \u0442\u0440\u0435\u0431\u043e\u0432\u0430\u043d\u0438\u044f \u043e\u0444\u0435\u0440\u0442\u044b",
+      "expected_fragment_ids": [
+        "frag_4a557d7f6c374155accb21123f1da751"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "offer-07",
+      "document": "offer",
+      "query": "\u043f\u043e\u0434\u043f\u0438\u0441\u0430\u043d\u0438\u0435 \u043f\u0430\u043a\u0435\u0442\u0430 \u043e\u0444\u0435\u0440\u0442",
+      "expected_fragment_ids": [
+        "frag_55176a981dd9f58afa0b0bc59ea0336e"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "offer-08",
+      "document": "offer",
+      "query": "\u043e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u0442\u044c \u043f\u0440\u0435\u0434\u043b\u043e\u0436\u0435\u043d\u0438\u0435",
+      "expected_fragment_ids": [
+        "frag_05e33baabe7561c1b24b93452ec7ebe7"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "mcd-01",
+      "document": "mcd",
+      "query": "\u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u041c\u0427\u0414",
+      "expected_fragment_ids": [
+        "frag_55d6382c539721ba0a50da6f7edf47c7"
+      ],
+      "exact_codes": [
+        "\u041c\u0427\u0414"
+      ],
+      "subsets": [
+        "exact_code"
+      ]
+    },
+    {
+      "query_id": "mcd-02",
+      "document": "mcd",
+      "query": "\u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u0434\u043e\u0432\u0435\u0440\u0435\u043d\u043d\u043e\u0441\u0442\u044c xml",
+      "expected_fragment_ids": [
+        "frag_aa6f35c8108f64dfcd4b5a17feef722d"
+      ],
+      "exact_codes": [
+        "xml"
+      ],
+      "subsets": [
+        "exact_code"
+      ]
+    },
+    {
+      "query_id": "mcd-03",
+      "document": "mcd",
+      "query": "\u043e\u043f\u0435\u0440\u0430\u0446\u0438\u0438 \u0441 \u041c\u0427\u0414 \u043f\u043e\u043b\u043d\u043e\u043c\u043e\u0447\u0438\u044f",
+      "expected_fragment_ids": [
+        "frag_03ab9c479cc076e9b7c5a4337922d5af"
+      ],
+      "exact_codes": [
+        "\u041c\u0427\u0414"
+      ],
+      "subsets": [
+        "exact_code"
+      ]
+    },
+    {
+      "query_id": "mcd-04",
+      "document": "mcd",
+      "query": "\u043f\u0440\u043e\u0444\u0438\u043b\u044c \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u0438 \u041c\u0427\u0414",
+      "expected_fragment_ids": [
+        "frag_7fa71ec3d3ac0780d6b8ffb585f0741b"
+      ],
+      "exact_codes": [
+        "\u041c\u0427\u0414"
+      ],
+      "subsets": [
+        "exact_code"
+      ]
+    },
+    {
+      "query_id": "mcd-05",
+      "document": "mcd",
+      "query": "\u043f\u043e\u0434\u043f\u0438\u0441\u0430\u0442\u044c \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u044b \u041c\u0427\u0414",
+      "expected_fragment_ids": [
+        "frag_747ac84f5e598726d9d86064c1c3cc7a"
+      ],
+      "exact_codes": [
+        "\u041c\u0427\u0414"
+      ],
+      "subsets": [
+        "exact_code"
+      ]
+    },
+    {
+      "query_id": "customer-01",
+      "document": "customer",
+      "query": "\u0433\u043b\u0430\u0432\u043d\u0430\u044f \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0430 \u043f\u043e\u0440\u0442\u0430\u043b\u0430",
+      "expected_fragment_ids": [
+        "frag_6086be8fdacd330011c583631f19e06d"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "customer-02",
+      "document": "customer",
+      "query": "\u0442\u0435\u0440\u043c\u0438\u043d\u044b \u0441\u043e\u043a\u0440\u0430\u0449\u0435\u043d\u0438\u044f \u0437\u0430\u043a\u0430\u0437\u0447\u0438\u043a\u0430",
+      "expected_fragment_ids": [
+        "frag_127fdb35a07f1575cde4534c4bd441da"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "customer-03",
+      "document": "customer",
+      "query": "\u0442\u0440\u0435\u0431\u043e\u0432\u0430\u043d\u0438\u044f \u043f\u0440\u043e\u0433\u0440\u0430\u043c\u043c\u043d\u043e\u043c\u0443 \u043e\u0431\u0435\u0441\u043f\u0435\u0447\u0435\u043d\u0438\u044e",
+      "expected_fragment_ids": [
+        "frag_07b1ba211b5d2e8c95af84db7be9f0c5"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "customer-04",
+      "document": "customer",
+      "query": "\u0443\u0441\u043b\u043e\u0432\u043d\u044b\u0435 \u043e\u0431\u043e\u0437\u043d\u0430\u0447\u0435\u043d\u0438\u044f \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439 \u0438\u043d\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430",
+      "expected_fragment_ids": [
+        "frag_24ebbc2cb36b65b9d308416c12f49ef6"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "customer-05",
+      "document": "customer",
+      "query": "\u0437\u0430\u043f\u0438\u0441\u0438 \u043e\u0444\u0435\u0440\u0442 \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0438",
+      "expected_fragment_ids": [
+        "frag_867da69d196bda5a117fba259f8ad995"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "customer-06",
+      "document": "customer",
+      "query": "\u0443\u0434\u0430\u043b\u0435\u043d\u0438\u0435 \u0437\u0430\u043a\u0443\u043f\u043a\u0438 \u043f\u043e \u043f\u043e\u0442\u0440\u0435\u0431\u043d\u043e\u0441\u0442\u0438",
+      "expected_fragment_ids": [
+        "frag_04565080ead64f87a5fc107e1f4346bc"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "customer-07",
+      "document": "customer",
+      "query": "\u043e\u0441\u0442\u0430\u0432\u0438\u0442\u044c \u043e\u0431\u0440\u0430\u0449\u0435\u043d\u0438\u0435 \u043f\u043e\u0440\u0442\u0430\u043b",
+      "expected_fragment_ids": [
+        "frag_0c06228833d499dd6951a3cb4155550a"
+      ],
+      "subsets": []
+    },
+    {
+      "query_id": "customer-08",
+      "document": "customer",
+      "query": "\u0441\u043f\u0438\u0441\u043e\u043a \u043e\u0431\u0440\u0430\u0449\u0435\u043d\u0438\u0439 \u0442\u0435\u0445\u043d\u0438\u0447\u0435\u0441\u043a\u043e\u0439 \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u0438",
+      "expected_fragment_ids": [
+        "frag_affe30dfb4d875bdf22c5232921d2100"
+      ],
+      "subsets": []
+    }
+  ]
+}

@@ -1,0 +1,184 @@
+{
+  "benchmark": "k2d-2026-coverage",
+  "status": "PASS_WITH_LIMITATIONS",
+  "source_inputs": {
+    "support_export": {
+      "filename": "Выгрузка СТП за 2026 (1).xlsx",
+      "sheet": "Sheet1",
+      "bytes": 6200799,
+      "data_rows": 24960,
+      "columns": ["Влияние", "Заявитель", "Тема", "Статус", "Описание", "Решение"],
+      "empty_descriptions": 0,
+      "status_counts_all_rows": {"Завершено": 24960},
+      "prefix_rows": 23508,
+      "prefix_ratio": 0.9418269231,
+      "full_row_duplicate_rows": 193,
+      "normalized_description_duplicate_rows": 644,
+      "unique_nonempty_descriptions": 24316,
+      "raw_theme_unique_values_all_rows": 795,
+      "raw_theme_unique_values_after_query_dedup": 778,
+      "raw_theme_top10_all_rows": {
+        "Электронное исполнение (ЕИС)": 5930,
+        "Работа с контрактами": 5496,
+        "Электронное исполнение (малый объем)": 3648,
+        "Личный кабинет пользователя": 2696,
+        "Работа с СТЕ": 2117,
+        "Закупочные процедуры": 1937,
+        "Карточка поставщика": 370,
+        "Блокировка личного кабинета": 193,
+        "ДОП": 160,
+        "Контракты (44-ФЗ)": 134
+      },
+      "canonical_mapping_unique_queries": {
+        "UNMAPPED": 23830,
+        "AMBIGUOUS": 43,
+        "Блокировка личного кабинета": 2,
+        "Закупочные процедуры": 10,
+        "Личный кабинет пользователя": 9,
+        "Работа с СТЕ": 27,
+        "Работа с контрактами": 316,
+        "Электронное исполнение (ЕИС)": 35,
+        "Электронное исполнение (малый объем)": 44
+      },
+      "historical_action_likely_unique": 1835
+    },
+    "taxonomy": {
+      "filename": "Темы_подтемы_обращений.xlsx",
+      "sheet": "Лист1",
+      "bytes": 13758,
+      "themes": 9,
+      "subcategories": 86,
+      "subcategories_by_theme": {
+        "Блокировка личного кабинета": 6,
+        "Закупочные процедуры": 15,
+        "Карточка поставщика": 6,
+        "Личный кабинет пользователя": 13,
+        "Работа с СТЕ": 14,
+        "Работа с контрактами": 13,
+        "Уполномоченный орган (Региональный заказчик)": 5,
+        "Электронное исполнение (ЕИС)": 8,
+        "Электронное исполнение (малый объем)": 6
+      }
+    }
+  },
+  "evaluation": {
+    "query_source": "Описание only",
+    "prefix_transform": "strip one leading Подтема запроса: for evaluation; preserve the remaining user text",
+    "normalization": "NFC, NBSP-to-space, whitespace collapse, casefold",
+    "historical_solution_usage": "coarse HUMAN_ACTION_LIKELY signal only; never sent to retrieval and never normative",
+    "sample_seed": 20260912,
+    "sample_target": 600,
+    "sample_count": 600,
+    "selection": "deduplicate normalized descriptions; one per available canonical group; sqrt(size)-weighted deterministic fill",
+    "strata": {
+      "length_buckets": {
+        "short_0_30": 2,
+        "medium_31_120": 186,
+        "long_121_400": 316,
+        "very_long_401_plus": 96
+      },
+      "technical_count": 498,
+      "ambiguous_count": 219
+    },
+    "manual_review": {
+      "requested": 30,
+      "performed": 30,
+      "strong_labels_added": 0,
+      "rule": "Manual review does not promote a case to EVIDENCE_STRONG without explicit normative adjudication."
+    }
+  },
+  "retrieval": {
+    "snapshot_id": "snap_0e979dfef376faff41f7c76416fda457",
+    "corpus": "NORMATIVE",
+    "config_version": "hybrid-rrf-v1-no-dense",
+    "config_versions_observed": {"hybrid-rrf-v1-no-dense": 600},
+    "dense_enabled": false,
+    "dense_reason": "K2 database has 0 of 3899 required embeddings; no weights were downloaded.",
+    "historical_fields_sent_to_retrieval": [],
+    "candidate_limit": 10
+  },
+  "coverage": {
+    "overall": {
+      "sample_count": 600,
+      "classifications": {
+        "EVIDENCE_STRONG": 0,
+        "EVIDENCE_POSSIBLE": 330,
+        "NO_EVIDENCE": 227,
+        "HUMAN_ACTION_LIKELY": 42,
+        "UNASSESSABLE": 1
+      }
+    },
+    "per_theme_sample": {
+      "UNMAPPED_OR_AMBIGUOUS": {"sample_count": 471, "EVIDENCE_POSSIBLE": 258, "NO_EVIDENCE": 175, "HUMAN_ACTION_LIKELY": 37, "UNASSESSABLE": 1},
+      "Блокировка личного кабинета": {"sample_count": 2, "EVIDENCE_POSSIBLE": 1, "NO_EVIDENCE": 1},
+      "Закупочные процедуры": {"sample_count": 10, "EVIDENCE_POSSIBLE": 5, "NO_EVIDENCE": 5},
+      "Карточка поставщика": {"sample_count": 0},
+      "Личный кабинет пользователя": {"sample_count": 9, "EVIDENCE_POSSIBLE": 5, "NO_EVIDENCE": 4},
+      "Работа с СТЕ": {"sample_count": 16, "EVIDENCE_POSSIBLE": 2, "NO_EVIDENCE": 14},
+      "Работа с контрактами": {"sample_count": 54, "EVIDENCE_POSSIBLE": 28, "HUMAN_ACTION_LIKELY": 4, "NO_EVIDENCE": 22},
+      "Уполномоченный орган (Региональный заказчик)": {"sample_count": 0},
+      "Электронное исполнение (ЕИС)": {"sample_count": 18, "EVIDENCE_POSSIBLE": 12, "HUMAN_ACTION_LIKELY": 1, "NO_EVIDENCE": 5},
+      "Электронное исполнение (малый объем)": {"sample_count": 20, "EVIDENCE_POSSIBLE": 19, "NO_EVIDENCE": 1}
+    },
+    "interpretation": "EVIDENCE_POSSIBLE is a conservative lexical correspondence signal, not an answerability or business decision. High retrieval score alone is never sufficient."
+  },
+  "recurring_gaps": [
+    {
+      "pattern": "Portal credentials, account administration, and external URLs/IDs",
+      "observation": "Recurring NO_EVIDENCE rows in the sample",
+      "interpretation": "Requires source-scope decision or human handling; not evidence of a system bug."
+    },
+    {
+      "pattern": "Post-instruction failures and requests to correct a live status",
+      "observation": "Many long technical descriptions contain already-tried actions and live identifiers",
+      "interpretation": "Static normative manuals cannot verify the live state; keep a human-action signal separate."
+    },
+    {
+      "pattern": "Table-heavy status/error branches",
+      "observation": "Some exact-code queries retrieve a related table fragment but applicability remains unproven",
+      "interpretation": "Classified as EVIDENCE_POSSIBLE, not strong evidence; table/provenance review remains required."
+    }
+  ],
+  "gold_retrieval_reference": {
+    "rerun": true,
+    "gold_path": "evals/k2a-gold.json",
+    "query_count": 44,
+    "snapshot_id": "snap_0e979dfef376faff41f7c76416fda457",
+    "B1_lexical_baseline": {
+      "recall_at_5": 0.6136,
+      "recall_at_10": 0.75,
+      "mrr": 0.4018,
+      "typo_recall_at_10": 1.0,
+      "exact_code_hit_at_10": 0.6875,
+      "latency_ms": {"p50": 300.771, "p95": 359.774, "mean": 306.769}
+    },
+    "B2_rrf": {"status": "NOT_MEASURED", "blocker": "Qwen3 embeddings are not backfilled: expected 3899, found 0"},
+    "B3_rrf_reranker": {"status": "NOT_MEASURED", "blocker": "Qwen3 embeddings are not backfilled: expected 3899, found 0"},
+    "gold_labels_changed": false
+  },
+  "latency_ms": {"sample_count": 600, "p50": 994.172, "p95": 2871.11, "mean": 1251.515},
+  "remaining_misses": {
+    "no_evidence_count": 227,
+    "unassessable_count": 1,
+    "not_gold_misses": true,
+    "representative_rows": [22659, 7760, 8039, 4941, 5544, 2129, 5224, 22408, 2633, 24497, 788, 4625, 21695]
+  },
+  "findings": [
+    {
+      "severity": "MEDIUM",
+      "title": "STP theme is not a stable join to the organizer taxonomy",
+      "evidence": "778 distinct free-text values; only unambiguous exact/containment matches are mapped, leaving an explicit UNMAPPED_OR_AMBIGUOUS bucket.",
+      "disposition": "Documented in checkpoint-questions.md and organizer-questions.md; no safe retrieval change."
+    },
+    {
+      "severity": "LOW",
+      "title": "Dense channel unavailable in the running K2 database",
+      "evidence": "0/3899 persisted embeddings.",
+      "disposition": "Visible as no-dense config; rerun after certified backfill."
+    }
+  ],
+  "fixes": [],
+  "high_findings_unresolved": 0,
+  "scope_check": "Only src/knowledge/** changed",
+  "next_required_input": "Organizer answers to checkpoint questions; embedding backfill certification before dense coverage claims."
+}

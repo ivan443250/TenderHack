@@ -35,6 +35,7 @@ tenderhack-knowledge = "tenderhack_knowledge.main:run"
 tenderhack-knowledge-worker = "tenderhack_knowledge.worker.main:run"
 tenderhack-knowledge-inference-smoke = "tenderhack_knowledge.inference.smoke:main"
 tenderhack-knowledge-ingest = "tenderhack_knowledge.ingestion.cli:main"
+tenderhack-knowledge-embedding-backfill = "tenderhack_knowledge.retrieval.backfill:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tenderhack_knowledge"]

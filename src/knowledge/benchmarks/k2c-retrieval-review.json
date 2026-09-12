@@ -1,0 +1,533 @@
+{
+  "benchmark": "k2c-retrieval-review",
+  "status": "PASS_WITH_LIMITATIONS",
+  "snapshot_id": "snap_0e979dfef376faff41f7c76416fda457",
+  "corpus": "NORMATIVE",
+  "gold_metrics_before": {
+    "status": "MEASURED",
+    "recall_at_5": 0.6136,
+    "recall_at_10": 0.75,
+    "mrr": 0.4018,
+    "typo_recall_at_10": 1.0,
+    "exact_code_hit_at_10": 0.6875,
+    "latency_ms": {
+      "sample_count": 44,
+      "p50": 309.151,
+      "p95": 381.683,
+      "mean": 319.6
+    },
+    "note": "Measured in this K2B run against the running disposable PostgreSQL corpus; the previously recorded K2A report remains unchanged."
+  },
+  "gold_metrics_after": {
+    "status": "MEASURED",
+    "query_count": 44,
+    "recall_at_5": 0.6136,
+    "recall_at_10": 0.75,
+    "mrr": 0.4018,
+    "typo_recall_at_10": 1.0,
+    "exact_code_hit_at_10": 0.6875,
+    "latency_ms": {
+      "sample_count": 44,
+      "p50": 303.396,
+      "p95": 360.243,
+      "mean": 307.385
+    }
+  },
+  "gold_set": {
+    "path": "evals\\k2a-gold.json",
+    "query_count": 44,
+    "labels_changed": false
+  },
+  "adversarial": {
+    "count": 17,
+    "passed": 17,
+    "failed": 0,
+    "cases": [
+      {
+        "case": "misspelled_russian",
+        "expectation": "trigram_recovery",
+        "passed": true,
+        "reason": "ok",
+        "exact_codes": [],
+        "entity_types": [],
+        "candidate_count": 10,
+        "channels": [
+          "trigram"
+        ],
+        "document_count": 4,
+        "stable": true,
+        "latency_ms": {
+          "p50": 333.409,
+          "p95": 339.212
+        }
+      },
+      {
+        "case": "exact_code",
+        "expectation": "exact_channel",
+        "passed": true,
+        "reason": "ok",
+        "exact_codes": [
+          "УПД"
+        ],
+        "entity_types": [
+          "document_abbreviation"
+        ],
+        "candidate_count": 10,
+        "channels": [
+          "exact",
+          "fts"
+        ],
+        "document_count": 2,
+        "stable": true,
+        "latency_ms": {
+          "p50": 298.824,
+          "p95": 303.876
+        }
+      },
+      {
+        "case": "leading_zero",
+        "expectation": "preserve_code",
+        "passed": true,
+        "reason": "ok",
+        "exact_codes": [
+          "00017"
+        ],
+        "entity_types": [
+          "numeric_identifier"
+        ],
+        "candidate_count": 0,
+        "channels": [],
+        "document_count": 0,
+        "stable": true,
+        "latency_ms": {
+          "p50": 274.29,
+          "p95": 274.807
+        }
+      },
+      {
+        "case": "mixed_latin_cyrillic_lookalike",
+        "expectation": "do_not_promote_lookalike",
+        "passed": true,
+        "reason": "ok",
+        "exact_codes": [],
+        "entity_types": [],
+        "candidate_count": 10,
+        "channels": [
+          "trigram"
+        ],
+        "document_count": 3,
+        "stable": true,
+        "latency_ms": {
+          "p50": 272.635,
+          "p95": 277.171
+        }
+      },
+      {
+        "case": "short_query",
+        "expectation": "exact_channel",
+        "passed": true,
+        "reason": "ok",
+        "exact_codes": [
+          "МЧД"
+        ],
+        "entity_types": [
+          "document_abbreviation"
+        ],
+        "candidate_count": 10,
+        "channels": [
+          "exact",
+          "fts"
+        ],
+        "document_count": 3,
+        "stable": true,
+        "latency_ms": {
+          "p50": 280.801,
+          "p95": 281.841
+        }
+      },
+      {
+        "case": "long_description",
+        "expectation": "returns_bounded_candidates",
+        "passed": true,
+        "reason": "ok",
+        "exact_codes": [
+          "УПД"
+        ],
+        "entity_types": [
+          "document_abbreviation"
+        ],
+        "candidate_count": 10,
+        "channels": [
+          "exact"
+        ],
+        "document_count": 2,
+        "stable": true,
+        "latency_ms": {
+          "p50": 465.789,
+          "p95": 472.513
+        }
+      },
+      {
+        "case": "negation",
+        "expectation": "preserve_negation",
+        "passed": true,
+        "reason": "ok",
+        "exact_codes": [
+          "УПД",
+          "МЧД"
+        ],
+        "entity_types": [
+          "document_abbreviation"
+        ],
+        "candidate_count": 10,
+        "channels": [
+          "exact"
+        ],
+        "document_count": 2,
+        "stable": true,
+        "latency_ms": {
+          "p50": 348.29,
+          "p95": 350.027
+        }
+      },
+      {
+        "case": "already_tried",
+        "expectation": "returns_bounded_candidates",
+        "passed": true,
+        "reason": "ok",
+        "exact_codes": [],
+        "entity_types": [],
+        "candidate_count": 8,
+        "channels": [
+          "trigram"
+        ],
+        "document_count": 2,
+        "stable": true,
+        "latency_ms": {
+          "p50": 297.678,
+          "p95": 305.141
+        }
+      },
+      {
+        "case": "exact_status",
+        "expectation": "status_entity",
+        "passed": true,
+        "reason": "ok",
+        "exact_codes": [],
+        "entity_types": [
+          "status"
+        ],
+        "candidate_count": 5,
+        "channels": [
+          "fts",
+          "trigram"
+        ],
+        "document_count": 3,
+        "stable": true,
+        "latency_ms": {
+          "p50": 253.139,
+          "p95": 358.711
+        }
+      },
+      {
+        "case": "same_term_supplier_customer",
+        "expectation": "multiple_documents",
+        "passed": true,
+        "reason": "ok",
+        "exact_codes": [],
+        "entity_types": [],
+        "candidate_count": 10,
+        "channels": [
+          "fts",
+          "trigram"
+        ],
+        "document_count": 4,
+        "stable": true,
+        "latency_ms": {
+          "p50": 263.576,
+          "p95": 266.79
+        }
+      },
+      {
+        "case": "same_term_different_workflows",
+        "expectation": "multiple_documents",
+        "passed": true,
+        "reason": "ok",
+        "exact_codes": [],
+        "entity_types": [],
+        "candidate_count": 10,
+        "channels": [
+          "fts",
+          "trigram"
+        ],
+        "document_count": 2,
+        "stable": true,
+        "latency_ms": {
+          "p50": 293.992,
+          "p95": 296.568
+        }
+      },
+      {
+        "case": "table",
+        "expectation": "known_table_fragment",
+        "passed": true,
+        "reason": "ok",
+        "exact_codes": [],
+        "entity_types": [],
+        "candidate_count": 10,
+        "channels": [
+          "fts",
+          "trigram"
+        ],
+        "document_count": 1,
+        "stable": true,
+        "latency_ms": {
+          "p50": 265.286,
+          "p95": 274.124
+        }
+      },
+      {
+        "case": "condition_sensitive_duration",
+        "expectation": "condition_entities",
+        "passed": true,
+        "reason": "ok",
+        "exact_codes": [
+          "15"
+        ],
+        "entity_types": [
+          "duration",
+          "numeric_identifier",
+          "status"
+        ],
+        "candidate_count": 10,
+        "channels": [
+          "exact"
+        ],
+        "document_count": 3,
+        "stable": true,
+        "latency_ms": {
+          "p50": 331.706,
+          "p95": 335.608
+        }
+      },
+      {
+        "case": "multiple_concepts",
+        "expectation": "preserve_concepts",
+        "passed": true,
+        "reason": "ok",
+        "exact_codes": [
+          "УПД",
+          "МЧД"
+        ],
+        "entity_types": [
+          "document_abbreviation",
+          "status"
+        ],
+        "candidate_count": 10,
+        "channels": [
+          "exact"
+        ],
+        "document_count": 2,
+        "stable": true,
+        "latency_ms": {
+          "p50": 352.913,
+          "p95": 354.225
+        }
+      },
+      {
+        "case": "irrelevant_contract_number",
+        "expectation": "bounded_no_exception",
+        "passed": true,
+        "reason": "ok",
+        "exact_codes": [
+          "000000000000",
+          "123456",
+          "YML"
+        ],
+        "entity_types": [
+          "document_abbreviation",
+          "numeric_identifier"
+        ],
+        "candidate_count": 10,
+        "channels": [
+          "exact"
+        ],
+        "document_count": 3,
+        "stable": true,
+        "latency_ms": {
+          "p50": 360.541,
+          "p95": 362.599
+        }
+      },
+      {
+        "case": "no_confident_source",
+        "expectation": "no_exact_or_fts",
+        "passed": true,
+        "reason": "ok",
+        "exact_codes": [],
+        "entity_types": [],
+        "candidate_count": 0,
+        "channels": [],
+        "document_count": 0,
+        "stable": true,
+        "latency_ms": {
+          "p50": 260.39,
+          "p95": 276.604
+        }
+      },
+      {
+        "case": "sql_injection_payload",
+        "expectation": "bounded_no_exception",
+        "passed": true,
+        "reason": "ok",
+        "exact_codes": [],
+        "entity_types": [],
+        "candidate_count": 10,
+        "channels": [
+          "fts",
+          "trigram"
+        ],
+        "document_count": 2,
+        "stable": true,
+        "latency_ms": {
+          "p50": 351.268,
+          "p95": 367.122
+        }
+      }
+    ],
+    "latency_ms": {
+      "sample_count": 51,
+      "p50": 298.293,
+      "p95": 465.04,
+      "mean": 315.091
+    }
+  },
+  "findings": {
+    "HIGH": [],
+    "MEDIUM": [
+      {
+        "id": "K2C-M1",
+        "status": "FIXED",
+        "finding": "Weak trigram recovery admitted an unrelated Russian query (maximum similarity 0.35) as evidence candidates.",
+        "fix": "Raise the shared trigram acceptance threshold from 0.28 to 0.40; keep the threshold identical in SQL filtering and channel labeling.",
+        "verification": "The unrelated probe returns no candidate; the misspelled gold query (similarity >= 0.615) and all adversarial cases still pass."
+      }
+    ],
+    "LOW": []
+  },
+  "finding_severity": {
+    "HIGH": 0,
+    "MEDIUM": 1,
+    "LOW": 0
+  },
+  "fixes": [
+    "Raise the shared trigram acceptance threshold from 0.28 to 0.40; keep the threshold identical in SQL filtering and channel labeling."
+  ],
+  "adversarial_count": 17,
+  "remaining_misses": [
+    {
+      "query_id": "act-03",
+      "reason": "parser/chunk: sparse CSP table extraction"
+    },
+    {
+      "query_id": "act-07",
+      "reason": "parser/chunk: status table wording split"
+    },
+    {
+      "query_id": "yml-06",
+      "reason": "parser/chunk: YML table/header context split"
+    },
+    {
+      "query_id": "supplier-01",
+      "reason": "lexical: short terminology has weak overlap"
+    },
+    {
+      "query_id": "supplier-02",
+      "reason": "lexical: generic software wording"
+    },
+    {
+      "query_id": "supplier-04",
+      "reason": "lexical: offer registry wording differs"
+    },
+    {
+      "query_id": "supplier-05",
+      "reason": "lexical: deletion procedure wording differs"
+    },
+    {
+      "query_id": "supplier-08",
+      "reason": "lexical: contact data is sparse"
+    },
+    {
+      "query_id": "supplier-09",
+      "reason": "lexical: error wording differs"
+    },
+    {
+      "query_id": "offer-01",
+      "reason": "parser/chunk: offer/STЕ table context split"
+    },
+    {
+      "query_id": "mcd-05",
+      "reason": "parser/chunk: signing instruction is table-like"
+    }
+  ],
+  "target": {
+    "recall_at_10": 0.9,
+    "met": false
+  },
+  "latency_ms": {
+    "sample_count": 44,
+    "p50": 303.396,
+    "p95": 360.243,
+    "mean": 307.385
+  },
+  "latency": {
+    "gold_before_ms": {
+      "sample_count": 44,
+      "p50": 309.151,
+      "p95": 381.683,
+      "mean": 319.6
+    },
+    "gold_after_ms": {
+      "sample_count": 44,
+      "p50": 303.396,
+      "p95": 360.243,
+      "mean": 307.385
+    },
+    "adversarial_ms": {
+      "sample_count": 51,
+      "p50": 298.293,
+      "p95": 465.04,
+      "mean": 315.091
+    }
+  },
+  "final_retrieval_config_version": "hybrid-rrf-v1-no-dense",
+  "dense_status": {
+    "status": "NOT_MEASURED",
+    "embedding_stats": {
+      "snapshot_fragments": 3899,
+      "embeddings": 0,
+      "matching_dimension": 0,
+      "matching_metadata": 0,
+      "non_finite": 0,
+      "identity_preserved": false
+    },
+    "reason": "Qwen3 vectors are not backfilled; lexical fallback is explicit."
+  },
+  "review_checks": {
+    "snapshot_and_corpus_boundary": "PASS",
+    "historical_leakage": "PASS",
+    "sql_inputs_parameterized": "PASS",
+    "deterministic_tie_break": "PASS",
+    "same_query_stability": "PASS",
+    "exact_code_and_leading_zero_preservation": "PASS",
+    "reranker_cardinality_guard": "PASS (existing K2B regression)",
+    "score_semantics": "raw ranking signals, not probabilities"
+  },
+  "invariants": {
+    "snapshot_constrained": true,
+    "normative_only": true,
+    "sql_inputs_parameterized": true,
+    "deterministic_tie_break": true,
+    "reranker_cardinality_guarded": true
+  }
+}
