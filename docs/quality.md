@@ -341,6 +341,14 @@ Baseline commands:
 # .NET support core (src/support-core)
 dotnet build src/support-core/TenderHack.sln -c Release
 dotnet test src/support-core/TenderHack.sln -c Release
+# `TenderHack.Api.Tests` (evals/decisions-equivalent, quality.md §8) needs Docker: it starts a
+# disposable Postgres container per run (Testcontainers) and drives the real ASP.NET pipeline with
+# `knowledge` replaced by the deterministic fixture fake — apply migrations, JSON/naming policy,
+# idempotency and owner-authz wiring are exercised for real, not mocked. It also covers
+# support-adapter-v0.md §10 contract test 13 (webhook: unsigned/bad signature/stale timestamp -> 401,
+# endpoint absent when `Support:Webhook:Enabled=false`) via a second host with the webhook channel
+# turned on. There is no dedicated `TenderHack.Worker.Tests` project yet — bounded-retry-submit and
+# the status-sync poll loop are exercised only indirectly, through Application-layer unit tests.
 
 # Python knowledge service (src/knowledge)
 uv sync --extra test --project src/knowledge

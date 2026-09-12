@@ -2,10 +2,13 @@ using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TenderHack.Application.Handoff;
+using TenderHack.Application.Orchestration;
 using TenderHack.Application.Ports;
 using TenderHack.Domain.Cases;
 using TenderHack.Domain.Handoffs;
+using TenderHack.Infrastructure.Handoff;
 
 namespace TenderHack.Worker;
 
@@ -42,18 +45,20 @@ public sealed class HandoffSubmitWorker(IServiceScopeFactory scopeFactory, ILogg
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
         var adapter = scope.ServiceProvider.GetRequiredService<IHandoffAdapter>();
         var clock = scope.ServiceProvider.GetRequiredService<TimeProvider>();
+        var submissionPublisher = scope.ServiceProvider.GetRequiredService<HandoffSubmissionPublisher>();
+        var maxAttempts = scope.ServiceProvider.GetRequiredService<IOptions<SupportOptions>>().Value.Submit.MaxAttempts;
 
         var pending = await outboxReader.ListPendingAsync(HandoffOutboxMessages.Submit, batchSize: 10, ct);
 
         foreach (var entry in pending)
         {
-            await ProcessEntryAsync(entry, cases, outboxReader, unitOfWork, adapter, clock, ct);
+            await ProcessEntryAsync(entry, cases, outboxReader, unitOfWork, adapter, submissionPublisher, clock, maxAttempts, ct);
         }
     }
 
     private async Task ProcessEntryAsync(
         OutboxEntry entry, ICaseRepository cases, IOutboxReader outboxReader, IUnitOfWork unitOfWork,
-        IHandoffAdapter adapter, TimeProvider clock, CancellationToken ct)
+        IHandoffAdapter adapter, HandoffSubmissionPublisher submissionPublisher, TimeProvider clock, int maxAttempts, CancellationToken ct)
     {
         var payload = JsonSerializer.Deserialize<HandoffSubmitPayload>(entry.PayloadJson)
             ?? throw new InvalidOperationException($"Outbox row {entry.Id} has no payload.");
@@ -72,24 +77,60 @@ public sealed class HandoffSubmitWorker(IServiceScopeFactory scopeFactory, ILogg
 
         try
         {
-            var request = new HandoffRequest(caseId, handoffId, payload.Summary, payload.DispatchQueue, payload.ReasonCodes, payload.EngineeringReviewSuggested);
+            // Everything beyond the id is read straight off the loaded aggregate — the package was
+            // assembled once at `prepare` time from persisted case state alone (support-adapter-v0.md
+            // §2), and `ConfirmedSummary` is the user's own final edited text (set by confirm/retry).
+            var package = handoff.Package ?? throw new InvalidOperationException($"Handoff {handoffId} has no prepared package.");
+            var request = new HandoffRequest(
+                caseId,
+                handoffId,
+                handoff.ConfirmedSummary ?? package.DraftSummary,
+                package.Channel,
+                package.DispatchQueue,
+                package.HandoffReason,
+                package.UserReportedContext,
+                package.VerifiedPortalContext,
+                package.AlreadyTried,
+                package.UnknownFields,
+                package.SourcesChecked,
+                package.RelevantMessageIds,
+                package.EngineeringReviewSuggested);
             var ack = await adapter.SubmitAsync(request, idempotencyKey: handoffId.ToString(), ct);
+            var now = clock.GetUtcNow();
 
             if (ack.Accepted)
             {
-                @case.AcknowledgeHandoff(ack.Simulated, ack.ExternalCaseId, clock.GetUtcNow());
+                @case.AcknowledgeHandoff(ack.Simulated, ack.ExternalCaseId, now);
             }
             else
             {
                 @case.FailHandoff();
             }
 
+            // Publish the timeline event/notification for whichever outcome just landed — without
+            // this the browser sits on `PENDING` until the first polled stage arrives (or forever,
+            // for a rejected/failed submission).
+            await submissionPublisher.PublishAsync(@case, ack.SafeMessage, now, ct);
+
             await outboxReader.MarkDeliveredAsync(entry.Id, ct);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
-            @case.FailHandoff();
-            await outboxReader.MarkFailedAsync(entry.Id, ex.Message, ct);
+            // support-adapter-v0.md §7 "retries use bounded backoff": a transport failure (unlike an
+            // explicit adapter rejection, handled above without ever reaching this catch) gets
+            // `MaxAttempts` total tries across outbox redelivery ticks before the handoff is
+            // actually marked `FAILED` — `entry.AttemptCount` is this row's PRIOR attempt count, so
+            // the attempt that just failed is number `AttemptCount + 1`.
+            if (entry.AttemptCount + 1 < maxAttempts)
+            {
+                await outboxReader.RecordAttemptFailureAsync(entry.Id, ex.Message, ct);
+            }
+            else
+            {
+                @case.FailHandoff();
+                await submissionPublisher.PublishAsync(@case, safeMessage: null, clock.GetUtcNow(), ct);
+                await outboxReader.MarkFailedAsync(entry.Id, ex.Message, ct);
+            }
         }
 
         await unitOfWork.SaveChangesAsync(ct);

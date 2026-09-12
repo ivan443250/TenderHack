@@ -26,6 +26,12 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__Postgres: ${API_DATABASE_URL:-Host=postgres;Port=5432;Database=${POSTGRES_DB:-tenderhack};Username=api_rw;Password=${API_DB_PASSWORD:-api_dev_only}}
       Knowledge__BaseUrl: ${KNOWLEDGE_BASE_URL:-http://knowledge:8000}
+      # Outer HttpClient safety net; must stay >= the largest per-stage value below (architecture.md §10).
+      Knowledge__Timeout: ${KNOWLEDGE_TIMEOUT:-00:02:00}
+      # Generation runs an actual local model and needs a materially larger budget than the
+      # lexical/retrieval stages — tune per hardware profile, not per request.
+      Knowledge__Timeouts__Draft: ${KNOWLEDGE_DRAFT_TIMEOUT:-00:01:30}
+      Knowledge__Timeouts__Verify: ${KNOWLEDGE_VERIFY_TIMEOUT:-00:00:30}
     ports:
       - "8080:8080"
     depends_on:

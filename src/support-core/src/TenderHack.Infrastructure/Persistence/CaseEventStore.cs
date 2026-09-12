@@ -13,11 +13,11 @@ namespace TenderHack.Infrastructure.Persistence;
 /// </summary>
 public sealed class CaseEventStore(IDbContextFactory<TenderHackDbContext> dbContextFactory) : ITurnEventStream
 {
-    public async Task PublishAsync(CaseId caseId, CaseEvent @event, CancellationToken ct)
+    public async Task<long> PublishAsync(CaseId caseId, CaseEvent @event, CancellationToken ct)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(ct);
 
-        db.CaseEvents.Add(new CaseEventEntity
+        var entity = new CaseEventEntity
         {
             CaseId = caseId.Value,
             TurnId = @event.TurnId?.Value,
@@ -25,8 +25,10 @@ public sealed class CaseEventStore(IDbContextFactory<TenderHackDbContext> dbCont
             Type = @event.Type,
             OccurredAt = @event.OccurredAt,
             PayloadJson = JsonSerializer.Serialize(@event.Payload),
-        });
+        };
+        db.CaseEvents.Add(entity);
 
         await db.SaveChangesAsync(ct);
+        return entity.Id;
     }
 }

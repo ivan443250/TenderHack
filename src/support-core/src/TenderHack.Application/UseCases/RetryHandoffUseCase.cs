@@ -11,14 +11,7 @@ namespace TenderHack.Application.UseCases;
 /// </summary>
 public sealed class RetryHandoffUseCase(ICaseRepository cases, IUnitOfWork unitOfWork, IOutbox outbox)
 {
-    public async Task<Case> ExecuteAsync(
-        CaseId caseId,
-        string ownerId,
-        string summary,
-        string dispatchQueue,
-        IReadOnlyList<string> reasonCodes,
-        bool engineeringReviewSuggested,
-        CancellationToken ct)
+    public async Task<Case> ExecuteAsync(CaseId caseId, string ownerId, string summary, CancellationToken ct)
     {
         var @case = await cases.FindAsync(caseId, ct) ?? throw new CaseNotFoundException(caseId);
         if (@case.OwnerId != ownerId)
@@ -26,9 +19,8 @@ public sealed class RetryHandoffUseCase(ICaseRepository cases, IUnitOfWork unitO
             throw new CaseNotFoundException(caseId);
         }
 
-        @case.RetryHandoff();
-        outbox.Enqueue(HandoffOutboxMessages.Submit, new HandoffSubmitPayload(
-            @case.Id.ToString(), @case.Handoff!.Id.ToString(), summary, dispatchQueue, reasonCodes, engineeringReviewSuggested));
+        @case.RetryHandoff(summary);
+        outbox.Enqueue(HandoffOutboxMessages.Submit, new HandoffSubmitPayload(@case.Id.ToString(), @case.Handoff!.Id.ToString()));
 
         await unitOfWork.SaveChangesAsync(ct);
         return @case;

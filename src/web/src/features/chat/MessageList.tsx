@@ -1,5 +1,5 @@
 import type { ApiClient } from "../../api/client";
-import type { CaseSnapshot, SourceDetail, TimelineItem } from "../../api/types";
+import type { AnswerSource, CaseSnapshot, SourceDetail, TimelineItem } from "../../api/types";
 import {
   AssistantResponse,
   ClarificationNotice,
@@ -36,12 +36,20 @@ function renderItem(item: TimelineItem, snapshot: CaseSnapshot, api: ApiClient, 
       return <TurnStageNotice key={item.item_id} stage={String(payload.stage ?? "")} />;
 
     case "AI_ANSWER": {
-      const sources = Array.isArray(payload.sources) ? (payload.sources as string[]) : [];
+      // web-api-v0.md §4.3: sources carry fragment_id/title/page/label.
+      const sources = Array.isArray(payload.sources) ? (payload.sources as AnswerSource[]) : [];
       return (
         <div key={item.item_id} className="flex w-full flex-col items-start gap-3">
           <AssistantResponse markdown={String(payload.markdown ?? "")} />
-          {sources.map((fragmentId) => (
-            <SourceCitation key={fragmentId} fragmentId={fragmentId} api={api} onOpen={onOpenSource} />
+          {sources.map((source) => (
+            <SourceCitation
+              key={source.fragment_id}
+              fragmentId={source.fragment_id}
+              title={source.title}
+              page={source.page}
+              api={api}
+              onOpen={onOpenSource}
+            />
           ))}
         </div>
       );

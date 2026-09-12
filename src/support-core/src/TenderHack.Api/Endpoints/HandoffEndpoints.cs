@@ -68,19 +68,16 @@ public static class HandoffEndpoints
                 return replay;
             }
 
-            var history = await events.ListAsync(id, after: 0, ct);
-            var routing = CaseMapper.ExtractLastRouting(history)
-                ?? new RoutingFacts("l1-general", [], EngineeringReviewSuggested: false);
-
-            var @case = await useCase.ExecuteAsync(
-                id, ownerId, request.Summary, routing.DispatchQueue, routing.ReasonCodes, routing.EngineeringReviewSuggested, ct);
+            // Routing/context/sources are already on `Handoff.Package`, assembled once at `prepare`
+            // time (A6) — `summary` is the only field the client ever gets to edit.
+            var @case = await useCase.ExecuteAsync(id, ownerId, request.Summary, ct);
 
             if (IdempotencyHelper.GetKey(context) is { } key)
             {
                 await idempotency.SaveAsync(ownerId, IdempotencyScopes.ConfirmHandoff, key, IdempotencyHelper.HashPayload(request), id.ToString(), ct);
             }
 
-            history = await events.ListAsync(id, after: 0, ct);
+            var history = await events.ListAsync(id, after: 0, ct);
             return Results.Ok(CaseMapper.ToSnapshot(@case, history));
         });
 
@@ -105,19 +102,14 @@ public static class HandoffEndpoints
                 return replay;
             }
 
-            var history = await events.ListAsync(id, after: 0, ct);
-            var routing = CaseMapper.ExtractLastRouting(history)
-                ?? new RoutingFacts("l1-general", [], EngineeringReviewSuggested: false);
-
-            var @case = await useCase.ExecuteAsync(
-                id, ownerId, request.Summary, routing.DispatchQueue, routing.ReasonCodes, routing.EngineeringReviewSuggested, ct);
+            var @case = await useCase.ExecuteAsync(id, ownerId, request.Summary, ct);
 
             if (IdempotencyHelper.GetKey(context) is { } key)
             {
                 await idempotency.SaveAsync(ownerId, IdempotencyScopes.RetryHandoff, key, IdempotencyHelper.HashPayload(request), id.ToString(), ct);
             }
 
-            history = await events.ListAsync(id, after: 0, ct);
+            var history = await events.ListAsync(id, after: 0, ct);
             return Results.Ok(CaseMapper.ToSnapshot(@case, history));
         });
     }

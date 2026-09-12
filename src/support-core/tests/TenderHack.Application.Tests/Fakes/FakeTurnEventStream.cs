@@ -6,12 +6,13 @@ namespace TenderHack.Application.Tests.Fakes;
 public sealed class FakeTurnEventStream : ITurnEventStream
 {
     private readonly List<(CaseId CaseId, CaseEvent Event)> _published = [];
+    private long _nextEventId = 1;
 
     public IReadOnlyList<(CaseId CaseId, CaseEvent Event)> Published => _published;
 
-    public Task PublishAsync(CaseId caseId, CaseEvent @event, CancellationToken ct)
+    public Task<long> PublishAsync(CaseId caseId, CaseEvent @event, CancellationToken ct)
     {
         _published.Add((caseId, @event));
-        return Task.CompletedTask;
+        return Task.FromResult(_nextEventId++);
     }
 }

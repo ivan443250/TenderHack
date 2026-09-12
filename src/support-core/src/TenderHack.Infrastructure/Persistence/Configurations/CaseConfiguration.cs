@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using TenderHack.Domain.Cases;
 using TenderHack.Domain.Feedback;
@@ -32,6 +33,27 @@ public sealed class CaseConfiguration : IEntityTypeConfiguration<Case>
         builder.Property(c => c.ModerationWarningCount).IsRequired();
         builder.Property(c => c.CompletionReason).HasConversion<string>();
         builder.Property(c => c.CompletedAt);
+
+        // TurnContext (architecture.md §10 continuity) is stored as one JSON column rather than an
+        // owned collection: it is always read/written whole per turn, never queried by SQL, and its
+        // KnownSlots have no identity of their own to key an owned table on. A record's default
+        // Equals/GetHashCode compares each property by reference for its list-typed members, so a
+        // freshly-rebuilt "same content" instance would otherwise never equal the tracked original —
+        // an explicit ValueComparer based on the same JSON round-trip is what makes EF Core actually
+        // detect and persist a mutation (`Case` always replaces its own reference wholesale, never
+        // mutates one in place, precisely so this comparison is meaningful).
+        var turnContextComparer = new ValueComparer<TurnContext>(
+            (left, right) => TurnContextJson.Serialize(left!) == TurnContextJson.Serialize(right!),
+            value => TurnContextJson.Serialize(value).GetHashCode(),
+            value => TurnContextJson.Deserialize(TurnContextJson.Serialize(value)));
+        builder.Property(c => c.TurnContext)
+            .HasColumnName("turn_context_json")
+            .HasConversion(
+                (TurnContext value) => TurnContextJson.Serialize(value),
+                (string json) => TurnContextJson.Deserialize(json),
+                turnContextComparer)
+            .IsRequired();
+
         builder.Property(c => c.FeedbackId).HasConversion(
             id => id == null ? (Guid?)null : id.Value.Value,
             value => value == null ? (FeedbackId?)null : new FeedbackId(value.Value));
@@ -49,6 +71,15 @@ public sealed class CaseConfiguration : IEntityTypeConfiguration<Case>
             turn.Property(t => t.CreatedAt).IsRequired();
             turn.Property(t => t.Status).HasConversion<string>().IsRequired();
             turn.Property(t => t.Decision).HasConversion<string>();
+
+            // Its own `xmin` — separate from `cases`' own token above. A long-running turn (real
+            // knowledge/model latency) publishing its final decision only ever UPDATEs this `turns`
+            // row, never the `cases` row itself, so the `cases`-level token cannot catch a stale
+            // publish. Without this, a superseded turn's own `UPDATE ... SET status='Completed'`
+            // would silently succeed and overwrite the newer request's `Superseded` write — exactly
+            // the invariant "running old turn cannot publish after a newer revision supersedes it"
+            // (architecture.md §6) requires the DB, not just in-process state, to enforce.
+            turn.Property<uint>("xmin").IsRowVersion();
 
             // Two requests that loaded the same case snapshot compute the same next revision; the
             // `xmin` token above cannot catch that (starting a turn only inserts here, it never
@@ -71,6 +102,21 @@ public sealed class CaseConfiguration : IEntityTypeConfiguration<Case>
             handoff.Property(h => h.LastExternalRevision).IsRequired();
             handoff.Property(h => h.AcceptedAt);
             handoff.Property(h => h.Stale).IsRequired();
+            handoff.Property(h => h.ConfirmedSummary);
+
+            // Same JSON-column + explicit ValueComparer pattern as `Case.TurnContext`
+            // (CaseConfiguration above) and for the same reason — required.
+            var packageComparer = new ValueComparer<HandoffPackage?>(
+                (left, right) => HandoffPackageJson.Serialize(left) == HandoffPackageJson.Serialize(right),
+                value => HandoffPackageJson.Serialize(value).GetHashCode(),
+                value => HandoffPackageJson.Deserialize(HandoffPackageJson.Serialize(value)));
+            handoff.Property(h => h.Package)
+                .HasColumnName("package_json")
+                .HasConversion(
+                    (HandoffPackage? value) => HandoffPackageJson.Serialize(value),
+                    (string json) => HandoffPackageJson.Deserialize(json),
+                    packageComparer)
+                .IsRequired();
 
             handoff.OwnsOne(h => h.Stage, stage =>
             {

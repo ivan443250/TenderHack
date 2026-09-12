@@ -116,6 +116,9 @@
   рейтинг/ранжирование (`product-spec.md §18.2`). `null` означает «человек не участвовал или адаптер не сообщил».
 - `helpful` в `QualityFeedbackPush` — deprecated, дублирует `information_quality_rating`; новые consumers
   читают только два явных рейтинга.
+- `model_version`/`retrieval_config_version` в `QualityTurnPush` — additive optional поля (2026-09-12):
+  генератор/retrieval config для этого хода, когда `draft`/`retrieve` реально выполнялись; `null` для
+  ходов без сгенерированного ответа (`CLARIFY`/`HANDOFF_OFFER`/`TECHNICAL_ERROR`).
 - `corpus` в `POST /v0/retrieve` обязателен и по умолчанию не подразумевается — вызывающая сторона (`Application`)
   всегда передаёт `NORMATIVE` явно для user-facing ответа; `HISTORICAL` используется только для аналитики/evals,
   никогда для генерации ответа пользователю (`product-spec.md §6.2`).

@@ -16,6 +16,12 @@ public sealed class Handoff
 
     public HandoffStatus Status { get; private set; } = HandoffStatus.NotRequested;
 
+    /// <summary>Assembled at `prepare` time from persisted case state alone (support-adapter-v0.md §2) — never null once prepared.</summary>
+    public HandoffPackage? Package { get; private set; }
+
+    /// <summary>The user's own final text (web-api-v0.md §8, product-spec.md §17 "пользователь может поправить summary") — distinct from <see cref="HandoffPackage.DraftSummary"/>, which is only ever the auto-generated starting point.</summary>
+    public string? ConfirmedSummary { get; private set; }
+
     public IntegrationMode? IntegrationMode { get; private set; }
 
     public string? ExternalCaseId { get; private set; }
@@ -35,19 +41,21 @@ public sealed class Handoff
     /// <summary>Dedupe key for status ingestion; -1 means no status has been applied yet.</summary>
     public long LastExternalRevision { get; private set; } = -1;
 
-    internal Handoff(HandoffId id, CaseId caseId)
+    internal Handoff(HandoffId id, CaseId caseId, HandoffPackage package)
     {
         Id = id;
         CaseId = caseId;
+        Package = package;
     }
 
-    internal void Confirm()
+    internal void Confirm(string summary)
     {
         if (Status != HandoffStatus.NotRequested)
         {
             throw new InvalidHandoffTransitionException(Id, Status, HandoffStatus.Pending);
         }
 
+        ConfirmedSummary = summary;
         Status = HandoffStatus.Pending;
     }
 
@@ -79,13 +87,14 @@ public sealed class Handoff
         Status = HandoffStatus.Failed;
     }
 
-    internal void Retry()
+    internal void Retry(string summary)
     {
         if (Status != HandoffStatus.Failed)
         {
             throw new InvalidHandoffTransitionException(Id, Status, HandoffStatus.Pending);
         }
 
+        ConfirmedSummary = summary;
         Status = HandoffStatus.Pending;
     }
 

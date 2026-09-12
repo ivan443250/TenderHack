@@ -63,6 +63,11 @@ namespace TenderHack.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("resolution_status");
 
+                    b.Property<string>("TurnContext")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("turn_context_json");
+
                     b.Property<uint>("xmin")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -242,6 +247,10 @@ namespace TenderHack.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("read_at");
 
+                    b.Property<long>("SourceEventId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("source_event_id");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("text")
@@ -257,6 +266,10 @@ namespace TenderHack.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OwnerId", "Id")
                         .HasDatabaseName("ix_notifications_owner_id_id");
+
+                    b.HasIndex("OwnerId", "CaseId", "Type", "SourceEventId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_notifications_owner_id_case_id_type_source_event_id");
 
                     b.ToTable("notifications", (string)null);
                 });
@@ -334,6 +347,12 @@ namespace TenderHack.Infrastructure.Persistence.Migrations
                                 .HasColumnType("text")
                                 .HasColumnName("status");
 
+                            b1.Property<uint>("xmin")
+                                .IsConcurrencyToken()
+                                .ValueGeneratedOnAddOrUpdate()
+                                .HasColumnType("xid")
+                                .HasColumnName("xmin");
+
                             b1.HasKey("Id")
                                 .HasName("pk_turns");
 
@@ -362,6 +381,10 @@ namespace TenderHack.Infrastructure.Persistence.Migrations
                                 .HasColumnType("uuid")
                                 .HasColumnName("case_id");
 
+                            b1.Property<string>("ConfirmedSummary")
+                                .HasColumnType("text")
+                                .HasColumnName("confirmed_summary");
+
                             b1.Property<string>("ExternalCaseId")
                                 .HasColumnType("text")
                                 .HasColumnName("external_case_id");
@@ -373,6 +396,11 @@ namespace TenderHack.Infrastructure.Persistence.Migrations
                             b1.Property<long>("LastExternalRevision")
                                 .HasColumnType("bigint")
                                 .HasColumnName("last_external_revision");
+
+                            b1.Property<string>("Package")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("package_json");
 
                             b1.Property<bool>("Stale")
                                 .HasColumnType("boolean")

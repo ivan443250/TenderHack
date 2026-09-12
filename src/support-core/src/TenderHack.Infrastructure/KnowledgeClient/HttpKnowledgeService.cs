@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using TenderHack.Domain.Feedback;
 using AppKnowledge = TenderHack.Application.Knowledge;
 using Generated = TenderHack.Infrastructure.KnowledgeClient.Generated;
@@ -8,20 +9,30 @@ namespace TenderHack.Infrastructure.KnowledgeClient;
 /// Implements the `Application` port over the NSwag-generated client (knowledge-v0.md). Owns the
 /// only translation between generated wire DTOs and Application's own records, and the only place
 /// that classifies a failed call into <see cref="AppKnowledge.KnowledgeFailureException"/>
-/// (knowledge-v0.md §3) — nothing generated escapes past this file.
+/// (knowledge-v0.md §3) — nothing generated escapes past this file. Also owns per-stage timeout
+/// enforcement (architecture.md §10): each call gets its own <see cref="CancellationTokenSource"/>
+/// linked to the caller's token rather than relying on one global `HttpClient.Timeout`.
 /// </summary>
-public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) : AppKnowledge.IKnowledgeService
+public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client, IOptions<KnowledgeServiceOptions> options) : AppKnowledge.IKnowledgeService
 {
+    private KnowledgeStageTimeouts Timeouts => options.Value.Timeouts;
+
+    /// <summary>architecture.md §7: idempotent stages get up to 2 retries (3 attempts total) of a `TIMEOUT`/`UNAVAILABLE` failure.</summary>
+    private const int IdempotentStageAttempts = 3;
+
+    /// <summary>architecture.md §7: `draft` is retried at most once — nothing is persisted before the turn commits, so a single retry is still safe.</summary>
+    private const int DraftAttempts = 2;
+
     public async Task<AppKnowledge.UnderstandResult> UnderstandAsync(
         AppKnowledge.UnderstandRequest request, AppKnowledge.KnowledgeRequestContext context, CancellationToken ct)
     {
         var response = await CallAsync(
-            () => client.UnderstandAsync(
+            token => client.UnderstandAsync(
                 context.TraceId,
                 context.CaseId.ToString(),
                 context.TurnId.ToString(),
                 new Generated.UnderstandRequest { Text = request.Text, Prior_turn_summary = request.PriorTurnSummary },
-                ct), ct);
+                token), Timeouts.Understand, ct, IdempotentStageAttempts);
 
         return new AppKnowledge.UnderstandResult(
             response.Normalized_text,
@@ -42,12 +53,12 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
         };
 
         var response = await CallAsync(
-            () => client.ModerationContextAsync(
+            token => client.ModerationContextAsync(
                 context.TraceId,
                 context.CaseId.ToString(),
                 context.TurnId.ToString(),
                 new Generated.ModerationContextRequest { Text = request.Text, Rule_match = ruleMatch },
-                ct), ct);
+                token), Timeouts.ModerationContext, ct, IdempotentStageAttempts);
 
         var ambiguity = response.Ambiguity switch
         {
@@ -63,7 +74,7 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
         AppKnowledge.RetrieveRequest request, AppKnowledge.KnowledgeRequestContext context, CancellationToken ct)
     {
         var response = await CallAsync(
-            () => client.RetrieveAsync(
+            token => client.RetrieveAsync(
                 context.TraceId,
                 context.CaseId.ToString(),
                 context.TurnId.ToString(),
@@ -77,19 +88,19 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
                         : Generated.Corpus.NORMATIVE,
                     Snapshot_id = request.SnapshotId,
                 },
-                ct), ct);
+                token), Timeouts.Retrieve, ct, IdempotentStageAttempts);
 
         return new AppKnowledge.RetrieveResult(
             response.Snapshot_id,
             response.Retrieval_config_version,
-            [.. response.Candidates.Select(c => new AppKnowledge.RetrievalCandidate(c.Fragment_id, c.Document_id, c.Page, c.Anchor))]);
+            [.. response.Candidates.Select(c => new AppKnowledge.RetrievalCandidate(c.Fragment_id, c.Document_id, c.Page, c.Anchor, c.Title))]);
     }
 
     public async Task<AppKnowledge.AnswerabilityResult> AssessAnswerabilityAsync(
         AppKnowledge.AnswerabilityRequest request, AppKnowledge.KnowledgeRequestContext context, CancellationToken ct)
     {
         var response = await CallAsync(
-            () => client.AnswerabilityAsync(
+            token => client.AnswerabilityAsync(
                 context.TraceId,
                 context.CaseId.ToString(),
                 context.TurnId.ToString(),
@@ -99,7 +110,7 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
                     Snapshot_id = request.SnapshotId,
                     Candidate_fragment_ids = [.. request.CandidateFragmentIds],
                 },
-                ct), ct);
+                token), Timeouts.Answerability, ct, IdempotentStageAttempts);
 
         var evidenceSufficiency = response.Evidence_sufficiency switch
         {
@@ -119,7 +130,7 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
         AppKnowledge.DraftRequest request, AppKnowledge.KnowledgeRequestContext context, CancellationToken ct)
     {
         var response = await CallAsync(
-            () => client.DraftAsync(
+            token => client.DraftAsync(
                 context.TraceId,
                 context.CaseId.ToString(),
                 context.TurnId.ToString(),
@@ -128,9 +139,9 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
                     Query = request.Query,
                     Snapshot_id = request.SnapshotId,
                     Evidence_fragment_ids = [.. request.EvidenceFragmentIds],
-                    Constraints = new Generated.DraftConstraints(),
+                    Constraints = new Generated.DraftConstraints { Tone = request.Tone },
                 },
-                ct), ct);
+                token), Timeouts.Draft, ct, DraftAttempts);
 
         return new AppKnowledge.DraftResult(
             response.Draft_markdown,
@@ -142,7 +153,7 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
         AppKnowledge.VerifyRequest request, AppKnowledge.KnowledgeRequestContext context, CancellationToken ct)
     {
         var response = await CallAsync(
-            () => client.VerifyAsync(
+            token => client.VerifyAsync(
                 context.TraceId,
                 context.CaseId.ToString(),
                 context.TurnId.ToString(),
@@ -151,7 +162,7 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
                     Claims = [.. request.Claims.Select(c => new Generated.Claim { Claim_id = c.ClaimId, Text = c.Text, Fragment_ids = [.. c.FragmentIds] })],
                     Snapshot_id = request.SnapshotId,
                 },
-                ct), ct);
+                token), Timeouts.Verify, ct, IdempotentStageAttempts);
 
         return new AppKnowledge.VerifyResult(
             [.. response.Results.Select(r => new AppKnowledge.ClaimVerification(r.Claim_id, r.Supported, [.. r.Evidence_fragment_ids]))]);
@@ -160,14 +171,14 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
     public async Task<AppKnowledge.SourceFragment> GetSourceAsync(string fragmentId, CancellationToken ct)
     {
         var traceId = Guid.NewGuid();
-        var response = await CallAsync(() => client.GetSourceAsync(traceId, fragmentId, ct), ct);
+        var response = await CallAsync(token => client.GetSourceAsync(traceId, fragmentId, token), Timeouts.Source, ct);
 
         return new AppKnowledge.SourceFragment(
             response.Document_id, response.Title, response.Version, response.Page, response.Anchor, response.Text, response.Snapshot_id);
     }
 
     public Task PushQualityTurnAsync(AppKnowledge.QualityTurnPush push, CancellationToken ct) =>
-        CallAsync(() => client.PushQualityTurnAsync(Guid.NewGuid(), new Generated.QualityTurnPush
+        CallAsync(token => client.PushQualityTurnAsync(Guid.NewGuid(), new Generated.QualityTurnPush
         {
             Case_id = push.CaseId,
             Turn_id = push.TurnId,
@@ -191,10 +202,12 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
                 Verify_ms = push.StageTimings.VerifyMs,
             },
             Error_category = push.ErrorCategory,
-        }, ct), ct);
+            Model_version = push.ModelVersion,
+            Retrieval_config_version = push.RetrievalConfigVersion,
+        }, token), Timeouts.Background, ct);
 
     public Task PushQualityFeedbackAsync(AppKnowledge.QualityFeedbackPush push, CancellationToken ct) =>
-        CallAsync(() => client.PushQualityFeedbackAsync(Guid.NewGuid(), new Generated.QualityFeedbackPush
+        CallAsync(token => client.PushQualityFeedbackAsync(Guid.NewGuid(), new Generated.QualityFeedbackPush
         {
             Feedback_id = push.FeedbackId,
             Case_id = push.CaseId,
@@ -211,10 +224,10 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
             },
             Solved = push.Solved,
             Comment_text = push.CommentText,
-        }, ct), ct);
+        }, token), Timeouts.Background, ct);
 
     public Task PushQualityCompletionAsync(AppKnowledge.QualityCompletionPush push, CancellationToken ct) =>
-        CallAsync(() => client.PushQualityCompletionAsync(Guid.NewGuid(), new Generated.QualityCompletionPush
+        CallAsync(token => client.PushQualityCompletionAsync(Guid.NewGuid(), new Generated.QualityCompletionPush
         {
             Case_id = push.CaseId,
             Completed_at = push.CompletedAt,
@@ -231,17 +244,17 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
             Stage_code = push.StageCode,
             Moderation_warning_count = push.ModerationWarningCount,
             Turn_count = push.TurnCount,
-        }, ct), ct);
+        }, token), Timeouts.Background, ct);
 
     public async Task<AppKnowledge.QualityEvaluations> GetQualityEvaluationsAsync(string caseId, CancellationToken ct)
     {
-        var response = await CallAsync(() => client.GetQualityEvaluationsAsync(Guid.NewGuid(), caseId, ct), ct);
+        var response = await CallAsync(token => client.GetQualityEvaluationsAsync(Guid.NewGuid(), caseId, token), Timeouts.Background, ct);
         return new AppKnowledge.QualityEvaluations(response.Case_id, [.. response.Evaluations.Select(ToEvaluation)]);
     }
 
     public async Task<AppKnowledge.IssueGroups> GetIssueGroupsAsync(CancellationToken ct)
     {
-        var response = await CallAsync(() => client.GetIssueGroupsAsync(Guid.NewGuid(), ct), ct);
+        var response = await CallAsync(token => client.GetIssueGroupsAsync(Guid.NewGuid(), token), Timeouts.Background, ct);
         return new AppKnowledge.IssueGroups([.. response.Groups.Select(ToIssueGroup)]);
     }
 
@@ -321,13 +334,47 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
 
     /// <summary>
     /// Single funnel from any failed `knowledge` call to <see cref="AppKnowledge.KnowledgeFailureException"/>
-    /// (knowledge-v0.md §3) — the orchestrator must never see a raw HTTP/JSON exception.
+    /// (knowledge-v0.md §3) — the orchestrator must never see a raw HTTP/JSON exception. Also the
+    /// single place a per-stage <paramref name="timeout"/> is enforced: a linked
+    /// <see cref="CancellationTokenSource"/> is cancelled after <paramref name="timeout"/>
+    /// independently of the shared `HttpClient.Timeout`, so `draft` can run far longer than
+    /// `understand` without either starving the other's budget.
+    ///
+    /// <paramref name="maxAttempts"/> implements architecture.md §7's retry rule: idempotent stages
+    /// (understand/retrieve/answerability/verify/moderation context) may retry a `TIMEOUT`/
+    /// `UNAVAILABLE` failure — never a schema/model error, which will not succeed on retry —
+    /// `draft` gets at most one retry (nothing is persisted before the whole turn commits, so one
+    /// retry can never double-publish a draft), and stages this contract does not name for retry
+    /// (source lookups, quality pushes, analytics reads) default to a single attempt.
     /// </summary>
-    private static async Task<T> CallAsync<T>(Func<Task<T>> call, CancellationToken ct)
+    private static async Task<T> CallAsync<T>(Func<CancellationToken, Task<T>> call, TimeSpan timeout, CancellationToken ct, int maxAttempts = 1)
     {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await AttemptOnceAsync(call, timeout, ct);
+            }
+            catch (AppKnowledge.KnowledgeFailureException ex) when (attempt < maxAttempts && IsRetryable(ex.Category))
+            {
+                await Task.Delay(RetryDelay, ct);
+            }
+        }
+    }
+
+    private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(300);
+
+    private static bool IsRetryable(AppKnowledge.KnowledgeFailureCategory category) =>
+        category is AppKnowledge.KnowledgeFailureCategory.Timeout or AppKnowledge.KnowledgeFailureCategory.Unavailable;
+
+    private static async Task<T> AttemptOnceAsync<T>(Func<CancellationToken, Task<T>> call, TimeSpan timeout, CancellationToken ct)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(timeout);
+
         try
         {
-            return await call();
+            return await call(cts.Token);
         }
         catch (Generated.KnowledgeApiClientException<Generated.ErrorResponse> ex)
         {
@@ -344,10 +391,10 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client) :
         }
         catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
         {
-            // Our caller did not cancel, so this is HttpClient's own `Timeout` (a TaskCanceledException
-            // wrapping a TimeoutException). Its token is HttpClient's internal linked CTS — already
-            // cancelled — which is why the decision must be made against the caller's token, never
-            // against `ex.CancellationToken`.
+            // Our caller did not cancel, so either this stage's own `cts.CancelAfter(timeout)` fired,
+            // or (less likely, if misconfigured) HttpClient's own `Timeout` did. The decision is made
+            // against the caller's original token, never against `ex.CancellationToken` — that one
+            // is always already-cancelled by the time it reaches here.
             throw new AppKnowledge.KnowledgeFailureException(AppKnowledge.KnowledgeFailureCategory.Timeout, "knowledge call timed out.", ex);
         }
         catch (HttpRequestException ex)

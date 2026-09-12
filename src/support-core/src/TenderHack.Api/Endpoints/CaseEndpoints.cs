@@ -38,7 +38,8 @@ public static class CaseEndpoints
             return Results.Created($"/api/v0/cases/{@case.Id}", CaseMapper.ToSnapshot(@case, []));
         });
 
-        app.MapGet("/api/v0/cases", async (HttpContext context, string? status, ListCasesUseCase useCase, CancellationToken ct) =>
+        app.MapGet("/api/v0/cases", async (
+            HttpContext context, string? status, ListCasesUseCase useCase, INotificationReader notifications, CancellationToken ct) =>
         {
             if (OwnerSession.TryGet(context) is not { } ownerId)
             {
@@ -47,7 +48,15 @@ public static class CaseEndpoints
 
             var archivedOnly = string.Equals(status, "archived", StringComparison.OrdinalIgnoreCase);
             var cases = await useCase.ExecuteAsync(ownerId, archivedOnly, ct);
-            return Results.Ok(cases.Select(CaseMapper.ToListItem).ToArray());
+
+            // One owner-scoped fetch, grouped client-side, rather than N notification queries — the
+            // case list is small at hackathon scale and this keeps `GET /cases` a single round trip.
+            var unread = await notifications.ListAsync(ownerId, after: 0, unreadOnly: true, ct);
+            var unreadByCaseId = unread.GroupBy(n => n.CaseId).ToDictionary(g => g.Key, g => g.Count());
+
+            return Results.Ok(cases
+                .Select(c => CaseMapper.ToListItem(c, unreadByCaseId.GetValueOrDefault(c.Id)))
+                .ToArray());
         });
 
         app.MapGet("/api/v0/cases/{caseId}", async (
@@ -67,7 +76,7 @@ public static class CaseEndpoints
         });
 
         app.MapPost("/api/v0/cases/{caseId}/messages", async (
-            HttpContext context, string caseId, SendMessageRequest request, SendMessageUseCase useCase, CancellationToken ct) =>
+            HttpContext context, string caseId, SendMessageRequest request, SendMessageUseCase useCase, IIdempotencyStore idempotency, CancellationToken ct) =>
         {
             if (!CaseEndpointHelpers.TryRequireCaseId(caseId, out var id, out var badRequest))
             {
@@ -87,8 +96,29 @@ public static class CaseEndpoints
             }
 
             var ownerId = CaseEndpointHelpers.RequireOwner(context);
+
+            // architecture.md §7: "same key + same payload → same logical result". A lost response
+            // must not re-run the pipeline (a second `knowledge` round trip, a second moderation
+            // check, a second superseded revision) — replay returns the exact original response
+            // rather than the case's current state, which the client already has other ways to read
+            // (GET /cases/{id}, the event stream).
+            if (await CaseEndpointHelpers.TryReplaySendMessageAsync(context, ownerId, request, idempotency, ct) is { } cachedResponse)
+            {
+                return Results.Ok(cachedResponse);
+            }
+
             var outcome = await useCase.ExecuteAsync(id, ownerId, request.Text, ct);
-            return Results.Ok(CaseMapper.ToSendMessageResponse(caseId, outcome));
+            var response = CaseMapper.ToSendMessageResponse(caseId, outcome);
+
+            if (IdempotencyHelper.GetKey(context) is { } key)
+            {
+                await idempotency.SaveAsync(ownerId, IdempotencyScopes.SendMessage, key, IdempotencyHelper.HashPayload(request), IdempotencyHelper.SerializeCachedResponse(response), ct);
+            }
+
+            // architecture.md §18: technical trace for judges/team, not end-user UI (web-api-v0.md §1) — a
+            // support/debug conversation can ask "what was this turn's trace_id" and grep the logs.
+            context.Response.Headers["X-Trace-Id"] = outcome.TraceId.ToString();
+            return Results.Ok(response);
         });
 
         app.MapGet("/api/v0/cases/{caseId}/events", async (

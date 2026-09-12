@@ -18,7 +18,7 @@ public sealed class HandoffSubmissionPublisher(ITurnEventStream events, INotific
     {
         var handoff = @case.Handoff ?? throw new HandoffNotFoundException(@case.Id);
 
-        await events.PublishAsync(@case.Id, new CaseEvent("HANDOFF_STATUS", null, null, now, new Dictionary<string, object?>
+        var eventId = await events.PublishAsync(@case.Id, new CaseEvent("HANDOFF_STATUS", null, null, now, new Dictionary<string, object?>
         {
             ["status"] = handoff.Status.ToString(),
             ["integration_mode"] = handoff.IntegrationMode?.ToString(),
@@ -38,6 +38,6 @@ public sealed class HandoffSubmissionPublisher(ITurnEventStream events, INotific
             _ => ("Обновление по обращению", "Статус передачи изменён."),
         };
 
-        notifications.Enqueue(@case.OwnerId, @case.Id, "HANDOFF_UPDATED", title, body, handoff.IntegrationMode?.ToString());
+        notifications.Enqueue(@case.OwnerId, @case.Id, "HANDOFF_UPDATED", title, body, handoff.IntegrationMode?.ToString(), eventId);
     }
 }

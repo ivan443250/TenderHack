@@ -51,7 +51,7 @@ public sealed record RetrieveRequest(
     Corpus Corpus,
     string? SnapshotId);
 
-public sealed record RetrievalCandidate(string FragmentId, string DocumentId, int? Page, string? Anchor);
+public sealed record RetrievalCandidate(string FragmentId, string DocumentId, int? Page, string? Anchor, string? Title = null);
 
 public sealed record RetrieveResult(
     string SnapshotId,
@@ -66,7 +66,13 @@ public sealed record AnswerabilityResult(
     IReadOnlyList<string> MissingConditions,
     IReadOnlyList<string> RiskFlags);
 
-public sealed record DraftRequest(string Query, string SnapshotId, IReadOnlyList<string> EvidenceFragmentIds);
+/// <summary>
+/// `Tone` maps to `knowledge-v0`'s existing (already-frozen, previously unused) `DraftConstraints.tone`
+/// field — product-spec.md §12's "один ограниченный rewrite/экстрактивный fallback" passes
+/// `"extractive"` on the retry after a failed verification, asking for a more conservative,
+/// closer-to-source draft instead of giving up after the first attempt.
+/// </summary>
+public sealed record DraftRequest(string Query, string SnapshotId, IReadOnlyList<string> EvidenceFragmentIds, string? Tone = null);
 
 public sealed record DraftClaim(string ClaimId, string Text, IReadOnlyList<string> FragmentIds);
 

@@ -46,7 +46,7 @@ public static class DependencyInjection
         services.AddHttpClient<Generated.IKnowledgeApiClient, Generated.KnowledgeApiClient>((provider, client) =>
         {
             var options = provider.GetRequiredService<IOptions<KnowledgeServiceOptions>>().Value;
-            client.BaseAddress = new Uri(options.BaseAddress);
+            client.BaseAddress = new Uri(options.BaseUrl);
             client.Timeout = options.Timeout;
         });
         services.AddScoped<IKnowledgeService, HttpKnowledgeService>();

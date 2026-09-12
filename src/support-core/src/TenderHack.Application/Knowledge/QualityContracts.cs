@@ -25,7 +25,9 @@ public sealed record QualityTurnPush(
     string? RecommendedLine,
     string? ServiceNeed,
     StageTimings StageTimings,
-    string? ErrorCategory);
+    string? ErrorCategory,
+    string? ModelVersion = null,
+    string? RetrievalConfigVersion = null);
 
 /// <summary>
 /// `helpful` is deprecated wire compatibility, mirroring `InformationQualityRating`; this port never

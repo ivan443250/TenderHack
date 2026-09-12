@@ -20,4 +20,7 @@ public sealed class NotificationEntity
     public required string Body { get; init; }
 
     public string? IntegrationMode { get; init; }
+
+    /// <summary>The `case_events` row that caused this notification — uniqueness key together with `(OwnerId, CaseId, Type)` (architecture.md §7).</summary>
+    public required long SourceEventId { get; init; }
 }

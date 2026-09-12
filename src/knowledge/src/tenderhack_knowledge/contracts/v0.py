@@ -235,6 +235,10 @@ class QualityTurnPush(BaseModel):
     service_need: str | None = None
     stage_timings: StageTimings
     error_category: str | None = None
+    # Additive v0 fields (2026-09-12, knowledge-v0.openapi.yaml QualityTurnPush): the generator's
+    # model_version / this turn's retrieval_config_version, when a draft/retrieve actually ran.
+    model_version: str | None = None
+    retrieval_config_version: str | None = None
 
 
 class FeedbackRating(str, Enum):

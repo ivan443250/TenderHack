@@ -14,6 +14,20 @@ public sealed class SupportOptions
 
     public WebhookOptions Webhook { get; set; } = new();
 
+    public SubmitOptions Submit { get; set; } = new();
+
+    public sealed class SubmitOptions
+    {
+        /// <summary>
+        /// support-adapter-v0.md §7 "retries use bounded backoff": a transport failure (timeout,
+        /// connection refused) gets this many total attempts across outbox redelivery ticks before
+        /// the handoff is marked `FAILED` and the user has to explicitly retry. An adapter that
+        /// actively rejects the submission (`HandoffAck.Accepted = false`) is not retried at all —
+        /// that is an explicit answer, not a transient failure.
+        /// </summary>
+        public int MaxAttempts { get; set; } = 3;
+    }
+
     public sealed class DemoOptions
     {
         public DemoSubmitMode Submit { get; set; } = DemoSubmitMode.Success;

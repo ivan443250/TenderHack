@@ -14,14 +14,24 @@ public interface IHandoffAdapter
 
 /// <summary>
 /// support-adapter-v0.md §2. Fields the adapter cannot know (verified Portal state, real SLA/contact)
-/// are simply absent — "unknown stays unknown", never fabricated.
+/// are simply absent — "unknown stays unknown", never fabricated. `Summary` is the user's final
+/// edited text; every other field comes straight from the case's own persisted
+/// <see cref="Domain.Handoffs.HandoffPackage"/> (`HandoffPackageBuilder`), assembled without any
+/// `knowledge` call so the package — and this request — can be built while `knowledge` is down.
 /// </summary>
 public sealed record HandoffRequest(
     CaseId CaseId,
     HandoffId HandoffId,
     string Summary,
+    string Channel,
     string DispatchQueue,
     IReadOnlyList<string> ReasonCodes,
+    IReadOnlyList<ContextSlot> UserReportedContext,
+    IReadOnlyList<ContextSlot> VerifiedPortalContext,
+    IReadOnlyList<string> AlreadyTried,
+    IReadOnlyList<string> UnknownFields,
+    IReadOnlyList<string> SourcesChecked,
+    IReadOnlyList<string> RelevantMessageIds,
     bool EngineeringReviewSuggested);
 
 public sealed record HandoffAck(bool Accepted, bool Simulated, string? ExternalCaseId, string? SafeMessage = null);

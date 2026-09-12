@@ -16,7 +16,8 @@ public sealed class TurnOrchestratorTests
     private readonly FakeUnitOfWork _unitOfWork = new();
 
     private TurnOrchestrator CreateSut(int closeAfterWarnings = 1) =>
-        new(_knowledge, _moderation, _events, _outbox, _unitOfWork, new ModerationOptions(closeAfterWarnings), TimeProvider.System);
+        new(_knowledge, _moderation, _events, _outbox, _unitOfWork, new ModerationOptions(closeAfterWarnings), TimeProvider.System,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<TurnOrchestrator>.Instance);
 
     private static Case NewCase() => new(CaseId.New(), ownerId: "owner-1", DateTimeOffset.UtcNow);
 
@@ -32,7 +33,12 @@ public sealed class TurnOrchestratorTests
         Assert.Equal(Decision.ModerationWarning, outcome.Decision);
         Assert.Equal(1, outcome.ModerationWarningCount);
         Assert.Equal(ConversationStatus.Active, @case.ConversationStatus);
-        Assert.Contains(_events.Published, e => e.Event.Type == "MODERATION_WARNING");
+        var warning = _events.Published.First(e => e.Event.Type == "MODERATION_WARNING");
+        Assert.Equal("PROFANITY_001", warning.Event.Payload["rule_id"]);
+        Assert.Equal("v1", warning.Event.Payload["rule_version"]);
+        Assert.Equal(1, warning.Event.Payload["close_after_warnings"]);
+        var message = Assert.IsType<string>(warning.Event.Payload["message"]);
+        Assert.Contains("Предупреждение 1 из 1", message);
     }
 
     [Fact]
@@ -47,7 +53,10 @@ public sealed class TurnOrchestratorTests
 
         Assert.Equal(Decision.ModerationClose, outcome.Decision);
         Assert.Equal(ConversationStatus.ClosedModeration, @case.ConversationStatus);
-        Assert.Contains(_events.Published, e => e.Event.Type == "CONVERSATION_CLOSED");
+        var closed = _events.Published.First(e => e.Event.Type == "CONVERSATION_CLOSED");
+        Assert.Equal("PROFANITY_001", closed.Event.Payload["rule_id"]);
+        Assert.Equal(1, closed.Event.Payload["close_after_warnings"]);
+        Assert.IsType<string>(closed.Event.Payload["message"]);
     }
 
     [Fact]
@@ -125,6 +134,82 @@ public sealed class TurnOrchestratorTests
     }
 
     [Fact]
+    public async Task KnowledgeUnavailableRiskFlagProducesTechnicalErrorNotNoConfirmedAnswer()
+    {
+        // knowledge signals an unreachable repository as a plain 200 INSUFFICIENT answerability
+        // response carrying this flag (not a 5xx) — infrastructure failure must never surface as
+        // "no confirmed answer" (product-spec.md §9).
+        var sut = CreateSut();
+        var @case = NewCase();
+        _knowledge.Answerability = new AnswerabilityResult(EvidenceSufficiency.Insufficient, [], [], ["KNOWLEDGE_UNAVAILABLE"]);
+
+        var outcome = await sut.RunAsync(@case, "вопрос", CancellationToken.None);
+
+        Assert.Equal(Decision.TechnicalError, outcome.Decision);
+        Assert.Equal(KnowledgeFailureCategory.Unavailable, outcome.FailureCategory);
+        Assert.DoesNotContain(_events.Published, e => e.Event.Type == "NO_CONFIRMED_ANSWER");
+        Assert.DoesNotContain(_events.Published, e => e.Event.Type == "HANDOFF_OFFER");
+        Assert.Contains(_events.Published, e => e.Event.Type == "TECHNICAL_ERROR");
+    }
+
+    [Fact]
+    public async Task InsufficientEvidenceWithAnExactCodeExpandsRetrievalOnceBeforeHandoff()
+    {
+        // product-spec.md §8 п.9: "максимум одно дополнительное расширение поиска" — the first
+        // retrieve was narrowed by an exact code that turned up nothing applicable; one retry
+        // without it before giving up.
+        var sut = CreateSut();
+        var @case = NewCase();
+        _knowledge.UnderstandOverride = req => new UnderstandResult(req.Text, [], ["РДИК_9999"], []);
+        _knowledge.AnswerabilitySequence = new Queue<AnswerabilityResult>(
+        [
+            new AnswerabilityResult(EvidenceSufficiency.Insufficient, [], [], []),
+            new AnswerabilityResult(EvidenceSufficiency.Insufficient, [], [], []),
+        ]);
+
+        var outcome = await sut.RunAsync(@case, "код РДИК_9999 не работает", CancellationToken.None);
+
+        Assert.Equal(Decision.HandoffOffer, outcome.Decision);
+        Assert.Equal(2, _knowledge.RetrieveRequests.Count);
+        Assert.Equal(["РДИК_9999"], _knowledge.RetrieveRequests[0].ExactCodes);
+        Assert.Empty(_knowledge.RetrieveRequests[1].ExactCodes);
+        var handoffEvent = _events.Published.Last(e => e.Event.Type == "HANDOFF_OFFER");
+        var reasonCodes = Assert.IsAssignableFrom<IReadOnlyList<string>>(handoffEvent.Event.Payload["reason_codes"]);
+        Assert.Contains("EXPANDED_RETRY", reasonCodes);
+    }
+
+    [Fact]
+    public async Task ExpandedRetrievalFindingSomethingApplicablePublishesTheAnswerInstead()
+    {
+        var sut = CreateSut();
+        var @case = NewCase();
+        _knowledge.UnderstandOverride = req => new UnderstandResult(req.Text, [], ["РДИК_9999"], []);
+        _knowledge.AnswerabilitySequence = new Queue<AnswerabilityResult>(
+        [
+            new AnswerabilityResult(EvidenceSufficiency.Insufficient, [], [], []),
+            new AnswerabilityResult(EvidenceSufficiency.Sufficient, ["frag-1"], [], []),
+        ]);
+
+        var outcome = await sut.RunAsync(@case, "код РДИК_9999 не работает", CancellationToken.None);
+
+        Assert.Equal(Decision.Answer, outcome.Decision);
+        Assert.Equal(2, _knowledge.RetrieveRequests.Count);
+    }
+
+    [Fact]
+    public async Task InsufficientEvidenceWithoutAnExactCodeNeverExpandsRetrieval()
+    {
+        var sut = CreateSut();
+        var @case = NewCase();
+        _knowledge.Answerability = new AnswerabilityResult(EvidenceSufficiency.Insufficient, [], [], []);
+
+        var outcome = await sut.RunAsync(@case, "просто вопрос без кода", CancellationToken.None);
+
+        Assert.Equal(Decision.HandoffOffer, outcome.Decision);
+        Assert.Single(_knowledge.RetrieveRequests);
+    }
+
+    [Fact]
     public async Task EntitySlotTypeAndProvenanceSurviveFromUnderstandIntoRetrieve()
     {
         // Regression: earlier code flattened Entity to a bare string on the .NET boundary, so
@@ -151,15 +236,42 @@ public sealed class TurnOrchestratorTests
     {
         var sut = CreateSut();
         var @case = NewCase();
+        _knowledge.UnderstandOverride = req => new UnderstandResult(
+            req.Text, [new Entity("role", "поставщик", EntityProvenance.UserExplicit)], [], []);
 
         var outcome = await sut.RunAsync(@case, "как подать заявку?", CancellationToken.None);
 
         Assert.Equal(Decision.Answer, outcome.Decision);
         Assert.Equal("Ответ.", outcome.AnswerMarkdown);
-        Assert.Equal(["frag-1"], outcome.SourceFragmentIds);
+        var source = Assert.Single(outcome.Sources!);
+        Assert.Equal("frag-1", source.FragmentId);
+        Assert.Equal("doc-1", source.DocumentId);
+        Assert.Equal(1, source.Page);
+        // Title falls back to DocumentId when knowledge did not supply one (Candidate.title is additive/optional).
+        Assert.Equal("doc-1", source.Title);
         Assert.Equal(ResolutionStatus.Unknown, @case.ResolutionStatus);
+
+        // product-experience.md §5 Applicability Card: the same facts that passed the Answerability
+        // Gate, not a re-derived confidence score.
+        var answerEvent = _events.Published.Single(e => e.Event.Type == "AI_ANSWER");
+        var applicability = answerEvent.Event.Payload["applicability"]!;
+        var entitiesProperty = applicability.GetType().GetProperty("entities")!.GetValue(applicability);
+        var entities = Assert.IsAssignableFrom<System.Collections.IEnumerable>(entitiesProperty).Cast<object>().ToArray();
+        var roleEntity = Assert.Single(entities);
+        Assert.Equal("поставщик", roleEntity.GetType().GetProperty("value")!.GetValue(roleEntity));
+        Assert.Equal("user_explicit", roleEntity.GetType().GetProperty("provenance")!.GetValue(roleEntity));
+        var applicabilityFragmentIds = applicability.GetType().GetProperty("evidence_fragment_ids")!.GetValue(applicability);
+        Assert.Equal(new[] { "frag-1" }, applicabilityFragmentIds);
         var answer = Assert.Single(_events.Published, e => e.Event.Type == "AI_ANSWER");
-        Assert.Equal(["frag-1"], Assert.IsAssignableFrom<IReadOnlyList<string>>(answer.Event.Payload["sources"]));
+        // web-api-v0.md §4.3: sources are objects with fragment_id/document_id/page/anchor/title, not bare ids.
+        var publishedSources = Assert.IsAssignableFrom<System.Collections.IEnumerable>(answer.Event.Payload["sources"]).Cast<object>().ToArray();
+        var publishedSource = Assert.Single(publishedSources);
+        Assert.Equal("frag-1", publishedSource.GetType().GetProperty("fragment_id")!.GetValue(publishedSource));
+        Assert.Equal("doc-1", publishedSource.GetType().GetProperty("title")!.GetValue(publishedSource));
+        // architecture.md §8 "Knowledge versioning": every user-facing answer records snapshot/model/retrieval config.
+        Assert.Equal("snapshot-1", answer.Event.Payload["snapshot_id"]);
+        Assert.Equal("stub-v0", answer.Event.Payload["model_version"]);
+        Assert.Equal("stub-v0", answer.Event.Payload["retrieval_config_version"]);
 
         var push = Assert.IsType<QualityTurnPush>(Assert.Single(_outbox.Enqueued).Payload);
         Assert.Equal(QualityOutboxMessages.Turn, _outbox.Enqueued[0].MessageType);
@@ -167,6 +279,8 @@ public sealed class TurnOrchestratorTests
         Assert.Equal("Ответ.", push.AnswerMarkdown);
         Assert.Equal(["frag-1"], push.EvidenceFragmentIds);
         Assert.Equal("snapshot-1", push.SnapshotId);
+        Assert.Equal("stub-v0", push.ModelVersion);
+        Assert.Equal("stub-v0", push.RetrievalConfigVersion);
         Assert.NotNull(push.StageTimings.UnderstandMs);
         Assert.NotNull(push.StageTimings.RetrieveMs);
         Assert.NotNull(push.StageTimings.DraftMs);
@@ -184,6 +298,32 @@ public sealed class TurnOrchestratorTests
 
         Assert.Equal(Decision.HandoffOffer, outcome.Decision);
         Assert.Null(outcome.AnswerMarkdown);
+        // product-spec.md §12: one extractive rewrite attempt before giving up — both draft calls happened.
+        Assert.Equal(2, _knowledge.DraftRequests.Count);
+        Assert.Null(_knowledge.DraftRequests[0].Tone);
+        Assert.Equal("extractive", _knowledge.DraftRequests[1].Tone);
+        // Distinct from a plain "no evidence" handoff, for Knowledge Gap Radar (product-experience.md §8).
+        var handoffEvent = _events.Published.Last(e => e.Event.Type == "NO_CONFIRMED_ANSWER");
+        Assert.Equal("VERIFICATION_FAILED", handoffEvent.Event.Payload["reason"]);
+    }
+
+    [Fact]
+    public async Task ExtractiveRewriteSucceedingPublishesTheAnswerInstead()
+    {
+        var sut = CreateSut();
+        var @case = NewCase();
+        _knowledge.VerifySequence = new Queue<VerifyResult>(
+        [
+            new VerifyResult([new ClaimVerification("claim-1", Supported: false, [])]),
+            new VerifyResult([new ClaimVerification("claim-1", Supported: true, ["frag-1"])]),
+        ]);
+
+        var outcome = await sut.RunAsync(@case, "вопрос", CancellationToken.None);
+
+        Assert.Equal(Decision.Answer, outcome.Decision);
+        Assert.Equal(2, _knowledge.DraftRequests.Count);
+        Assert.Equal("extractive", _knowledge.DraftRequests[1].Tone);
+        Assert.DoesNotContain(_events.Published, e => e.Event.Type == "NO_CONFIRMED_ANSWER");
     }
 
     [Fact]
@@ -198,6 +338,107 @@ public sealed class TurnOrchestratorTests
         Assert.Equal(Decision.Clarify, outcome.Decision);
         Assert.Equal(["сумма контракта"], outcome.MissingConditions);
         Assert.DoesNotContain(_events.Published, e => e.Event.Type == "AI_ANSWER");
+        Assert.Equal(1, @case.TurnContext.ConsecutiveClarifications);
+    }
+
+    [Fact]
+    public async Task AThirdConsecutiveClarificationEscalatesToHandoffInstead()
+    {
+        // product-spec.md §11: "не более двух последовательных clarifications в одном нерешенном сценарии".
+        var sut = CreateSut();
+        var @case = NewCase();
+        _knowledge.Answerability = new AnswerabilityResult(EvidenceSufficiency.ConditionDependent, [], ["сумма контракта"], []);
+
+        var first = await sut.RunAsync(@case, "вопрос", CancellationToken.None);
+        var second = await sut.RunAsync(@case, "уточнение 1", CancellationToken.None);
+        var third = await sut.RunAsync(@case, "уточнение 2", CancellationToken.None);
+
+        Assert.Equal(Decision.Clarify, first.Decision);
+        Assert.Equal(Decision.Clarify, second.Decision);
+        Assert.Equal(Decision.HandoffOffer, third.Decision);
+        var handoffEvent = _events.Published.Last(e => e.Event.Type == "HANDOFF_OFFER");
+        var reasonCodes = Assert.IsAssignableFrom<IReadOnlyList<string>>(handoffEvent.Event.Payload["reason_codes"]);
+        Assert.Contains("CLARIFICATION_LIMIT", reasonCodes);
+    }
+
+    [Fact]
+    public async Task AnsweringResetsTheClarificationCounterForTheNextUnrelatedQuestion()
+    {
+        var sut = CreateSut();
+        var @case = NewCase();
+        _knowledge.Answerability = new AnswerabilityResult(EvidenceSufficiency.ConditionDependent, [], ["сумма контракта"], []);
+        await sut.RunAsync(@case, "вопрос 1", CancellationToken.None);
+        await sut.RunAsync(@case, "уточнение", CancellationToken.None);
+        Assert.Equal(2, @case.TurnContext.ConsecutiveClarifications);
+
+        _knowledge.Answerability = new AnswerabilityResult(EvidenceSufficiency.Sufficient, ["frag-1"], [], []);
+        var answered = await sut.RunAsync(@case, "новый вопрос", CancellationToken.None);
+
+        Assert.Equal(Decision.Answer, answered.Decision);
+        Assert.Equal(0, @case.TurnContext.ConsecutiveClarifications);
+    }
+
+    [Fact]
+    public async Task DecliningTheOutstandingClarificationGoesStraightToHandoffWithoutRetrieval()
+    {
+        var sut = CreateSut();
+        var @case = NewCase();
+        _knowledge.Answerability = new AnswerabilityResult(EvidenceSufficiency.ConditionDependent, [], ["сумма контракта"], []);
+        await sut.RunAsync(@case, "вопрос", CancellationToken.None);
+        var retrieveRequestAfterFirstTurn = _knowledge.LastRetrieveRequest;
+
+        var outcome = await sut.RunAsync(@case, "не знаю", CancellationToken.None);
+
+        Assert.Equal(Decision.HandoffOffer, outcome.Decision);
+        // Same object reference as after the first turn — retrieve was not called again for the decline.
+        Assert.Same(retrieveRequestAfterFirstTurn, _knowledge.LastRetrieveRequest);
+        Assert.Contains("сумма контракта", @case.TurnContext.DeclinedMissingConditions);
+        var handoffEvent = _events.Published.Last(e => e.Event.Type == "HANDOFF_OFFER");
+        var reasonCodes = Assert.IsAssignableFrom<IReadOnlyList<string>>(handoffEvent.Event.Payload["reason_codes"]);
+        Assert.Contains("CLARIFICATION_DECLINED", reasonCodes);
+    }
+
+    [Fact]
+    public async Task AKnownSlotFromAnEarlierTurnIsForwardedToRetrieveOnTheNextTurnWithoutBeingRestated()
+    {
+        // product-spec.md §7: "не спрашивать уже известное" — a slot understood on turn 1 must still
+        // reach retrieve on turn 2 even though turn 2's own message never repeats it.
+        var sut = CreateSut();
+        var @case = NewCase();
+        _knowledge.UnderstandOverride = req => new UnderstandResult(
+            req.Text, [new Entity("role", "поставщик", EntityProvenance.UserExplicit)], [], []);
+        await sut.RunAsync(@case, "я поставщик", CancellationToken.None);
+
+        _knowledge.UnderstandOverride = req => new UnderstandResult(req.Text, [], [], []);
+        await sut.RunAsync(@case, "как подать заявку?", CancellationToken.None);
+
+        var forwarded = Assert.Single(_knowledge.LastRetrieveRequest!.Entities);
+        Assert.Equal("role", forwarded.Type);
+        Assert.Equal("поставщик", forwarded.Value);
+    }
+
+    [Fact]
+    public async Task PriorTurnSummaryCarriesTheLastQuestionAndKnownSlotsIntoUnderstand()
+    {
+        var sut = CreateSut();
+        var @case = NewCase();
+        _knowledge.Answerability = new AnswerabilityResult(EvidenceSufficiency.ConditionDependent, [], ["роль пользователя"], []);
+        _knowledge.UnderstandOverride = req => new UnderstandResult(
+            req.Text, [new Entity("document_type", "УПД", EntityProvenance.UserExplicit)], [], []);
+        await sut.RunAsync(@case, "что делать с УПД?", CancellationToken.None);
+
+        UnderstandRequest? secondRequest = null;
+        _knowledge.UnderstandOverride = req =>
+        {
+            secondRequest = req;
+            return new UnderstandResult(req.Text, [], [], []);
+        };
+        await sut.RunAsync(@case, "поставщик", CancellationToken.None);
+
+        Assert.NotNull(secondRequest!.PriorTurnSummary);
+        Assert.Contains("что делать с УПД?", secondRequest.PriorTurnSummary);
+        Assert.Contains("document_type=УПД", secondRequest.PriorTurnSummary);
+        Assert.Contains("роль пользователя", secondRequest.PriorTurnSummary);
     }
 
     [Fact]

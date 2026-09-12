@@ -47,19 +47,26 @@ public sealed class IngestHandoffStatusUseCase(
         if (assignedSpecialist is not null) changed.Add("assigned_specialist");
         if (terminal is not null) changed.Add("terminal");
 
+        // web-api-v0.md §4.2: the payload is the full handoff view (§4.4) plus `changed` — the
+        // *current* state of the handoff, not just this update's delta. Reading it back off
+        // `handoff` (rather than echoing the method's own possibly-null parameters) keeps a field
+        // that was set by an earlier update (e.g. `stage`) present when only `terminal` changed now.
         var handoff = @case.Handoff!;
-        await events.PublishAsync(caseId, new CaseEvent("HANDOFF_STATUS", null, null, now, new Dictionary<string, object?>
+        var eventId = await events.PublishAsync(caseId, new CaseEvent("HANDOFF_STATUS", null, null, now, new Dictionary<string, object?>
         {
             ["status"] = handoff.Status.ToString(),
             ["integration_mode"] = handoff.IntegrationMode?.ToString(),
-            ["stage"] = stage is { } s ? new { code = s.Code, display_name = s.DisplayName } : null,
-            ["assigned_specialist"] = assignedSpecialist is { } a ? new { @ref = a.Ref, display_name = a.DisplayName } : null,
-            ["terminal"] = terminal?.ToString(),
+            ["external_case_id"] = handoff.ExternalCaseId,
+            ["stage"] = handoff.Stage is { } hs ? new { code = hs.Code, display_name = hs.DisplayName } : null,
+            ["assigned_specialist"] = handoff.AssignedSpecialist is { } spec ? new { @ref = spec.Ref, display_name = spec.DisplayName } : null,
+            ["terminal"] = handoff.Terminal?.ToString(),
+            ["stale"] = handoff.Stale,
+            ["updated_at"] = now,
             ["changed"] = changed,
         }), ct);
 
         notifications.Enqueue(@case.OwnerId, caseId, "HANDOFF_UPDATED", "Обновление по обращению",
-            BuildHandoffUpdateBody(stage, assignedSpecialist), handoff.IntegrationMode?.ToString());
+            BuildHandoffUpdateBody(stage, assignedSpecialist), handoff.IntegrationMode?.ToString(), eventId);
 
         if (terminal is not null && conversationStatusBefore == ConversationStatus.Active)
         {
