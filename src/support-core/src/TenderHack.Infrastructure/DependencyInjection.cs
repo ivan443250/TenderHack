@@ -17,10 +17,15 @@ public static class DependencyInjection
     {
         services.AddSingleton(TimeProvider.System);
 
-        services.AddDbContext<TenderHackDbContext>(options => ConfigureNpgsql(options, configuration));
+        // A single pooled factory backs both: CaseEventStore creates its own short-lived contexts
+        // from it directly, and the scoped registration below hands the ambient unit-of-work one
+        // per request. Registering AddDbContext *and* AddPooledDbContextFactory side by side is not
+        // supported — they'd both try to own DbContextOptions<TenderHackDbContext>.
         services.AddPooledDbContextFactory<TenderHackDbContext>(options => ConfigureNpgsql(options, configuration));
+        services.AddScoped(provider => provider.GetRequiredService<IDbContextFactory<TenderHackDbContext>>().CreateDbContext());
 
         services.AddScoped<ICaseRepository, CaseRepository>();
+        services.AddScoped<ICaseEventReader, CaseEventReader>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IOutbox, Outbox>();
         services.AddSingleton<ITurnEventStream, CaseEventStore>();

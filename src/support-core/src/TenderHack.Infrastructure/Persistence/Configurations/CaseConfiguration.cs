@@ -19,6 +19,7 @@ public sealed class CaseConfiguration : IEntityTypeConfiguration<Case>
         builder.Property(c => c.Id).HasConversion(id => id.Value, value => new CaseId(value));
 
         builder.Property(c => c.OwnerId).IsRequired();
+        builder.Property(c => c.CreatedAt).IsRequired();
         builder.Property(c => c.ConversationStatus).HasConversion<string>().IsRequired();
         builder.Property(c => c.ResolutionStatus).HasConversion<string>().IsRequired();
         builder.Property(c => c.ModerationWarningCount).IsRequired();
@@ -26,6 +27,7 @@ public sealed class CaseConfiguration : IEntityTypeConfiguration<Case>
         builder.Property(c => c.CompletedAt);
 
         builder.Ignore(c => c.ActiveTurn);
+        builder.Ignore(c => c.LastActivityAt);
 
         builder.OwnsMany(c => c.Turns, turn =>
         {

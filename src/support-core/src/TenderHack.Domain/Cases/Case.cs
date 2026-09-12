@@ -16,6 +16,8 @@ public sealed class Case
 
     public string OwnerId { get; }
 
+    public DateTimeOffset CreatedAt { get; }
+
     public ConversationStatus ConversationStatus { get; private set; } = ConversationStatus.Active;
 
     public ResolutionStatus ResolutionStatus { get; private set; } = ResolutionStatus.Unknown;
@@ -32,10 +34,23 @@ public sealed class Case
 
     public Turn? ActiveTurn => _turns.Count == 0 ? null : _turns[^1];
 
-    public Case(CaseId id, string ownerId)
+    /// <summary>Most recent thing that happened on this case — for list/sort views, not a persisted column.</summary>
+    public DateTimeOffset LastActivityAt
+    {
+        get
+        {
+            var latest = CreatedAt;
+            if (_turns.Count > 0 && _turns[^1].CreatedAt > latest) latest = _turns[^1].CreatedAt;
+            if (CompletedAt is { } completedAt && completedAt > latest) latest = completedAt;
+            return latest;
+        }
+    }
+
+    public Case(CaseId id, string ownerId, DateTimeOffset createdAt)
     {
         Id = id;
         OwnerId = ownerId;
+        CreatedAt = createdAt;
     }
 
     /// <summary>Persists a new user revision. A running/queued prior turn is superseded, never deleted.</summary>

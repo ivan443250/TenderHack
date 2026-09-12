@@ -10,6 +10,9 @@ public sealed class FakeCaseRepository : ICaseRepository
     public Task<Case?> FindAsync(CaseId caseId, CancellationToken ct) =>
         Task.FromResult(_cases.TryGetValue(caseId, out var found) ? found : null);
 
+    public Task<IReadOnlyList<Case>> ListByOwnerAsync(string ownerId, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<Case>>([.. _cases.Values.Where(c => c.OwnerId == ownerId)]);
+
     public void Add(Case @case) => _cases[@case.Id] = @case;
 }
 

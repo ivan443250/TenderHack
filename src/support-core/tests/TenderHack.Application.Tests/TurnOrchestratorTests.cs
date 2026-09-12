@@ -16,7 +16,7 @@ public sealed class TurnOrchestratorTests
     private TurnOrchestrator CreateSut(int closeAfterWarnings = 1) =>
         new(_knowledge, _moderation, _events, new ModerationOptions(closeAfterWarnings), TimeProvider.System);
 
-    private static Case NewCase() => new(CaseId.New(), ownerId: "owner-1");
+    private static Case NewCase() => new(CaseId.New(), ownerId: "owner-1", DateTimeOffset.UtcNow);
 
     [Fact]
     public async Task ConfirmedFirstViolationWarnsAndSkipsKnowledgeCalls()
