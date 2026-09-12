@@ -9,6 +9,7 @@ FROM ghcr.io/ggml-org/llama.cpp:server-cuda13-b10902@sha256:3a88f3dba5f665c0dcb5
 USER root
 
 ENV DEBIAN_FRONTEND=noninteractive \
+    LD_LIBRARY_PATH=/app:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     GIGA_MODEL_PATH=/models/giga-embeddings-0826-3b-q8_0.gguf \
@@ -43,9 +44,26 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
     && test -x /app/llama-server
 
-RUN groupadd --gid 1000 tenderhack \
-    && useradd --uid 1000 --gid 1000 --create-home --shell /usr/sbin/nologin tenderhack \
-    && install -d -o 1000 -g 1000 /opt/tenderhack /opt/tenderhack/gateway /opt/tenderhack/scripts /opt/tenderhack/run
+RUN set -eux; \
+    if ! getent group 1000 >/dev/null; then \
+        runtime_group_name=tenderhack-runtime; \
+        runtime_group_suffix=0; \
+        while getent group "$runtime_group_name" >/dev/null; do \
+            runtime_group_suffix=$((runtime_group_suffix + 1)); \
+            runtime_group_name="tenderhack-runtime-$runtime_group_suffix"; \
+        done; \
+        groupadd --gid 1000 "$runtime_group_name"; \
+    fi; \
+    if ! getent passwd 1000 >/dev/null; then \
+        runtime_user_name=tenderhack-runtime; \
+        runtime_user_suffix=0; \
+        while getent passwd "$runtime_user_name" >/dev/null; do \
+            runtime_user_suffix=$((runtime_user_suffix + 1)); \
+            runtime_user_name="tenderhack-runtime-$runtime_user_suffix"; \
+        done; \
+        useradd --uid 1000 --gid 1000 --create-home --shell /usr/sbin/nologin "$runtime_user_name"; \
+    fi; \
+    install -d -o 1000 -g 1000 /opt/tenderhack /opt/tenderhack/gateway /opt/tenderhack/scripts /opt/tenderhack/run
 
 COPY gateway/app.py /opt/tenderhack/gateway/app.py
 COPY entrypoint.sh /opt/tenderhack/entrypoint.sh

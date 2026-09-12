@@ -15,7 +15,13 @@
     "infra/inference/cloudru/deployment-prep-report.json"
   ],
   "files_modified": [
-    "infra/inference/README.md"
+    "infra/inference/README.md",
+    "infra/inference/cloudru/Dockerfile",
+    "infra/inference/cloudru/deployment-prep-report.json"
+  ],
+  "files_changed_this_fix": [
+    "infra/inference/cloudru/Dockerfile",
+    "infra/inference/cloudru/deployment-prep-report.json"
   ],
   "container": {
     "platform": "linux/amd64",
@@ -24,14 +30,37 @@
     "gid": 1000,
     "weights_baked_in": false,
     "volume_instruction": false,
-    "models_mount": "/models:ro"
+    "models_mount": "/models:ro",
+    "built_image_size_bytes": 1882903864
+  },
+  "base_identity": {
+    "image": "ghcr.io/ggml-org/llama.cpp:server-cuda13-b10902@sha256:3a88f3dba5f665c0dcb51f68ec990293758ac518b433556013a2e849694c8cd8",
+    "uid_1000": {
+      "name": "ubuntu",
+      "gid": 1000,
+      "home": "/home/ubuntu",
+      "shell": "/bin/bash"
+    },
+    "gid_1000": {
+      "name": "ubuntu"
+    },
+    "numeric_runtime_identity": "1000:1000",
+    "supplementary_groups_when_run_numeric": [1000],
+    "inspection": "docker run --platform linux/amd64 --user 1000:1000 ... id",
+    "result": "uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu)"
+  },
+  "uid_gid_fix": {
+    "status": "FIXED",
+    "behavior": "reuse getent group/passwd 1000; create only missing records with collision-safe fallback names; final USER remains numeric 1000:1000",
+    "directory_ownership": "PASS: /opt/tenderhack, gateway, scripts and run are 1000:1000 and writable by UID 1000"
   },
   "runtime": {
     "family": "llama.cpp / llama-server",
     "image": "ghcr.io/ggml-org/llama.cpp:server-cuda13-b10902@sha256:3a88f3dba5f665c0dcb51f68ec990293758ac518b433556013a2e849694c8cd8",
     "image_source": "official ggml-org container registry",
     "cuda_variant": "CUDA 13",
-    "version_command": "/app/llama-server --version (record on target image)",
+    "version_command": "/app/llama-server --version",
+    "version_measured_local": "0.4.0-dev (build 10902, commit df03399b8)",
     "build_strategy": "single pinned CUDA server base plus Python standard-library gateway",
     "external_ai_api": false,
     "model_download_at_runtime": false
@@ -108,18 +137,37 @@
     "download_status": "NOT_EXECUTED"
   },
   "build_validation": {
-    "status": "STATIC_VALIDATION_PASS_BUILD_NOT_EXECUTED_LOCALLY",
-    "reason": "Current workstation is not the target A100 and pulling the CUDA base is unnecessary for static package validation",
+    "status": "PASS_LINUX_AMD64_LOCAL_WITHOUT_MODELS",
+    "reason": "Built locally with --platform linux/amd64 and no model files in build context; GPU/model smoke intentionally not run",
     "dockerfile_static_review": "PASS: docker buildx build --check --platform linux/amd64",
     "gateway_compile": "PASS: Python 3.12 compileall",
-    "gateway_unit_tests": "PASS: 5 unittest cases with fake upstream servers",
+    "gateway_unit_tests": "PASS: 6 unittest cases with fake upstream servers",
     "shell_syntax": "PASS: bash -n on entrypoint, verify-models and smoke scripts",
     "json_validation": "PASS: Python JSON parser",
-    "image_size": null
+    "docker_build": "PASS: docker buildx build --platform linux/amd64 --load -t tenderhack-inference:uid1000-check ...",
+    "uid_gid_layer": "PASS: existing ubuntu UID/GID 1000 reused; groupadd/useradd did not run",
+    "runtime_identity": "PASS: image Config.User=1000:1000; runtime id groups=1000 only",
+    "directory_write_check": "PASS: /opt/tenderhack and /opt/tenderhack/run writable by 1000",
+    "llama_server_version": "PASS: /app/llama-server --version",
+    "image_digest_local": "sha256:7b7b522b429892c1934d2d4bf860f653fbe8aefb29b28d895c0066dfe52c5502",
+    "image_size": 1882903864
   },
   "cloudru_push_status": "NOT_EXECUTED",
   "model_download_status": "NOT_EXECUTED",
-  "high_findings": [],
+  "high_findings": [
+    {
+      "id": "BASE_UID_GID_1000_COLLISION",
+      "status": "FIXED",
+      "finding": "Pinned base already contains ubuntu UID/GID 1000; unconditional groupadd failed with GID already exists.",
+      "fix": "Dockerfile now checks getent group/passwd 1000 and creates only missing records using collision-safe fallback names."
+    },
+    {
+      "id": "LLAMA_SERVER_LIBRARY_PATH",
+      "status": "FIXED",
+      "finding": "Local runtime check could not resolve libllama-server-impl.so from /app with the inherited LD_LIBRARY_PATH.",
+      "fix": "Dockerfile prepends /app to LD_LIBRARY_PATH; llama-server --version now succeeds."
+    }
+  ],
   "medium_findings": [
     {
       "id": "RUNTIME_VERSION_TARGET_CHECK",
