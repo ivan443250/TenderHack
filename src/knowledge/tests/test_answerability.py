@@ -208,6 +208,49 @@ async def test_role_mention_in_one_context_fragment_is_not_role_ambiguity() -> N
 
 
 @pytest.mark.asyncio
+async def test_procedural_question_rejects_definition_without_operational_steps() -> None:
+    fragment = _fragment("f-act-definition", "Электронный акт — документ для фиксации результатов исполнения.")
+    assessment = await assess_answerability(
+        "Как оформить электронный акт?",
+        SNAPSHOT_ID,
+        [fragment.fragment_id],
+        _Repository((fragment,)),
+    )
+
+    assert assessment.evidence_sufficiency is EvidenceSufficiency.INSUFFICIENT
+    assert "LOW_SPECIFICITY" in assessment.risk_flags
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("query", "text"),
+    [
+        ("Как создать СТЕ для оферты?", "Чтобы создать СТЕ для оферты, откройте раздел и нажмите «Создать»."),
+        ("Как загрузить YML-файл?", "Загрузите YML-файл в разделе импорта и проверьте результат обработки."),
+    ],
+)
+async def test_procedural_ste_and_yml_evidence_remains_sufficient(query: str, text: str) -> None:
+    fragment = _fragment("f-procedure", text)
+    assessment = await assess_answerability(query, SNAPSHOT_ID, [fragment.fragment_id], _Repository((fragment,)))
+
+    assert assessment.evidence_sufficiency is EvidenceSufficiency.SUFFICIENT
+
+
+@pytest.mark.asyncio
+async def test_out_of_corpus_kafka_request_cannot_be_answered_from_portal_evidence() -> None:
+    fragment = _fragment("f-portal", "Портал поставщиков содержит инструкции по работе с документами.")
+    assessment = await assess_answerability(
+        "Как подключить Kafka к Порталу поставщиков?",
+        SNAPSHOT_ID,
+        [fragment.fragment_id],
+        _Repository((fragment,)),
+    )
+
+    assert assessment.evidence_sufficiency is EvidenceSufficiency.INSUFFICIENT
+    assert "OUT_OF_CORPUS_TECHNOLOGY" in assessment.risk_flags
+
+
+@pytest.mark.asyncio
 async def test_independent_supplier_and_customer_fragments_remain_ambiguous() -> None:
     supplier = _fragment("f-supplier", "Поставщик создаёт СТЕ для оферты.")
     customer = _fragment("f-customer", "Заказчик утверждает СТЕ для оферты.")

@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError, type ApiClient } from "../../api/client";
-import type { Material, MaterialSection, SourceDetail } from "../../api/types";
+import type { AnswerSource, Material, MaterialSection, SourceDetail } from "../../api/types";
 import { ContextPanel } from "./ContextPanel";
 
 afterEach(cleanup);
@@ -28,6 +28,21 @@ const MATERIAL: Material = {
 const SECTION: MaterialSection = { section: "1. Общие положения", page_start: 1, page_end: 5, first_fragment_id: "frag-1" };
 
 describe("ContextPanel Materials tab (E3)", () => {
+  it("shows answer sources in the count and opens the cited fragment", async () => {
+    const sourceRef: AnswerSource = { fragment_id: "frag-hidden-id", title: "Инструкция по созданию оферты.pdf", page: 12, label: "стр. 12" };
+    const source: SourceDetail = { document_id: "doc-1", title: sourceRef.title, version: "v1", page: 12, anchor: null, text: "Шаги создания", snapshot_id: "snap-1" };
+    const api = stubApiClient({ getSource: vi.fn().mockResolvedValue(source) });
+    render(<ContextPanel api={api} usedSources={[]} sourceRefs={[sourceRef]} onClose={() => {}} />);
+
+    expect(screen.getByText("Источники · 1")).toBeInTheDocument();
+    expect(screen.getByText(sourceRef.title)).toBeInTheDocument();
+    expect(screen.queryByText(sourceRef.fragment_id)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText(sourceRef.title));
+    await waitFor(() => expect(api.getSource).toHaveBeenCalledWith(sourceRef.fragment_id));
+    expect(await screen.findByText("Шаги создания")).toBeInTheDocument();
+  });
+
   it("loads and shows the document list, then a document's sections on click", async () => {
     const api = stubApiClient({
       listMaterials: vi.fn().mockResolvedValue({ snapshot_id: "snap-1", materials: [MATERIAL] }),

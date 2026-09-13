@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import type { ApiClient } from "../../api/client";
-import type { SourceDetail } from "../../api/types";
+import type { AnswerSource, SourceDetail } from "../../api/types";
 import { useCaseSession } from "../../state/caseStore";
 import { Composer } from "./Composer";
 import { ModerationBlockedNotice } from "./Messages";
@@ -21,6 +21,26 @@ export function ChatScreen({ api }: { api: ApiClient }) {
   const [usedSources, setUsedSources] = useState<Record<string, SourceDetail>>({});
 
   const usedSourcesList = useMemo(() => Object.values(usedSources), [usedSources]);
+  const answerSources = useMemo<AnswerSource[]>(() => {
+    const byFragment = new Map<string, AnswerSource>();
+    for (const item of session.snapshot?.timeline ?? []) {
+      if (item.type !== "AI_ANSWER") continue;
+      const sources = item.payload.sources;
+      if (!Array.isArray(sources)) continue;
+      for (const candidate of sources) {
+        if (!candidate || typeof candidate !== "object") continue;
+        const source = candidate as Partial<AnswerSource>;
+        if (typeof source.fragment_id !== "string" || byFragment.has(source.fragment_id)) continue;
+        byFragment.set(source.fragment_id, {
+          fragment_id: source.fragment_id,
+          title: typeof source.title === "string" && source.title.length > 0 ? source.title : "Источник",
+          page: typeof source.page === "number" ? source.page : null,
+          label: typeof source.label === "string" ? source.label : "Источник"
+        });
+      }
+    }
+    return [...byFragment.values()];
+  }, [session.snapshot?.timeline]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const timelineLength = session.snapshot?.timeline.length ?? 0;
   const feedbackDone = Boolean(session.snapshot?.feedback);
@@ -77,7 +97,7 @@ export function ChatScreen({ api }: { api: ApiClient }) {
         )}
       </div>
 
-      {panelOpen && <ContextPanel api={api} usedSources={usedSourcesList} onClose={() => setPanelOpen(false)} />}
+      {panelOpen && <ContextPanel api={api} usedSources={usedSourcesList} sourceRefs={answerSources} onClose={() => setPanelOpen(false)} />}
       {openedSource && <SourceModal source={openedSource} onClose={() => setOpenedSource(null)} />}
     </div>
   );

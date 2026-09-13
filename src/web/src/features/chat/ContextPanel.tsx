@@ -1,15 +1,25 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
-import { ChevronRightIcon, ExternalLinkIcon, FileTextIcon } from "../../design-system/icons";
+import { ChevronRightIcon, FileTextIcon } from "../../design-system/icons";
 import type { ApiClient } from "../../api/client";
 import { ApiError } from "../../api/client";
-import type { Material, MaterialSection, SourceDetail } from "../../api/types";
+import type { AnswerSource, Material, MaterialSection, SourceDetail } from "../../api/types";
 import { SourceModal } from "./SourceModal";
 
 type ContextPanelProps = {
   api: ApiClient;
   usedSources: SourceDetail[];
+  sourceRefs?: AnswerSource[];
   onClose: () => void;
+};
+
+type SourceItem = {
+  key: string;
+  title: string;
+  page: number | null;
+  version: string | null;
+  fragmentId: string | null;
+  detail: SourceDetail | null;
 };
 
 type MaterialsState =
@@ -31,11 +41,31 @@ function MaterialsUnavailableMessage(): string {
 /** Chat/Context Panel (Figma 258:743). "Материалы" (E3, docs/plans/active/2026-09-demo-readiness.md)
  * lists the current normative snapshot's documents, expands to each one's table of contents, and
  * opens a section through the same `GET /sources/{fragment_id}` drawer citations already use. */
-export function ContextPanel({ api, usedSources, onClose }: ContextPanelProps) {
+export function ContextPanel({ api, usedSources, sourceRefs = [], onClose }: ContextPanelProps) {
   const [tab, setTab] = useState<"sources" | "materials">("sources");
   const [materials, setMaterials] = useState<MaterialsState>({ status: "idle" });
   const [expanded, setExpanded] = useState<Record<string, SectionsState>>({});
   const [openedSource, setOpenedSource] = useState<SourceDetail | null>(null);
+  const sourceItems = useMemo<SourceItem[]>(() => {
+    if (sourceRefs.length > 0) {
+      return sourceRefs.map((source) => ({
+        key: source.fragment_id,
+        title: source.title || "Источник",
+        page: source.page,
+        version: null,
+        fragmentId: source.fragment_id,
+        detail: null
+      }));
+    }
+    return usedSources.map((source, index) => ({
+      key: `${source.document_id}-${source.page ?? "unknown"}-${index}`,
+      title: source.title,
+      page: source.page,
+      version: source.version,
+      fragmentId: null,
+      detail: source
+    }));
+  }, [sourceRefs, usedSources]);
 
   async function openMaterialsTab() {
     setTab("materials");
@@ -78,6 +108,14 @@ export function ContextPanel({ api, usedSources, onClose }: ContextPanelProps) {
     }
   }
 
+  async function openAnswerSource(fragmentId: string) {
+    try {
+      setOpenedSource(await api.getSource(fragmentId));
+    } catch {
+      // Keep the citation visible so the user can retry after a transient source error.
+    }
+  }
+
   return (
     <aside className="flex h-full w-[380px] shrink-0 animate-slide-in-right flex-col border-l border-[var(--border-default)] bg-white">
       <div className="flex h-16 items-center justify-between pl-5 pr-4">
@@ -94,7 +132,7 @@ export function ContextPanel({ api, usedSources, onClose }: ContextPanelProps) {
             onClick={() => setTab("sources")}
             className={`flex-1 rounded-[9px] text-xs font-medium transition-[background-color,color,box-shadow] duration-200 ${tab === "sources" ? "bg-white text-[var(--content-primary)] shadow-sm" : "text-[#5e6975]"}`}
           >
-            Источники · {usedSources.length}
+            Источники · {sourceItems.length}
           </button>
           <button
             type="button"
@@ -108,18 +146,20 @@ export function ContextPanel({ api, usedSources, onClose }: ContextPanelProps) {
         {tab === "sources" && (
           <>
             <p className="text-xs font-semibold tracking-[0.6px] text-[#7d8796]">ИСПОЛЬЗОВАНО В ОТВЕТЕ</p>
-            {usedSources.length === 0 && <p className="text-xs text-[var(--content-tertiary)]">Пока нет источников для этого ответа.</p>}
-            {usedSources.map((source) => (
-              <div key={source.document_id} className="flex h-16 items-center gap-2.5 rounded-xl border border-[#f5c7cc] bg-[#fff6f7] px-3 py-2.5">
+            {sourceItems.length === 0 && <p className="text-xs text-[var(--content-tertiary)]">Пока нет источников для этого ответа.</p>}
+            {sourceItems.map((source) => (
+              <button
+                key={source.key}
+                type="button"
+                onClick={() => source.fragmentId ? void openAnswerSource(source.fragmentId) : source.detail && setOpenedSource(source.detail)}
+                className="flex min-h-16 w-full items-center gap-2.5 rounded-xl border border-[#f5c7cc] bg-[#fff6f7] px-3 py-2.5 text-left transition-[background-color] duration-150 hover:bg-[#fff0f1]"
+              >
                 <FileTextIcon className="size-[18px] shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-semibold text-[var(--content-primary)]">{source.title}</p>
-                  <p className="text-xs text-[#7d8796]">{source.page ? `стр. ${source.page}` : source.version}</p>
-                </div>
-                <a href={`#source-${source.document_id}`} onClick={(event) => event.preventDefault()}>
-                  <ExternalLinkIcon className="size-4" />
-                </a>
-              </div>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-semibold text-[var(--content-primary)]">{source.title}</span>
+                  <span className="block text-xs text-[#7d8796]">{source.page ? `стр. ${source.page}` : source.version ?? "Источник"}</span>
+                </span>
+              </button>
             ))}
           </>
         )}

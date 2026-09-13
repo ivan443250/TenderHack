@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { ClarificationNotice, ModerationWarningNotice, NoConfirmedAnswerNotice } from "./Messages";
+import { AssistantResponse, ClarificationNotice, ModerationWarningNotice, NoConfirmedAnswerNotice } from "./Messages";
 
 describe("ClarificationNotice", () => {
   it("renders mapped questions when provided (B1)", () => {
@@ -11,11 +11,27 @@ describe("ClarificationNotice", () => {
     expect(screen.queryByText("role")).not.toBeInTheDocument();
   });
 
-  it("falls back to raw missing_conditions when questions is empty (B1 fallback)", () => {
+  it("maps slot names to human-readable copy when questions are absent (B1 fallback)", () => {
     render(<ClarificationNotice missingConditions={["role", "provider"]} questions={[]} />);
 
-    expect(screen.getByText("role")).toBeInTheDocument();
-    expect(screen.getByText("provider")).toBeInTheDocument();
+    expect(screen.getByText("Вы работаете на Портале как поставщик или как заказчик?")).toBeInTheDocument();
+    expect(screen.getByText("Какой оператор ЭДО вы используете?")).toBeInTheDocument();
+    expect(screen.queryByText("role")).not.toBeInTheDocument();
+    expect(screen.queryByText("provider")).not.toBeInTheDocument();
+  });
+});
+
+describe("AssistantResponse", () => {
+  it("renders safe Markdown without exposing markup, ids, or think blocks", () => {
+    render(<AssistantResponse markdown={'# Как создать СТЕ?\n\n1. **Откройте** раздел `Оферты`.\n2. Выберите пункт.\n\nfrag_abc123\n<think>internal reasoning</think>'} />);
+
+    expect(screen.getByRole("heading", { name: "Как создать СТЕ?" })).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "" })).toBeInTheDocument();
+    expect(screen.getByText("Откройте")).toBeInTheDocument();
+    expect(screen.getByText("Оферты")).toBeInTheDocument();
+    expect(screen.queryByText("# Как создать СТЕ?")).not.toBeInTheDocument();
+    expect(screen.queryByText("frag_abc123")).not.toBeInTheDocument();
+    expect(screen.queryByText("internal reasoning")).not.toBeInTheDocument();
   });
 });
 

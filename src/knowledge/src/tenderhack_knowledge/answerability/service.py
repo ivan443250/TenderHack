@@ -63,6 +63,14 @@ _ALREADY_TRIED_RE = re.compile(
     r"\u043d\u0435\s+\u043f\u043e\u043c\u043e\u0433\u043b\w*)"
 )
 _NEGATED_ASSERTION_RE = re.compile(r"(?i)(?:\u043d\u0435\s+\u043d\u0443\u0436\u043d\w*|\u043d\u0435\s+\u0442\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044f|\u043d\u0435\u043b\u044c\u0437\u044f|\u043d\u0435\u0432\u043e\u0437\u043c\u043e\u0436\u043d\w*)")
+_PROCEDURAL_QUERY_RE = re.compile(r"(?i)^\s*(?:\u043a\u0430\u043a|\u0433\u0434\u0435|\u043a\u0430\u043a\u0438\u043c\s+\u043e\u0431\u0440\u0430\u0437\u043e\u043c)\b")
+r"""
+_PROCEDURAL_ACTION_RE = re.compile(
+    r"(?i)(?:\u043d\u0430\u0436\u043c\w*|\u043f\u0435\u0440\u0435\u0439\u0434\w*|\u0432\u044b\u0431\u0435\u0440\w*|\u0441\u043e\u0437\u0434\u0430\u0439?\w*|\u0437\u0430\u0433\u0440\u0443\u0437\w*|\u043e\u0444\u043e\u0440\u043c\w*|\u043f\u043e\u0434\u043f\u0438\u0448\w*|\u0443\u043a\u0430\u0436\w*|\u0441\u0444\u043e\u0440\u043c\u0438\u044руй?\w*|\u0438\u043c\u043f\u043e\u0440\u0442\w*|\u0443\u0434\u0430\u043b\w*|\u0438\u0437\u043c\u0435\u043d\u0438\u043b?\w*|\u043e\u0442\u043a\u0440\u043e\u0439?\w*|\u0437\u0430\u043f\u043e\u043b\u043d\u0438\u0442\w*|\u0434\u043e\u0431\u0430\u0432\u044c?\w*|\u043f\u0440\u043e\u0432\u0435\u0440\u044c?\w*)"
+)
+"""
+_PROCEDURAL_ACTION_RE = re.compile(r"(?i)(?:нажм\w*|перейд\w*|выбер\w*|созда\w*|загруз\w*|оформ\w*|подпис\w*|укаж\w*|сформир\w*|импорт\w*|удал\w*|измен\w*|откро\w*|заполн\w*|добав\w*|проверь?\w*)")
+_OUT_OF_CORPUS_TECH_RE = re.compile(r"(?i)\bkafka\b")
 r"""
 _SUPPORT_RE = re.compile(
     r"(?i)(?:\u043e\u0431\u0440\u0430\u0442\u0438\u0442\u0435\u0441\u044c|\u043e\u0431\u0440\u0430\u0449\u0430\u0442\u044c\u0441\u044f|\u0441\u0442\u043f\s*\u043f\b|\u0442\u0435\u0445\u043d\u0438\u0447\u0435\u0441\uк\w*\s+\u043f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\w*)"
@@ -247,6 +255,11 @@ def _specificity(query: str, fragments: tuple[KnowledgeFragment, ...]) -> tuple[
         return True, 1.0
     if len(query_tokens) == 1 and query_tokens[0] in _GENERIC_TOKENS:
         return False, ratio
+    # A procedural question needs at least one operational instruction in the
+    # cited evidence.  A definition that merely repeats the document name is
+    # not enough to justify a user-facing how-to answer.
+    if _PROCEDURAL_QUERY_RE.search(query) and not _PROCEDURAL_ACTION_RE.search(" ".join(fragment.text for fragment in fragments)):
+        return False, ratio
     # One distinctive long term is enough; otherwise require two concepts or
     # a strong overlap.  No retrieval score or top-1/top-2 gap is consulted.
     distinctive = any(len(token) >= 7 and _stem(token) in overlap for token in query_tokens)
@@ -420,6 +433,9 @@ async def assess_answerability(
             risk_flags.append("HIGH_RISK_MISSING_CONDITION")
 
     specificity_ok, specificity_ratio = _specificity(query, evidence)
+    if _OUT_OF_CORPUS_TECH_RE.search(query):
+        specificity_ok = False
+        risk_flags.append("OUT_OF_CORPUS_TECHNOLOGY")
     if _NEGATED_ASSERTION_RE.search(query):
         negative_evidence = any(
             re.search(r"(?i)\u043d\u0435\s+\u043d\u0443\u0436\u043d\w*|\u043d\u0435\s+\u0442\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044f|\u043d\u0435\u043b\u044c\u0437\u044f|\u043d\u0435\u0432\u043e\u0437\u043c\u043e\u0436\u043d\w*", _normalize(fragment.text))
