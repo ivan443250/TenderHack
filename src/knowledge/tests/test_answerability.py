@@ -237,7 +237,7 @@ async def test_procedural_ste_and_yml_evidence_remains_sufficient(query: str, te
 
 
 @pytest.mark.asyncio
-async def test_out_of_corpus_kafka_request_cannot_be_answered_from_portal_evidence() -> None:
+async def test_out_of_corpus_technology_is_not_a_knowledge_scope_decision() -> None:
     fragment = _fragment("f-portal", "Портал поставщиков содержит инструкции по работе с документами.")
     assessment = await assess_answerability(
         "Как подключить Kafka к Порталу поставщиков?",
@@ -247,7 +247,7 @@ async def test_out_of_corpus_kafka_request_cannot_be_answered_from_portal_eviden
     )
 
     assert assessment.evidence_sufficiency is EvidenceSufficiency.INSUFFICIENT
-    assert "OUT_OF_CORPUS_TECHNOLOGY" in assessment.risk_flags
+    assert "OUT_OF_CORPUS_TECHNOLOGY" not in assessment.risk_flags
 
 
 @pytest.mark.asyncio

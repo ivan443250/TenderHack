@@ -33,7 +33,7 @@ ResolutionStatus   = UNKNOWN | RESOLVED | UNRESOLVED
 TurnStatus         = QUEUED | RUNNING | COMPLETED | FAILED | SUPERSEDED
 HandoffStatus      = NOT_REQUESTED | PENDING | ACCEPTED | SIMULATED_ACCEPTED | FAILED
 Decision           = ANSWER | CLARIFY | HANDOFF_OFFER | ANSWER_AND_HANDOFF |
-                     MODERATION_WARNING | MODERATION_CLOSE | TECHNICAL_ERROR
+                     OUT_OF_SCOPE | MODERATION_WARNING | MODERATION_CLOSE | TECHNICAL_ERROR
 ```
 
 Moderation is warning-first (`product-spec.md §14`): the first confirmed violation in a case is `MODERATION_WARNING`, the next one is `MODERATION_CLOSE`. The threshold is server configuration; the browser only renders `moderation_warning_count` and the warning text.
@@ -130,6 +130,7 @@ Minimum item/event types:
 - `TURN_STAGE`
 - `AI_ANSWER`
 - `CLARIFICATION`
+- `OUT_OF_SCOPE`
 - `NO_CONFIRMED_ANSWER`
 - `MODERATION_WARNING`
 - `CONVERSATION_CLOSED`

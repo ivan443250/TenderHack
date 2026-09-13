@@ -9,7 +9,8 @@ namespace TenderHack.Application.Orchestration;
 
 /// <summary>
 /// Per-turn state machine (architecture.md §5.2): persist input → moderate → direct human-request
-/// check → understand → retrieve → answerability → draft/verify when evidence allows → decide.
+/// check → deterministic scope gate → understand → retrieve → answerability → draft/verify when
+/// evidence allows → decide.
 /// Every stage result is published as a `case_events` row before the next stage starts. On every
 /// exit it also enqueues a `quality.turn` outbox push (knowledge-v0.md §10) for analytics. The
 /// final decision is left staged on the unit of work — the caller commits it.
@@ -87,6 +88,14 @@ public sealed class TurnOrchestrator(
                 return await OfferHandoffAsync(@case, turn, messageText, timings, now,
                     evidenceInsufficient: true, conditionDependent: false, [], explicitHumanRequest: true, ct,
                     reason: "EXPLICIT_HUMAN_REQUEST");
+            }
+
+            // Obvious small talk and clearly foreign topics do not need a retrieval/model call and
+            // must never become an accidental Portal handoff. The scope detector is intentionally
+            // conservative; anything it does not recognise continues through normal Knowledge.
+            if (SupportScopeDetector.TryGetReply(messageText, out var scopeReply))
+            {
+                return await HandleOutOfScopeAsync(@case, turn, messageText, scopeReply, timings, now, ct);
             }
 
             // "Не спрашивать повторно slot после «не знаю»" (product-spec.md §11): a decline of the
@@ -244,6 +253,28 @@ public sealed class TurnOrchestrator(
         }
 
         return TurnOutcome.Moderation(turn.Id, turn.Revision, decision, @case.ModerationWarningCount);
+    }
+
+    private async Task<TurnOutcome> HandleOutOfScopeAsync(
+        Case @case,
+        Turn turn,
+        string messageText,
+        string reply,
+        StageTimingsAccumulator timings,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        @case.ResetClarificationLoop();
+        @case.TryPublishDecision(turn.Id, turn.Revision, Decision.OutOfScope);
+        await PublishAsync(@case.Id, turn.Id, turn.Revision, "OUT_OF_SCOPE", now,
+            new Dictionary<string, object?>
+            {
+                ["message"] = reply,
+                ["reason"] = "OUT_OF_SCOPE",
+            }, ct);
+        EnqueueQualityTurnPush(@case, turn, messageText, Decision.OutOfScope, timings,
+            answerMarkdown: null, evidenceFragmentIds: null, snapshotId: null, routing: null, errorCategory: null);
+        return TurnOutcome.OutOfScope(turn.Id, turn.Revision, @case.ModerationWarningCount);
     }
 
     private async Task<TurnOutcome> DecideFromAnswerabilityAsync(
@@ -523,9 +554,18 @@ public sealed class TurnOrchestrator(
     {
         "role" => "Вы работаете на Портале как поставщик или как заказчик?",
         "provider" => "Через какого оператора ЭДО вы работаете?",
+        "process" => "Какой процесс или раздел Портала вы сейчас проходите?",
+        "document_status" => "Какой статус сейчас отображается у документа?",
         "status" => "Какой сейчас статус документа?",
-        "document_type" => "О каком документе речь — УПД, акт, счёт?",
-        _ => $"Уточните, пожалуйста: {slot}",
+        "document_type" => "Какой тип документа вы оформляете?",
+        "attempted_action" => "Какое действие вы выполняли перед проблемой?",
+        "duration" => "Как долго статус или ошибка остаётся без изменений?",
+        "already_tried" => "Что именно вы уже попробовали сделать?",
+        "error_code" => "Какой код ошибки или полный текст сообщения вы видите?",
+        "category_id" => "Какой идентификатор категории указан в файле?",
+        "model" => "Какую модель или формат вы используете?",
+        "source_state" => "Какое состояние документа указано в Портале?",
+        _ => "Уточните детали ситуации, чтобы подобрать точную инструкцию.",
     };
 
     private static string ToWireProvenance(ContextSlotProvenance provenance) => provenance switch

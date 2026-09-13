@@ -115,6 +115,42 @@ public sealed class TurnOrchestratorTests
     }
 
     [Fact]
+    public async Task ShortExplicitHumanRequestVariantOffersHandoffWithoutCallingKnowledge()
+    {
+        var sut = CreateSut();
+        var @case = NewCase();
+        _knowledge.FailAt = new InvalidOperationException("scope gate should stop before Knowledge");
+        _knowledge.FailingStage = nameof(FakeKnowledgeService.UnderstandAsync);
+
+        var outcome = await sut.RunAsync(@case, "позови специалиста", CancellationToken.None);
+
+        Assert.Equal(Decision.HandoffOffer, outcome.Decision);
+        Assert.DoesNotContain(_events.Published, e => e.Event.Type == "TURN_STAGE");
+        Assert.Contains(_events.Published, e => e.Event.Type == "HANDOFF_OFFER");
+    }
+
+    [Theory]
+    [InlineData("привет")]
+    [InlineData("спасибо")]
+    [InlineData("как приготовить борщ?")]
+    [InlineData("как подключить Kafka к Порталу поставщиков?")]
+    public async Task ObviousOutOfScopeMessageGetsGuidanceWithoutKnowledgeOrHandoff(string text)
+    {
+        var sut = CreateSut();
+        var @case = NewCase();
+        _knowledge.FailAt = new InvalidOperationException("scope gate should stop before Knowledge");
+        _knowledge.FailingStage = nameof(FakeKnowledgeService.UnderstandAsync);
+
+        var outcome = await sut.RunAsync(@case, text, CancellationToken.None);
+
+        Assert.Equal(Decision.OutOfScope, outcome.Decision);
+        Assert.DoesNotContain(_events.Published, e => e.Event.Type == "TURN_STAGE");
+        Assert.DoesNotContain(_events.Published, e => e.Event.Type == "HANDOFF_OFFER");
+        var scopeEvent = Assert.Single(_events.Published, e => e.Event.Type == "OUT_OF_SCOPE");
+        Assert.NotEmpty(Assert.IsType<string>(scopeEvent.Event.Payload["message"]));
+    }
+
+    [Fact]
     public async Task SufficientEvidenceWithRiskFlagsAnswersAndOffersHandoff()
     {
         var sut = CreateSut();
@@ -395,7 +431,31 @@ public sealed class TurnOrchestratorTests
         Assert.Equal(new[] { "role", "unknown_slot" }, clarification.Event.Payload["missing_conditions"]);
         var questions = Assert.IsAssignableFrom<IReadOnlyList<string>>(clarification.Event.Payload["questions"]);
         Assert.Equal("Вы работаете на Портале как поставщик или как заказчик?", questions[0]);
-        Assert.Equal("Уточните, пожалуйста: unknown_slot", questions[1]);
+        Assert.Equal("Уточните детали ситуации, чтобы подобрать точную инструкцию.", questions[1]);
+    }
+
+    [Fact]
+    public async Task ClarificationMapsAllKnownConditionSlotsToHumanQuestions()
+    {
+        var sut = CreateSut();
+        var @case = NewCase();
+        var slots = new[]
+        {
+            "role", "provider", "process", "document_type", "document_status", "status",
+            "attempted_action", "duration", "already_tried", "error_code", "category_id", "model", "source_state",
+        };
+        _knowledge.Answerability = new AnswerabilityResult(EvidenceSufficiency.ConditionDependent, [], slots, []);
+
+        await sut.RunAsync(@case, "вопрос", CancellationToken.None);
+
+        var clarification = Assert.Single(_events.Published, e => e.Event.Type == "CLARIFICATION");
+        var questions = Assert.IsAssignableFrom<IReadOnlyList<string>>(clarification.Event.Payload["questions"]);
+        Assert.Equal(slots.Length, questions.Count);
+        Assert.All(questions, question =>
+        {
+            Assert.NotEmpty(question);
+            Assert.DoesNotContain("_", question);
+        });
     }
 
     [Fact]

@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { AssistantResponse, ClarificationNotice, ModerationWarningNotice, NoConfirmedAnswerNotice } from "./Messages";
+import { AssistantResponse, ClarificationNotice, ModerationWarningNotice, NoConfirmedAnswerNotice, OutOfScopeNotice } from "./Messages";
 
 describe("ClarificationNotice", () => {
   it("renders mapped questions when provided (B1)", () => {
@@ -23,7 +23,7 @@ describe("ClarificationNotice", () => {
 
 describe("AssistantResponse", () => {
   it("renders safe Markdown without exposing markup, ids, or think blocks", () => {
-    render(<AssistantResponse markdown={'# Как создать СТЕ?\n\n1. **Откройте** раздел `Оферты`.\n2. Выберите пункт.\n\nfrag_abc123\n<think>internal reasoning</think>'} />);
+    render(<AssistantResponse markdown={'# Как создать СТЕ?\n\n1. **Откройте** раздел `Оферты`.\n2. Выберите пункт.\n\nfrag_abc123\nclaim_id: claim-1\n{"claim_id":"claim-2","fragment_ids":["frag-2"]}\nJSON schema\n<think>internal reasoning</think>'} />);
 
     expect(screen.getByRole("heading", { name: "Как создать СТЕ?" })).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "" })).toBeInTheDocument();
@@ -32,6 +32,19 @@ describe("AssistantResponse", () => {
     expect(screen.queryByText("# Как создать СТЕ?")).not.toBeInTheDocument();
     expect(screen.queryByText("frag_abc123")).not.toBeInTheDocument();
     expect(screen.queryByText("internal reasoning")).not.toBeInTheDocument();
+    expect(screen.queryByText("claim-1")).not.toBeInTheDocument();
+    expect(screen.queryByText("claim-2")).not.toBeInTheDocument();
+    expect(screen.queryByText(/claim_id/)).not.toBeInTheDocument();
+    expect(screen.queryByText("JSON schema")).not.toBeInTheDocument();
+  });
+});
+
+describe("OutOfScopeNotice", () => {
+  it("renders server-authored scope guidance without a handoff CTA", () => {
+    render(<OutOfScopeNotice message="Я помогаю с вопросами по работе Портала поставщиков." />);
+
+    expect(screen.getByText(/Портала поставщиков/)).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });
 

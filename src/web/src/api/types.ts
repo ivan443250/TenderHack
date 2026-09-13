@@ -12,6 +12,7 @@ export type Decision =
   | "CLARIFY"
   | "HANDOFF_OFFER"
   | "ANSWER_AND_HANDOFF"
+  | "OUT_OF_SCOPE"
   | "MODERATION_WARNING"
   | "MODERATION_CLOSE"
   | "TECHNICAL_ERROR";
@@ -23,6 +24,7 @@ export type TimelineItemType =
   | "TURN_STAGE"
   | "AI_ANSWER"
   | "CLARIFICATION"
+  | "OUT_OF_SCOPE"
   | "NO_CONFIRMED_ANSWER"
   | "MODERATION_WARNING"
   | "CONVERSATION_CLOSED"

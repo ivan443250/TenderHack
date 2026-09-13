@@ -6,6 +6,7 @@ import {
   ConversationClosedNotice,
   ModerationWarningNotice,
   NoConfirmedAnswerNotice,
+  OutOfScopeNotice,
   TechnicalErrorNotice,
   TurnStageNotice,
   UserMessage
@@ -66,6 +67,9 @@ function renderItem(item: TimelineItem, snapshot: CaseSnapshot, api: ApiClient, 
           questions={Array.isArray(payload.questions) ? (payload.questions as string[]) : undefined}
         />
       );
+
+    case "OUT_OF_SCOPE":
+      return <OutOfScopeNotice key={item.item_id} message={String(payload.message ?? "Я помогаю с вопросами по работе Портала поставщиков.")} />;
 
     case "NO_CONFIRMED_ANSWER":
       return <NoConfirmedAnswerNotice key={item.item_id} reason={typeof payload.reason === "string" ? payload.reason : undefined} />;
