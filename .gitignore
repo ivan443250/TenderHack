@@ -50,6 +50,9 @@ model-cache/
 data/raw/
 data/private/
 data/import/
+# Approved immutable organizer corpus; source checksums are enforced by bootstrap.
+!data/organizer/
+!data/organizer/**
 artifacts/
 outputs/
 
