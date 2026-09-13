@@ -1,6 +1,7 @@
 using TenderHack.Application.Ports;
 using TenderHack.Domain;
 using TenderHack.Domain.Cases;
+using TenderHack.Domain.Common;
 using TenderHack.Domain.Handoffs;
 
 namespace TenderHack.Application.Orchestration;
@@ -20,8 +21,8 @@ public sealed class HandoffSubmissionPublisher(ITurnEventStream events, INotific
 
         var eventId = await events.PublishAsync(@case.Id, new CaseEvent("HANDOFF_STATUS", null, null, now, new Dictionary<string, object?>
         {
-            ["status"] = handoff.Status.ToString(),
-            ["integration_mode"] = handoff.IntegrationMode?.ToString(),
+            ["status"] = handoff.Status.ToWire(),
+            ["integration_mode"] = handoff.IntegrationMode.ToWire(),
             ["external_case_id"] = handoff.ExternalCaseId,
             ["stage"] = null,
             ["assigned_specialist"] = null,
@@ -38,6 +39,6 @@ public sealed class HandoffSubmissionPublisher(ITurnEventStream events, INotific
             _ => ("Обновление по обращению", "Статус передачи изменён."),
         };
 
-        notifications.Enqueue(@case.OwnerId, @case.Id, "HANDOFF_UPDATED", title, body, handoff.IntegrationMode?.ToString(), eventId);
+        notifications.Enqueue(@case.OwnerId, @case.Id, "HANDOFF_UPDATED", title, body, handoff.IntegrationMode.ToWire(), eventId);
     }
 }

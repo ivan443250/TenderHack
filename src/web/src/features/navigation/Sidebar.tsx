@@ -2,7 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { IconButton } from "../../design-system/IconButton";
 import { PortalLogo, PortalMark } from "../../design-system/Brand";
-import { EditIcon, HelpIcon, SearchIcon, SettingsIcon, SidebarToggleIcon, DotIcon } from "../../design-system/icons";
+import { EditIcon, SidebarToggleIcon, DotIcon } from "../../design-system/icons";
 import type { CaseListItem } from "../../api/types";
 
 type SidebarProps = {
@@ -58,13 +58,6 @@ export function Sidebar({ recentCases, archivedCases, activeCaseId, collapsed, o
           <EditIcon className="size-5" />
           Новый чат
         </Link>
-        <button
-          type="button"
-          className="flex h-11 items-center gap-2 rounded-xl px-2.5 text-left text-xs font-medium text-[var(--content-secondary)] transition-[background-color,color] duration-150 hover:bg-[var(--surface-subtle)] hover:text-[var(--content-primary)]"
-        >
-          <SearchIcon className="size-5" />
-          Поиск по чатам
-        </button>
       </div>
 
       {recentCases.length > 0 && (
@@ -90,17 +83,6 @@ export function Sidebar({ recentCases, archivedCases, activeCaseId, collapsed, o
       )}
 
       <div className="flex-1" />
-      <div className="h-px w-full bg-[var(--border-default)]" />
-      <div className="flex flex-col gap-0.5 py-1">
-        <button type="button" className="flex h-11 items-center gap-2 rounded-xl px-2.5 text-left text-xs font-medium text-[var(--content-secondary)] transition-[background-color,color] duration-150 hover:bg-[var(--surface-subtle)] hover:text-[var(--content-primary)]">
-          <HelpIcon className="size-5" />
-          Помощь
-        </button>
-        <button type="button" className="flex h-11 items-center gap-2 rounded-xl px-2.5 text-left text-xs font-medium text-[var(--content-secondary)] transition-[background-color,color] duration-150 hover:bg-[var(--surface-subtle)] hover:text-[var(--content-primary)]">
-          <SettingsIcon className="size-5" />
-          Настройки
-        </button>
-      </div>
     </nav>
   );
 }

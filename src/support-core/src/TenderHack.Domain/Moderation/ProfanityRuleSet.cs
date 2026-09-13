@@ -35,13 +35,20 @@ public static partial class ProfanityRuleSet
     [GeneratedRegex(@"\bбля[а-яё]*\b", RegexOptions.IgnoreCase)]
     private static partial Regex BlyaRegex();
 
-    [GeneratedRegex(@"\bху[йеяю][а-яё]*\b", RegexOptions.IgnoreCase)]
+    /// <summary>
+    /// Allows a common verb prefix ("на-", "по-", "за-", "от-", "вы-", "о-", "до-", "пере-") glued
+    /// directly onto the root with no internal word boundary — e.g. "нахуй", "охуеть" (quality.md §6:
+    /// prefixed forms were previously missed because \b sits between prefix and root, not before it).
+    /// </summary>
+    [GeneratedRegex(@"\b(?:на|по|за|от|вы|о|до|пере)?ху[йеяю][а-яё]*\b", RegexOptions.IgnoreCase)]
     private static partial Regex HuyRegex();
 
     [GeneratedRegex(@"\bпизд[а-яё]*\b", RegexOptions.IgnoreCase)]
     private static partial Regex PizdRegex();
 
-    [GeneratedRegex(@"\bеб[а-яё]{1,6}\b", RegexOptions.IgnoreCase)]
+    /// <summary>Matches both "е" and "ё" spellings of the root ("ебать"/"ёбаный") with the same
+    /// optional glued prefix as <see cref="HuyRegex"/> (covers "заебал", "ёбаный").</summary>
+    [GeneratedRegex(@"\b(?:на|по|за|от|вы|о|до|пере)?[её]б[а-яё]{1,6}\b", RegexOptions.IgnoreCase)]
     private static partial Regex EbatRegex();
 
     [GeneratedRegex(@"\bсук[аи][а-яё]*\b", RegexOptions.IgnoreCase)]

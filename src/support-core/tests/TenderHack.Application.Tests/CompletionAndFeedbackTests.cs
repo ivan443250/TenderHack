@@ -99,7 +99,7 @@ public sealed class CompletionAndFeedbackTests
         Assert.Contains(events.Published, e => e.Event.Type == "FEEDBACK_SUBMITTED");
         // The `solved` signal moved resolution, and the timeline shows it like any other transition.
         var changed = Assert.Single(events.Published, e => e.Event.Type == "CASE_RESOLUTION_CHANGED");
-        Assert.Equal("Resolved", changed.Event.Payload["resolution_status"]);
+        Assert.Equal("RESOLVED", changed.Event.Payload["resolution_status"]);
     }
 
     [Fact]

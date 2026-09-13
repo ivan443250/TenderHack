@@ -1,6 +1,7 @@
 using TenderHack.Application.Knowledge;
 using TenderHack.Application.Ports;
 using TenderHack.Domain.Cases;
+using TenderHack.Domain.Common;
 
 namespace TenderHack.Application.Orchestration;
 
@@ -17,14 +18,14 @@ public sealed class CaseCompletionPublisher(ITurnEventStream events, INotificati
         if (@case.ResolutionStatus != resolutionBefore)
         {
             await events.PublishAsync(@case.Id, new CaseEvent("CASE_RESOLUTION_CHANGED", null, null, now,
-                new Dictionary<string, object?> { ["resolution_status"] = @case.ResolutionStatus.ToString() }), ct);
+                new Dictionary<string, object?> { ["resolution_status"] = @case.ResolutionStatus.ToWire() }), ct);
         }
 
         var completedEventId = await events.PublishAsync(@case.Id, new CaseEvent("CASE_COMPLETED", null, null, now,
             new Dictionary<string, object?>
             {
-                ["completion_reason"] = @case.CompletionReason?.ToString(),
-                ["resolution_status"] = @case.ResolutionStatus.ToString(),
+                ["completion_reason"] = @case.CompletionReason.ToWire(),
+                ["resolution_status"] = @case.ResolutionStatus.ToWire(),
             }), ct);
 
         notifications.Enqueue(@case.OwnerId, @case.Id, "CASE_COMPLETED", "Обращение завершено",
@@ -33,10 +34,10 @@ public sealed class CaseCompletionPublisher(ITurnEventStream events, INotificati
         outbox.Enqueue(QualityOutboxMessages.Completion, new QualityCompletionPush(
             @case.Id.ToString(),
             now,
-            @case.CompletionReason?.ToString() ?? string.Empty,
-            @case.ResolutionStatus.ToString(),
-            HandoffStatus: @case.Handoff?.Status.ToString(),
-            IntegrationMode: @case.Handoff?.IntegrationMode?.ToString(),
+            @case.CompletionReason.ToWire() ?? string.Empty,
+            @case.ResolutionStatus.ToWire(),
+            HandoffStatus: @case.Handoff?.Status.ToWire(),
+            IntegrationMode: @case.Handoff?.IntegrationMode.ToWire(),
             SpecialistRef: @case.Handoff?.AssignedSpecialist?.Ref,
             StageCode: @case.Handoff?.Stage?.Code,
             ModerationWarningCount: @case.ModerationWarningCount,

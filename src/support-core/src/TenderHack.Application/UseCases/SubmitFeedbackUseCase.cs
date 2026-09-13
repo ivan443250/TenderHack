@@ -2,6 +2,7 @@ using TenderHack.Application.Exceptions;
 using TenderHack.Application.Knowledge;
 using TenderHack.Application.Ports;
 using TenderHack.Domain.Cases;
+using TenderHack.Domain.Common;
 using TenderHack.Domain.Feedback;
 
 namespace TenderHack.Application.UseCases;
@@ -39,8 +40,8 @@ public sealed class SubmitFeedbackUseCase(
 
         await events.PublishAsync(caseId, new CaseEvent("FEEDBACK_SUBMITTED", null, null, now, new Dictionary<string, object?>
         {
-            ["specialist_rating"] = specialistRating?.ToString(),
-            ["information_quality_rating"] = informationQualityRating?.ToString(),
+            ["specialist_rating"] = specialistRating.ToWire(),
+            ["information_quality_rating"] = informationQualityRating.ToWire(),
             ["solved"] = solved,
         }), ct);
 
@@ -49,7 +50,7 @@ public sealed class SubmitFeedbackUseCase(
         if (@case.ResolutionStatus != resolutionBefore)
         {
             await events.PublishAsync(caseId, new CaseEvent("CASE_RESOLUTION_CHANGED", null, null, now,
-                new Dictionary<string, object?> { ["resolution_status"] = @case.ResolutionStatus.ToString() }), ct);
+                new Dictionary<string, object?> { ["resolution_status"] = @case.ResolutionStatus.ToWire() }), ct);
         }
 
         var turnId = @case.Turns.Count > 0 ? @case.Turns[^1].Id.ToString() : caseId.ToString();
@@ -61,7 +62,7 @@ public sealed class SubmitFeedbackUseCase(
             specialistRating,
             informationQualityRating,
             SpecialistRef: @case.Handoff?.AssignedSpecialist?.Ref,
-            IntegrationMode: @case.Handoff?.IntegrationMode?.ToString(),
+            IntegrationMode: @case.Handoff?.IntegrationMode.ToWire(),
             solved,
             commentText));
 

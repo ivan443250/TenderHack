@@ -13,6 +13,10 @@ public sealed class ProfanityMatcherTests
     [InlineData("это полный п1здец")] // leet digit inside the word
     [InlineData("cyka, опять")] // Latin look-alikes
     [InlineData("ну ты и блядё")] // ё inside the word tail
+    [InlineData("пошли вы нахуй")] // glued prefix "на-" onto the root
+    [InlineData("да меня уже заебал этот портал")] // glued prefix "за-" onto the "еб" root
+    [InlineData("можно просто охуеть с этой формы")] // glued prefix "о-" onto the root
+    [InlineData("ёбаный сайт опять лежит")] // ё-spelling of the root
     public void ConfirmedTermIsNotAmbiguous(string text)
     {
         var match = ProfanityMatcher.Evaluate(text);

@@ -145,7 +145,7 @@ public sealed class HandoffUseCasesTests
         Assert.Equal(1, unitOfWork.SaveChangesCallCount);
         var published = Assert.Single(events.Published, e => e.Event.Type == "HANDOFF_STATUS");
         // web-api-v0.md §4.2: the payload is the full current handoff view, not just this update's delta.
-        Assert.Equal("SimulatedAccepted", published.Event.Payload["status"]);
+        Assert.Equal("SIMULATED_ACCEPTED", published.Event.Payload["status"]);
         Assert.Equal("ext-1", published.Event.Payload["external_case_id"]);
         Assert.False((bool)published.Event.Payload["stale"]!);
         Assert.Equal(new[] { "stage" }, published.Event.Payload["changed"]);

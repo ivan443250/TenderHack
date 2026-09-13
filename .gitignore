@@ -34,6 +34,8 @@ dist/
 .vite/
 coverage/
 *.tsbuildinfo
+src/web/vite.config.js
+src/web/vite.config.d.ts
 
 # Local models / ML artifacts
 models/

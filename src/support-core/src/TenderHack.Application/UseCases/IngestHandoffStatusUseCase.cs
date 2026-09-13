@@ -2,6 +2,7 @@ using TenderHack.Application.Exceptions;
 using TenderHack.Application.Orchestration;
 using TenderHack.Application.Ports;
 using TenderHack.Domain.Cases;
+using TenderHack.Domain.Common;
 using TenderHack.Domain.Handoffs;
 
 namespace TenderHack.Application.UseCases;
@@ -54,19 +55,19 @@ public sealed class IngestHandoffStatusUseCase(
         var handoff = @case.Handoff!;
         var eventId = await events.PublishAsync(caseId, new CaseEvent("HANDOFF_STATUS", null, null, now, new Dictionary<string, object?>
         {
-            ["status"] = handoff.Status.ToString(),
-            ["integration_mode"] = handoff.IntegrationMode?.ToString(),
+            ["status"] = handoff.Status.ToWire(),
+            ["integration_mode"] = handoff.IntegrationMode.ToWire(),
             ["external_case_id"] = handoff.ExternalCaseId,
             ["stage"] = handoff.Stage is { } hs ? new { code = hs.Code, display_name = hs.DisplayName } : null,
             ["assigned_specialist"] = handoff.AssignedSpecialist is { } spec ? new { @ref = spec.Ref, display_name = spec.DisplayName } : null,
-            ["terminal"] = handoff.Terminal?.ToString(),
+            ["terminal"] = handoff.Terminal.ToWire(),
             ["stale"] = handoff.Stale,
             ["updated_at"] = now,
             ["changed"] = changed,
         }), ct);
 
         notifications.Enqueue(@case.OwnerId, caseId, "HANDOFF_UPDATED", "Обновление по обращению",
-            BuildHandoffUpdateBody(stage, assignedSpecialist), handoff.IntegrationMode?.ToString(), eventId);
+            BuildHandoffUpdateBody(stage, assignedSpecialist), handoff.IntegrationMode.ToWire(), eventId);
 
         if (terminal is not null && conversationStatusBefore == ConversationStatus.Active)
         {

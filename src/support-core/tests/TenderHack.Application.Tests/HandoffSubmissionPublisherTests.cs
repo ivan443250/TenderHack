@@ -40,12 +40,12 @@ public sealed class HandoffSubmissionPublisherTests
 
         var published = Assert.Single(events.Published);
         Assert.Equal("HANDOFF_STATUS", published.Event.Type);
-        Assert.Equal("Accepted", published.Event.Payload["status"]);
+        Assert.Equal("ACCEPTED", published.Event.Payload["status"]);
         Assert.Equal(new[] { "status" }, published.Event.Payload["changed"]);
 
         var notification = Assert.Single(notifications.Enqueued);
         Assert.Equal("HANDOFF_UPDATED", notification.Type);
-        Assert.Equal("Real", notification.IntegrationMode);
+        Assert.Equal("REAL", notification.IntegrationMode);
     }
 
     [Fact]
@@ -60,10 +60,10 @@ public sealed class HandoffSubmissionPublisherTests
         await sut.PublishAsync(@case, safeMessage: null, DateTimeOffset.UtcNow, CancellationToken.None);
 
         var published = Assert.Single(events.Published);
-        Assert.Equal("SimulatedAccepted", published.Event.Payload["status"]);
+        Assert.Equal("SIMULATED_ACCEPTED", published.Event.Payload["status"]);
 
         var notification = Assert.Single(notifications.Enqueued);
-        Assert.Equal("Simulated", notification.IntegrationMode);
+        Assert.Equal("SIMULATED", notification.IntegrationMode);
         Assert.Contains("демо", notification.Body, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -79,7 +79,7 @@ public sealed class HandoffSubmissionPublisherTests
         await sut.PublishAsync(@case, safeMessage: "Демо-адаптер отклонил обращение.", DateTimeOffset.UtcNow, CancellationToken.None);
 
         var published = Assert.Single(events.Published);
-        Assert.Equal("Failed", published.Event.Payload["status"]);
+        Assert.Equal("FAILED", published.Event.Payload["status"]);
         Assert.Equal("Демо-адаптер отклонил обращение.", published.Event.Payload["safe_message"]);
 
         var notification = Assert.Single(notifications.Enqueued);

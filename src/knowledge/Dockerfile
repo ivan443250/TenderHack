@@ -9,9 +9,12 @@ COPY pyproject.toml ./
 COPY src ./src
 COPY alembic.ini ./
 COPY migrations ./migrations
+COPY docker-entrypoint.sh ./
 
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir .
+    && pip install --no-cache-dir . \
+    && chmod +x ./docker-entrypoint.sh
 
 EXPOSE 8000
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["uvicorn", "tenderhack_knowledge.main:app", "--host", "0.0.0.0", "--port", "8000"]

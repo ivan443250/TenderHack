@@ -1,3 +1,5 @@
+import logging
+import sys
 from functools import lru_cache
 from typing import Annotated
 from uuid import UUID
@@ -44,6 +46,7 @@ from tenderhack_knowledge.retrieval import LexicalRetriever
 from tenderhack_knowledge.understanding import understand_query
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=1)
@@ -72,6 +75,13 @@ def get_generator() -> LocalOpenAIChatGenerator:
 
 def _internal_error(message: str) -> HTTPException:
     from tenderhack_knowledge.contracts.v0 import ErrorCode
+
+    # Log with the original traceback (when raised via `raise _internal_error(...) from exc` inside an
+    # except block) so a 500 is diagnosable from server logs instead of only the opaque client message.
+    if sys.exc_info()[0] is not None:
+        logger.exception(message)
+    else:
+        logger.error(message)
 
     return HTTPException(status_code=500, detail={"code": ErrorCode.INTERNAL_ERROR.value, "message": message})
 
