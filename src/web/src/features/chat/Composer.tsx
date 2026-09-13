@@ -57,7 +57,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
         placeholder={placeholder}
         disabled={disabled}
         autoFocus={autoFocus}
-        className="min-w-0 flex-1 bg-transparent text-sm text-[var(--content-primary)] outline-none placeholder:text-[var(--content-tertiary)] disabled:opacity-60"
+        className="min-w-0 flex-1 border-0 bg-transparent text-sm text-[var(--content-primary)] outline-none shadow-none ring-0 placeholder:text-[var(--content-tertiary)] focus-visible:outline-none focus-visible:shadow-none focus-visible:ring-0 disabled:opacity-60"
       />
       <button
         type="submit"

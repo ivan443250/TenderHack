@@ -13,6 +13,7 @@ namespace TenderHack.Api.Contracts;
 /// </summary>
 public sealed record CaseListItemResponse(
     string CaseId,
+    string Title,
     ConversationStatus ConversationStatus,
     ResolutionStatus ResolutionStatus,
     DateTimeOffset LastActivityAt,

@@ -126,6 +126,7 @@ export type CaseSnapshot = {
 
 export type CaseListItem = {
   case_id: string;
+  title: string;
   conversation_status: ConversationStatus;
   resolution_status: ResolutionStatus;
   last_activity_at: string;

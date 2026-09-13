@@ -1,7 +1,8 @@
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { CaseSnapshot } from "../../api/types";
-import { deriveRequestStage, FAILED_STAGE } from "./RequestStatusStepper";
+import { deriveRequestStage, RequestStatusStepper } from "./RequestStatusStepper";
 
 function snapshot(overrides: Partial<CaseSnapshot>): CaseSnapshot {
   return {
@@ -22,16 +23,38 @@ function snapshot(overrides: Partial<CaseSnapshot>): CaseSnapshot {
 }
 
 describe("deriveRequestStage", () => {
-  it("returns the FAILED sentinel for a failed turn instead of step 1 (B6)", () => {
-    const stage = deriveRequestStage(snapshot({ active_turn: { turn_id: "t1", revision: 1, status: "FAILED" } }));
+  it("is visible only while a turn is being processed", () => {
+    const processing = snapshot({ active_turn: { turn_id: "t1", revision: 1, status: "QUEUED" } });
 
-    expect(stage).toBe(FAILED_STAGE);
-    expect(stage).not.toBe(1);
+    render(<RequestStatusStepper snapshot={processing} />);
+    expect(screen.getByText("Этап 1 из 4")).toBeInTheDocument();
+    expect(deriveRequestStage(processing)).toBe(1);
   });
 
-  it("still returns step 1 for a freshly queued turn", () => {
-    const stage = deriveRequestStage(snapshot({ active_turn: { turn_id: "t1", revision: 1, status: "QUEUED" } }));
+  it("is hidden after an ANSWER", () => {
+    const answered = snapshot({
+      last_decision: "ANSWER",
+      active_turn: { turn_id: "t1", revision: 1, status: "COMPLETED" }
+    });
 
-    expect(stage).toBe(1);
+    const { container } = render(<RequestStatusStepper snapshot={answered} />);
+    expect(container).toBeEmptyDOMElement();
+    expect(deriveRequestStage(answered)).toBeNull();
+  });
+
+  it("is hidden after a CLARIFY", () => {
+    const clarified = snapshot({
+      last_decision: "CLARIFY",
+      active_turn: { turn_id: "t1", revision: 1, status: "COMPLETED" }
+    });
+
+    const { container } = render(<RequestStatusStepper snapshot={clarified} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("is hidden for a failed turn rather than presenting it as progress", () => {
+    const stage = deriveRequestStage(snapshot({ active_turn: { turn_id: "t1", revision: 1, status: "FAILED" } }));
+
+    expect(stage).toBeNull();
   });
 });

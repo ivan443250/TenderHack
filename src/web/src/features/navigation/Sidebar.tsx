@@ -6,6 +6,15 @@ import { PortalLogo, PortalMark } from "../../design-system/Brand";
 import { EditIcon, SidebarToggleIcon, DotIcon, TrashIcon } from "../../design-system/icons";
 import type { CaseListItem } from "../../api/types";
 
+const MAX_CASE_TITLE_LENGTH = 36;
+
+export function formatCaseTitle(title: string | null | undefined): string {
+  const normalized = title?.trim().replace(/\s+/g, " ") ?? "";
+  if (!normalized) return "Новый чат";
+  if (normalized.length <= MAX_CASE_TITLE_LENGTH) return normalized;
+  return `${normalized.slice(0, MAX_CASE_TITLE_LENGTH - 1).trimEnd()}…`;
+}
+
 type SidebarProps = {
   recentCases: CaseListItem[];
   archivedCases: CaseListItem[];
@@ -32,7 +41,7 @@ function HistoryItem({
   errorMessage?: string;
 }) {
   const [confirming, setConfirming] = useState(false);
-  const label = item.case_id.slice(0, 8);
+  const label = formatCaseTitle(item.title);
 
   if (confirming) {
     return (
@@ -62,8 +71,8 @@ function HistoryItem({
           active ? "bg-[var(--surface-subtle)] text-[var(--content-primary)]" : "text-[var(--content-secondary)] hover:bg-[var(--surface-subtle)]"
         }`}
       >
-        <Link to={`/cases/${item.case_id}`} className="min-w-0 flex-1 truncate">
-          Чат {label}
+        <Link to={`/cases/${item.case_id}`} className="min-w-0 flex-1 truncate" title={label}>
+          {label}
         </Link>
         {item.unread_notifications > 0 && <DotIcon className="size-6 shrink-0 text-[var(--action-primary)]" />}
         <button

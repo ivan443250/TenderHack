@@ -39,7 +39,8 @@ public static class CaseEndpoints
         });
 
         app.MapGet("/api/v0/cases", async (
-            HttpContext context, string? status, ListCasesUseCase useCase, INotificationReader notifications, CancellationToken ct) =>
+            HttpContext context, string? status, ListCasesUseCase useCase, INotificationReader notifications,
+            ICaseEventReader events, CancellationToken ct) =>
         {
             if (OwnerSession.TryGet(context) is not { } ownerId)
             {
@@ -53,9 +54,10 @@ public static class CaseEndpoints
             // case list is small at hackathon scale and this keeps `GET /cases` a single round trip.
             var unread = await notifications.ListAsync(ownerId, after: 0, unreadOnly: true, ct);
             var unreadByCaseId = unread.GroupBy(n => n.CaseId).ToDictionary(g => g.Key, g => g.Count());
+            var firstMessages = await events.ListFirstUserMessageTextsAsync([.. cases.Select(c => c.Id)], ct);
 
             return Results.Ok(cases
-                .Select(c => CaseMapper.ToListItem(c, unreadByCaseId.GetValueOrDefault(c.Id)))
+                .Select(c => CaseMapper.ToListItem(c, unreadByCaseId.GetValueOrDefault(c.Id), firstMessages.GetValueOrDefault(c.Id)))
                 .ToArray());
         });
 

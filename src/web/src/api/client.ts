@@ -27,7 +27,7 @@ export type ApiClientOptions = {
   fetchImpl?: typeof fetch;
 };
 
-function idempotencyKey(): string {
+function newIdempotencyKey(): string {
   return crypto.randomUUID();
 }
 
@@ -37,18 +37,19 @@ export function createApiClient(options: ApiClientOptions = {}) {
 
   async function request<T>(
     path: string,
-    init: RequestInit & { idempotent?: boolean } = {}
+    init: RequestInit & { idempotent?: boolean; idempotencyKey?: string } = {}
   ): Promise<T> {
+    const { idempotent, idempotencyKey, ...requestInit } = init;
     const headers = new Headers(init.headers);
     if (init.body && !headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
     }
-    if (init.idempotent) {
-      headers.set("Idempotency-Key", idempotencyKey());
+    if (idempotencyKey || idempotent) {
+      headers.set("Idempotency-Key", idempotencyKey ?? newIdempotencyKey());
     }
 
     const response = await fetchImpl(`${baseUrl}${path}`, {
-      ...init,
+      ...requestInit,
       headers,
       credentials: "include"
     });
@@ -99,7 +100,8 @@ export function createApiClient(options: ApiClientOptions = {}) {
     async sendMessage(caseId: string, text: string, clientMessageId: string): Promise<SendMessageResponse> {
       return request<SendMessageResponse>(`/v0/cases/${encodeURIComponent(caseId)}/messages`, {
         method: "POST",
-        body: JSON.stringify({ text, client_message_id: clientMessageId })
+        body: JSON.stringify({ text, client_message_id: clientMessageId }),
+        idempotencyKey: clientMessageId
       });
     },
 

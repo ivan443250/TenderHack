@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import type { ApiClient } from "../../api/client";
+import type { InitialCaseMessage } from "../../state/caseStore";
 import { Composer, type ComposerHandle } from "../chat/Composer";
 import { SuggestionChip } from "../../design-system/Chip";
 import { InteractiveGlow } from "./InteractiveGlow";
@@ -26,9 +27,9 @@ export function HomeScreen({ api }: { api: ApiClient }) {
     setBusy(true);
     try {
       const created = await api.createCase();
-      await api.sendMessage(created.case_id, text, crypto.randomUUID());
-      navigate(`/cases/${created.case_id}`);
-    } finally {
+      const initialMessage: InitialCaseMessage = { text, clientMessageId: crypto.randomUUID() };
+      navigate(`/cases/${created.case_id}`, { state: { initialMessage, initialSnapshot: created } });
+    } catch {
       setBusy(false);
     }
   }

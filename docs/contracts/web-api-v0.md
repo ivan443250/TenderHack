@@ -47,7 +47,7 @@ Route names and semantics below are the `v0` public contract. A rename/removal o
 | Capability | Route | Semantics |
 |---|---|---|
 | Owner session | `POST /api/v0/session` | issues/refreshes the anonymous owner cookie (§13); idempotent |
-| List cases | `GET /api/v0/cases?status=active\|archived` | owner-scoped list with `last_activity_at`, `unread_notifications` |
+| List cases | `GET /api/v0/cases?status=active\|archived` | owner-scoped list with first-message `title`, `last_activity_at`, `unread_notifications` |
 | Create case | `POST /api/v0/cases` | creates/restores one chat case; idempotent |
 | Read case snapshot | `GET /api/v0/cases/{case_id}` | full server state for reload/recovery |
 | Send user message | `POST /api/v0/cases/{case_id}/messages` | persists user input and starts new turn/revision; `409 CASE_CLOSED` on a completed case |
@@ -69,6 +69,22 @@ Route names and semantics below are the `v0` public contract. A rename/removal o
 State-changing calls accept `Idempotency-Key` where browser retry is plausible.
 
 ## 4. Core response shapes
+
+`GET /api/v0/cases` returns compact list items. `title` is an additive server-derived preview of
+the first persisted `USER_MESSAGE` (up to 36 characters); cases without one use `Новый чат`.
+The list is produced in a bounded number of database reads and never requires one snapshot request
+per sidebar item.
+
+```json
+{
+  "case_id": "...",
+  "title": "Как создать СТЕ для оферты?",
+  "conversation_status": "ACTIVE",
+  "resolution_status": "UNKNOWN",
+  "last_activity_at": "2026-09-13T12:00:00Z",
+  "unread_notifications": 0
+}
+```
 
 ### 4.1. `CaseSnapshot`
 

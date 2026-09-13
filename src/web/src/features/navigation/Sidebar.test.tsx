@@ -7,9 +7,10 @@ import { Sidebar } from "./Sidebar";
 
 afterEach(cleanup);
 
-function item(caseId: string): CaseListItem {
+function item(caseId: string, title = "Как создать СТЕ для оферты?"): CaseListItem {
   return {
     case_id: caseId,
+    title,
     conversation_status: "ACTIVE",
     resolution_status: "UNKNOWN",
     last_activity_at: new Date().toISOString(),
@@ -52,7 +53,7 @@ describe("Sidebar hide-case control (E1)", () => {
     fireEvent.click(screen.getByText("Нет"));
 
     expect(onHideCase).not.toHaveBeenCalled();
-    expect(screen.getByText("Чат case-123")).toBeInTheDocument();
+    expect(screen.getByText("Как создать СТЕ для оферты?")).toBeInTheDocument();
   });
 
   it("shows the handoff-in-progress error under the matching item", () => {
@@ -62,5 +63,28 @@ describe("Sidebar hide-case control (E1)", () => {
     });
 
     expect(screen.getByText("Сначала дождитесь завершения обращения у специалиста.")).toBeInTheDocument();
+  });
+
+  it("shows a question preview instead of any case id", () => {
+    renderSidebar(vi.fn());
+
+    expect(screen.getByText("Как создать СТЕ для оферты?")).toBeInTheDocument();
+    expect(screen.queryByText(/case-123/)).not.toBeInTheDocument();
+  });
+
+  it("truncates an overlong title to 36 characters with an ellipsis", () => {
+    const longTitle = "Что делать при ошибке отправки документа исполнения и повторной ошибке";
+    renderSidebar(vi.fn(), { recentCases: [item("case-12345678", longTitle)] });
+
+    const link = screen.getByRole("link", { name: /Что делать при ошибке отправки/ });
+    expect(link.textContent).toHaveLength(36);
+    expect(link.textContent).toMatch(/…$/);
+    expect(link).toHaveClass("truncate");
+  });
+
+  it("uses 'Новый чат' when an old case has no title", () => {
+    renderSidebar(vi.fn(), { recentCases: [item("case-12345678", "")] });
+
+    expect(screen.getByTitle("Новый чат")).toBeInTheDocument();
   });
 });

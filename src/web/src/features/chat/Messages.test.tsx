@@ -1,7 +1,9 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { AssistantResponse, ClarificationNotice, ModerationWarningNotice, NoConfirmedAnswerNotice, OutOfScopeNotice } from "./Messages";
+
+afterEach(cleanup);
 
 describe("ClarificationNotice", () => {
   it("renders mapped questions when provided (B1)", () => {
