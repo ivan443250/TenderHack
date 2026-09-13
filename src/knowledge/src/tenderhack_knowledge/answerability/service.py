@@ -16,6 +16,8 @@ from tenderhack_knowledge.conditions.cards import CardMatchContext, ConditionCar
 from tenderhack_knowledge.contracts.v0 import AnswerabilityResponse, EvidenceSufficiency
 from tenderhack_knowledge.ingestion.models import Corpus, KnowledgeFragment, KnowledgeSnapshot
 from tenderhack_knowledge.ingestion.repository import CorpusBoundaryError, UnknownSnapshotError
+from tenderhack_knowledge.historical_support.importer import HISTORICAL_KIND
+from tenderhack_knowledge.historical_support.matching import rank_historical_matches
 
 
 class AnswerabilityRepository(Protocol):
@@ -371,13 +373,16 @@ async def assess_answerability(
     snapshot = await _maybe_await(repository.get_snapshot(snapshot_id))
     if snapshot is None:
         raise UnknownSnapshotError(snapshot_id)
-    if snapshot.corpus != Corpus.NORMATIVE:
-        raise CorpusBoundaryError(f"answerability requires a normative snapshot, got {snapshot.corpus.value}")
     fragments = tuple(await _maybe_await(repository.snapshot_fragments(snapshot_id)))
     by_id = {fragment.fragment_id: fragment for fragment in fragments}
     requested_ids = tuple(dict.fromkeys(str(value) for value in candidate_fragment_ids))
     invalid_ids = tuple(fragment_id for fragment_id in requested_ids if fragment_id not in by_id)
     evidence = tuple(fragment for fragment_id in requested_ids if (fragment := by_id.get(fragment_id)) is not None and fragment.text.strip())
+
+    if snapshot.corpus == Corpus.HISTORICAL:
+        return _assess_historical(query, requested_ids, invalid_ids, evidence)
+    if snapshot.corpus != Corpus.NORMATIVE:
+        raise CorpusBoundaryError(f"unsupported answerability corpus: {snapshot.corpus.value}")
 
     risk_flags: list[str] = []
     missing: list[str] = []
@@ -528,4 +533,45 @@ async def assess_answerability(
         missing_conditions=tuple(dict.fromkeys(missing)),
         risk_flags=tuple(dict.fromkeys(risk_flags)),
         dimensions=dimensions,
+    )
+
+
+def _assess_historical(
+    query: str,
+    requested_ids: tuple[str, ...],
+    invalid_ids: tuple[str, ...],
+    evidence: tuple[KnowledgeFragment, ...],
+) -> AnswerabilityAssessment:
+    """Accept only one strong, verified historical match.
+
+    The outer orchestrator invokes this branch only after normative evidence
+    was insufficient. This function still fails closed on mixed kinds,
+    invalid IDs, weak similarity, contradictions, or terse solutions.
+    """
+
+    valid = tuple(fragment for fragment in evidence if fragment.kind == HISTORICAL_KIND and fragment.review_status == "VERIFIED")
+    if invalid_ids or len(valid) != len(evidence) or not requested_ids:
+        return AnswerabilityAssessment(
+            evidence_sufficiency=EvidenceSufficiency.INSUFFICIENT,
+            evidence_fragment_ids=(),
+            missing_conditions=(),
+            risk_flags=(),
+            dimensions=EvidenceDimensionResult(bool(valid), False, False, False, False),
+        )
+    ranked = rank_historical_matches(query, valid)
+    best = ranked[0] if ranked else None
+    if best is None or not best.strong:
+        return AnswerabilityAssessment(
+            evidence_sufficiency=EvidenceSufficiency.INSUFFICIENT,
+            evidence_fragment_ids=(),
+            missing_conditions=(),
+            risk_flags=(),
+            dimensions=EvidenceDimensionResult(bool(valid), False, False, False, False),
+        )
+    return AnswerabilityAssessment(
+        evidence_sufficiency=EvidenceSufficiency.SUFFICIENT,
+        evidence_fragment_ids=(best.fragment.fragment_id,),
+        missing_conditions=(),
+        risk_flags=(),
+        dimensions=EvidenceDimensionResult(True, True, True, True, False),
     )

@@ -61,6 +61,10 @@ class KnowledgeFragment(BaseModel):
     section: str | None = None
     kind: str
     heading_path: tuple[str, ...] = ()
+    # Normative fragments search and cite the same source text. Historical
+    # support records search the sanitized ticket description but cite only
+    # the separately sanitized, organizer-verified solution.
+    search_text: str | None = None
     text: str
     source_anchor: SourceAnchor
     actor_roles: tuple[str, ...] | None = None

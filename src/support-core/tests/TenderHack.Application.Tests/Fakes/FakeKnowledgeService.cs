@@ -37,13 +37,17 @@ public sealed class FakeKnowledgeService : IKnowledgeService
 
     /// <summary>When set, returned by the first call only; subsequent calls fall back to the default candidate (B4's expand-once retry needs two distinguishable responses).</summary>
     public RetrieveResult? FirstRetrieveResult { get; set; }
+    public RetrieveResult HistoricalRetrieveResult { get; set; } =
+        new("historical-empty-v1", "historical-lexical-v1", []);
 
     public Task<RetrieveResult> RetrieveAsync(RetrieveRequest request, KnowledgeRequestContext context, CancellationToken ct)
     {
         ThrowIfConfiguredToFail(nameof(RetrieveAsync));
         LastRetrieveRequest = request;
         RetrieveRequests.Add(request);
-        var result = RetrieveRequests.Count == 1 && FirstRetrieveResult is { } first
+        var result = request.Corpus == Corpus.Historical
+            ? HistoricalRetrieveResult
+            : RetrieveRequests.Count == 1 && FirstRetrieveResult is { } first
             ? first
             : new RetrieveResult("snapshot-1", "stub-v0", [new RetrievalCandidate("frag-1", "doc-1", 1, null)]);
         return Task.FromResult(result);

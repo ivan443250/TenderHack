@@ -11,6 +11,7 @@ from tenderhack_knowledge.contracts.v0 import (
     AcceptedResponse,
     AnswerabilityRequest,
     AnswerabilityResponse,
+    Corpus,
     DraftRequest,
     DraftResponse,
     ErrorResponse,
@@ -205,6 +206,15 @@ async def retrieve(
     request = payload.model_copy(update={"exact_codes": exact_codes})
     try:
         retriever = LexicalRetriever(repository)
+        if request.corpus == Corpus.HISTORICAL and request.snapshot_id is None:
+            historical_snapshot = await repository.get_current_snapshot("HISTORICAL")
+            if historical_snapshot is None:
+                return RetrieveResponse(
+                    snapshot_id="historical-empty-v1",
+                    retrieval_config_version="historical-lexical-v1",
+                    candidates=[],
+                )
+            request = request.model_copy(update={"snapshot_id": historical_snapshot.snapshot_id})
         result = await retriever.retrieve(
             request,
             mode="hybrid",
@@ -400,12 +410,13 @@ async def source(fragment_id: str, x_trace_id: TraceIdHeader) -> SourceResponse:
         raise _internal_error("no current normative snapshot") from exc
     except Exception as exc:  # pragma: no cover - depends on external DB
         raise _internal_error("unable to resolve source fragment") from exc
+    historical = resolution.kind == "HISTORICAL_SUPPORT_SOLUTION"
     return SourceResponse(
-        document_id=resolution.document_id,
-        title=_safe_title(resolution.original_filename),
+        document_id="historical-support" if historical else resolution.document_id,
+        title="Проверенное решение службы поддержки" if historical else _safe_title(resolution.original_filename),
         version=resolution.declared_version or resolution.document_version_id,
-        page=resolution.page_start,
-        anchor=_anchor_text(resolution),
+        page=None if historical else resolution.page_start,
+        anchor=None if historical else _anchor_text(resolution),
         text=resolution.text,
         snapshot_id=resolution.snapshot_id or "",
     )

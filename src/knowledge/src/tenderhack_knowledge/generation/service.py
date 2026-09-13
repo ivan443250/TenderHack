@@ -121,7 +121,7 @@ class GroundedDraftService:
             generator = self.generator_factory()
         if generator is None:
             raise GeneratorUnavailableError("local generator is unavailable")
-        fragments = await _normative_fragments(self.repository, payload.snapshot_id, payload.evidence_fragment_ids)
+        fragments = await _evidence_fragments(self.repository, payload.snapshot_id, payload.evidence_fragment_ids)
         prompt = build_draft_prompt(payload.query, fragments, payload.constraints)
         # Request the smallest structured-output mode supported by the
         # OpenAI-compatible local runtime.  The parser below remains strict:
@@ -205,21 +205,27 @@ async def create_grounded_draft(
     return await GroundedDraftService(repository, generator, generator_factory=generator_factory).generate(payload)
 
 
-async def _normative_fragments(repository: Any, snapshot_id: str, requested_ids: list[str]) -> tuple[KnowledgeFragment, ...]:
+async def _evidence_fragments(repository: Any, snapshot_id: str, requested_ids: list[str]) -> tuple[KnowledgeFragment, ...]:
     snapshot = repository.get_snapshot(snapshot_id)
     if inspect.isawaitable(snapshot):
         snapshot = await snapshot
     if snapshot is None:
         raise UnknownSnapshotError(snapshot_id)
-    if snapshot.corpus != Corpus.NORMATIVE:
-        raise CorpusBoundaryError(f"draft requires a normative snapshot, got {snapshot.corpus.value}")
+    if snapshot.corpus not in {Corpus.NORMATIVE, Corpus.HISTORICAL}:
+        raise CorpusBoundaryError(f"draft does not support snapshot corpus {snapshot.corpus.value}")
     values = repository.snapshot_fragments(snapshot_id)
     if inspect.isawaitable(values):
         values = await values
     by_id = {fragment.fragment_id: fragment for fragment in values}
     # The answerability gate already rejects a partial invalid candidate set;
     # retain caller ordering for reproducible prompts and provenance.
-    return tuple(by_id[fragment_id] for fragment_id in dict.fromkeys(requested_ids))
+    selected = tuple(by_id[fragment_id] for fragment_id in dict.fromkeys(requested_ids))
+    if snapshot.corpus == Corpus.HISTORICAL and any(
+        fragment.kind != "HISTORICAL_SUPPORT_SOLUTION" or fragment.review_status != "VERIFIED"
+        for fragment in selected
+    ):
+        raise CorpusBoundaryError("historical draft requires verified support-solution evidence")
+    return selected
 
 
 def _is_unavailable(error: GeneratorClientError) -> bool:

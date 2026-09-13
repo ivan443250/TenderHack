@@ -235,9 +235,10 @@ public sealed class TurnOrchestratorTests
         var outcome = await sut.RunAsync(@case, "код РДИК_9999 не работает", CancellationToken.None);
 
         Assert.Equal(Decision.HandoffOffer, outcome.Decision);
-        Assert.Equal(2, _knowledge.RetrieveRequests.Count);
+        Assert.Equal(3, _knowledge.RetrieveRequests.Count);
         Assert.Equal(["РДИК_9999"], _knowledge.RetrieveRequests[0].ExactCodes);
         Assert.Empty(_knowledge.RetrieveRequests[1].ExactCodes);
+        Assert.Equal(Corpus.Historical, _knowledge.RetrieveRequests[2].Corpus);
         var handoffEvent = _events.Published.Last(e => e.Event.Type == "HANDOFF_OFFER");
         var reasonCodes = Assert.IsAssignableFrom<IReadOnlyList<string>>(handoffEvent.Event.Payload["reason_codes"]);
         Assert.Contains("EXPANDED_RETRY", reasonCodes);
@@ -271,7 +272,70 @@ public sealed class TurnOrchestratorTests
         var outcome = await sut.RunAsync(@case, "просто вопрос без кода", CancellationToken.None);
 
         Assert.Equal(Decision.HandoffOffer, outcome.Decision);
+        Assert.Equal(2, _knowledge.RetrieveRequests.Count);
+        Assert.Equal(Corpus.Normative, _knowledge.RetrieveRequests[0].Corpus);
+        Assert.Equal(Corpus.Historical, _knowledge.RetrieveRequests[1].Corpus);
+    }
+
+    [Fact]
+    public async Task NormativeSufficientNeverCallsHistoricalFallback()
+    {
+        var sut = CreateSut();
+        var @case = NewCase();
+        _knowledge.HistoricalRetrieveResult = new RetrieveResult(
+            "historical-1", "historical-lexical-v1",
+            [new RetrievalCandidate("hist-1", "historical-support", null, null, "Проверенное решение службы поддержки")]);
+
+        var outcome = await sut.RunAsync(@case, "Как создать СТЕ для оферты?", CancellationToken.None);
+
+        Assert.Equal(Decision.Answer, outcome.Decision);
         Assert.Single(_knowledge.RetrieveRequests);
+        Assert.Equal(Corpus.Normative, _knowledge.RetrieveRequests[0].Corpus);
+    }
+
+    [Fact]
+    public async Task StrongHistoricalMatchRescuesNormativeInsufficiency()
+    {
+        var sut = CreateSut();
+        var @case = NewCase();
+        _knowledge.AnswerabilitySequence = new Queue<AnswerabilityResult>(
+        [
+            new AnswerabilityResult(EvidenceSufficiency.Insufficient, [], [], []),
+            new AnswerabilityResult(EvidenceSufficiency.Sufficient, ["hist-1"], [], []),
+        ]);
+        _knowledge.HistoricalRetrieveResult = new RetrieveResult(
+            "historical-1", "historical-lexical-v1",
+            [new RetrievalCandidate("hist-1", "historical-support", null, null, "Проверенное решение службы поддержки")]);
+        _knowledge.Draft = new DraftResult("Проверенное решение.", [new DraftClaim("claim-1", "Проверенное решение.", ["hist-1"])], "stub-v0");
+        _knowledge.Verify = new VerifyResult([new ClaimVerification("claim-1", Supported: true, ["hist-1"])]);
+
+        var outcome = await sut.RunAsync(@case, "В УПД не пересчитывается сумма после удаления позиций", CancellationToken.None);
+
+        Assert.Equal(Decision.Answer, outcome.Decision);
+        Assert.Equal(Corpus.Historical, _knowledge.RetrieveRequests[1].Corpus);
+        var source = Assert.Single(outcome.Sources!);
+        Assert.Equal("Проверенное решение службы поддержки", source.Title);
+        Assert.Null(source.Page);
+    }
+
+    [Fact]
+    public async Task WeakHistoricalMatchStillOffersHandoff()
+    {
+        var sut = CreateSut();
+        var @case = NewCase();
+        _knowledge.AnswerabilitySequence = new Queue<AnswerabilityResult>(
+        [
+            new AnswerabilityResult(EvidenceSufficiency.Insufficient, [], [], []),
+            new AnswerabilityResult(EvidenceSufficiency.Insufficient, [], [], []),
+        ]);
+        _knowledge.HistoricalRetrieveResult = new RetrieveResult(
+            "historical-1", "historical-lexical-v1",
+            [new RetrievalCandidate("hist-weak", "historical-support", null, null, "Проверенное решение службы поддержки")]);
+
+        var outcome = await sut.RunAsync(@case, "Не работает документ", CancellationToken.None);
+
+        Assert.Equal(Decision.HandoffOffer, outcome.Decision);
+        Assert.Empty(_knowledge.DraftRequests);
     }
 
     [Fact]

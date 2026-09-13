@@ -92,6 +92,7 @@ kb_fragments = sa.Table(
     sa.Column("section", sa.Text()),
     sa.Column("kind", sa.String(32), nullable=False),
     sa.Column("heading_path", sa.JSON(), nullable=False),
+    sa.Column("search_text", sa.Text()),
     sa.Column("text", sa.Text(), nullable=False),
     sa.Column("source_anchor", sa.JSON(), nullable=False),
     sa.Column("actor_roles", sa.JSON()),
@@ -296,11 +297,15 @@ class PostgresKnowledgeRepository:
             )
 
     async def get_current_normative_snapshot(self) -> KnowledgeSnapshot | None:
+        return await self.get_current_snapshot(Corpus.NORMATIVE)
+
+    async def get_current_snapshot(self, corpus: Corpus | str) -> KnowledgeSnapshot | None:
+        corpus_value = corpus.value if isinstance(corpus, Corpus) else str(corpus)
         async with self.engine.connect() as connection:
             row = await self._one(
                 connection,
                 select(kb_snapshots)
-                .where(kb_snapshots.c.corpus == Corpus.NORMATIVE.value)
+                .where(kb_snapshots.c.corpus == corpus_value)
                 .order_by(kb_snapshots.c.created_at.desc(), kb_snapshots.c.snapshot_id.desc())
                 .limit(1),
             )
@@ -528,8 +533,9 @@ class PostgresKnowledgeRepository:
         normalized_query = query.strip()
         safe_limit = max(1, min(int(limit), 100))
         codes = tuple(dict.fromkeys(code for code in exact_codes if code))
+        searchable_text = sa.func.coalesce(kb_fragments.c.search_text, kb_fragments.c.text)
         exact_predicates = tuple(
-            kb_fragments.c.text.ilike(f"%{_escape_like(code)}%", escape="\\")
+            searchable_text.ilike(f"%{_escape_like(code)}%", escape="\\")
             for code in codes
         )
         exact_score = sa.literal(0.0)
@@ -541,8 +547,8 @@ class PostgresKnowledgeRepository:
 
         russian_config = sa.cast(sa.literal("russian"), REGCONFIG)
         simple_config = sa.cast(sa.literal("simple"), REGCONFIG)
-        russian_vector = sa.func.to_tsvector(russian_config, kb_fragments.c.text)
-        simple_vector = sa.func.to_tsvector(simple_config, kb_fragments.c.text)
+        russian_vector = sa.func.to_tsvector(russian_config, searchable_text)
+        simple_vector = sa.func.to_tsvector(simple_config, searchable_text)
         russian_query = sa.func.websearch_to_tsquery(russian_config, normalized_query)
         simple_query = sa.func.websearch_to_tsquery(simple_config, normalized_query)
         russian_match = russian_vector.op("@@")(russian_query)
@@ -551,7 +557,7 @@ class PostgresKnowledgeRepository:
             sa.func.ts_rank_cd(russian_vector, russian_query),
             sa.func.ts_rank_cd(simple_vector, simple_query),
         )
-        trigram_score = sa.func.word_similarity(normalized_query, kb_fragments.c.text)
+        trigram_score = sa.func.word_similarity(normalized_query, searchable_text)
         channels = [*exact_predicates]
         if use_fts:
             channels.extend((russian_match, simple_match))
@@ -568,6 +574,7 @@ class PostgresKnowledgeRepository:
                 kb_documents.c.original_filename,
                 kb_fragments.c.page_start,
                 kb_fragments.c.source_anchor,
+                kb_fragments.c.search_text,
                 kb_fragments.c.text,
                 exact_score.label("exact_score"),
                 fts_score.label("fts_score"),
@@ -1018,6 +1025,7 @@ def _fragment_from_row(row: object) -> KnowledgeFragment:
         section=row["section"],
         kind=row["kind"],
         heading_path=tuple(row["heading_path"] or ()),
+        search_text=row.get("search_text"),
         text=row["text"],
         source_anchor=SourceAnchor.model_validate(row["source_anchor"]),
         actor_roles=tuple(row["actor_roles"]) if row["actor_roles"] is not None else None,

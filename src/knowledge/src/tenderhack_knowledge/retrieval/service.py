@@ -8,6 +8,7 @@ from typing import Literal
 from tenderhack_knowledge.contracts.v0 import Candidate, CandidateScores, Corpus, RetrieveRequest
 from tenderhack_knowledge.ingestion.ids import normalize_source_name
 from tenderhack_knowledge.ingestion.repository import CorpusBoundaryError, UnknownSnapshotError
+from tenderhack_knowledge.historical_support.importer import HISTORICAL_SOURCE_TITLE
 from tenderhack_knowledge.persistence.repository import PostgresKnowledgeRepository, TRIGRAM_MIN_SCORE
 from tenderhack_knowledge.understanding import normalize_query
 
@@ -66,6 +67,7 @@ class LexicalRetriever:
         )
         candidates: list[Candidate] = []
         records: list[RetrievalRecord] = []
+        historical = snapshot.corpus.value == Corpus.HISTORICAL.value
         for row in rows:
             exact = float(row["exact_score"] or 0.0)
             fts = float(row["fts_score"] or 0.0)
@@ -74,17 +76,17 @@ class LexicalRetriever:
             candidates.append(
                 Candidate(
                     fragment_id=row["fragment_id"],
-                    document_id=row["document_id"],
-                    page=row["page_start"],
-                    anchor=anchor,
-                    title=_source_title(row.get("original_filename")),
+                    document_id="historical-support" if historical else row["document_id"],
+                    page=None if historical else row["page_start"],
+                    anchor=None if historical else anchor,
+                    title=HISTORICAL_SOURCE_TITLE if historical else _source_title(row.get("original_filename")),
                     scores=CandidateScores(
                         exact=exact if exact > 0 else None,
                         fts=fts if fts > 0 else None,
                         dense=None,
                         rerank=None,
                     ),
-                    applicability_flags=[],
+                    applicability_flags=["HISTORICAL_SUPPORT_SOLUTION"] if historical else [],
                 )
             )
             channels: list[Literal["exact", "fts", "trigram"]] = []
@@ -105,11 +107,9 @@ class LexicalRetriever:
             if snapshot is None:
                 raise UnknownSnapshotError(payload.snapshot_id)
         else:
-            if payload.corpus != Corpus.NORMATIVE:
-                raise UnknownSnapshotError("historical retrieval requires an explicit snapshot")
-            snapshot = await self.repository.get_current_normative_snapshot()
+            snapshot = await self.repository.get_current_snapshot(payload.corpus.value)
             if snapshot is None:
-                raise UnknownSnapshotError("no current normative snapshot")
+                raise UnknownSnapshotError(f"no current {payload.corpus.value.casefold()} snapshot")
         if snapshot.corpus.value != payload.corpus.value:
             raise CorpusBoundaryError(
                 f"snapshot corpus {snapshot.corpus.value} does not match requested corpus {payload.corpus.value}"

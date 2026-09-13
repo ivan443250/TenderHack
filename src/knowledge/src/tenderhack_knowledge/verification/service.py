@@ -173,10 +173,15 @@ async def verify_claims(
         snapshot = await snapshot
     if snapshot is None:
         raise UnknownSnapshotError(snapshot_id)
-    if snapshot.corpus != Corpus.NORMATIVE:
-        raise CorpusBoundaryError(f"verification requires a normative snapshot, got {snapshot.corpus.value}")
+    if snapshot.corpus not in {Corpus.NORMATIVE, Corpus.HISTORICAL}:
+        raise CorpusBoundaryError(f"verification does not support snapshot corpus {snapshot.corpus.value}")
     values = repository.snapshot_fragments(snapshot_id)
     if inspect.isawaitable(values):
         values = await values
     fragments = {fragment.fragment_id: fragment for fragment in values}
+    if snapshot.corpus == Corpus.HISTORICAL and any(
+        fragment.kind != "HISTORICAL_SUPPORT_SOLUTION" or fragment.review_status != "VERIFIED"
+        for fragment in fragments.values()
+    ):
+        raise CorpusBoundaryError("historical verification requires verified support-solution evidence")
     return tuple(_verify_one(claim, fragments) for claim in claims)

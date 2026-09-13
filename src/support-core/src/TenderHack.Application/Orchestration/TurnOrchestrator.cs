@@ -345,14 +345,14 @@ public sealed class TurnOrchestrator(
                             @case, turn, messageText, understand, expandedRetrieve, expandedAnswerability, context, timings, now, ct, expandedOnce: true);
                     }
 
-                    return await OfferHandoffAsync(@case, turn, messageText, timings, now,
-                        evidenceInsufficient: true, conditionDependent: false, expandedAnswerability.RiskFlags, explicitHumanRequest: false, ct, expandedRetrieve.SnapshotId,
-                        reason: "INSUFFICIENT_EVIDENCE", extraReasonCode: "EXPANDED_RETRY", checkedFragmentIds: expandedCandidateIds);
+                    return await TryHistoricalFallbackAsync(
+                        @case, turn, messageText, understand, expandedRetrieve, expandedAnswerability,
+                        context, timings, now, ct, extraReasonCode: "EXPANDED_RETRY");
                 }
 
-                return await OfferHandoffAsync(@case, turn, messageText, timings, now,
-                    evidenceInsufficient: true, conditionDependent: false, answerability.RiskFlags, explicitHumanRequest: false, ct, retrieve.SnapshotId,
-                    reason: "INSUFFICIENT_EVIDENCE", checkedFragmentIds: retrieve.Candidates.Select(c => c.FragmentId).ToArray());
+                return await TryHistoricalFallbackAsync(
+                    @case, turn, messageText, understand, retrieve, answerability,
+                    context, timings, now, ct);
 
             case EvidenceSufficiency.Sufficient:
                 var draft = await StageTimingsAccumulator.TimeAsync(
@@ -427,6 +427,46 @@ public sealed class TurnOrchestrator(
             default:
                 throw new ArgumentOutOfRangeException(nameof(answerability), answerability.EvidenceSufficiency, null);
         }
+    }
+
+    private async Task<TurnOutcome> TryHistoricalFallbackAsync(
+        Case @case,
+        Turn turn,
+        string messageText,
+        UnderstandResult understand,
+        RetrieveResult normativeRetrieve,
+        AnswerabilityResult normativeAnswerability,
+        KnowledgeRequestContext context,
+        StageTimingsAccumulator timings,
+        DateTimeOffset now,
+        CancellationToken ct,
+        string? extraReasonCode = null)
+    {
+        var knownEntities = @case.TurnContext.KnownSlots.Select(ToEntity).ToArray();
+        var historicalRetrieve = await StageTimingsAccumulator.TimeAsync(
+            () => knowledge.RetrieveAsync(
+                new RetrieveRequest(understand.NormalizedText, knownEntities, understand.ExactCodes, Corpus.Historical, SnapshotId: null),
+                context, ct),
+            ms => timings.RetrieveMs = (timings.RetrieveMs ?? 0) + ms);
+
+        if (historicalRetrieve.Candidates.Count > 0)
+        {
+            var historicalIds = historicalRetrieve.Candidates.Select(candidate => candidate.FragmentId).ToArray();
+            var historicalAnswerability = await knowledge.AssessAnswerabilityAsync(
+                new AnswerabilityRequest(understand.NormalizedText, historicalRetrieve.SnapshotId, historicalIds), context, ct);
+            if (historicalAnswerability.EvidenceSufficiency == EvidenceSufficiency.Sufficient)
+            {
+                return await DecideFromAnswerabilityAsync(
+                    @case, turn, messageText, understand, historicalRetrieve, historicalAnswerability,
+                    context, timings, now, ct, expandedOnce: true);
+            }
+        }
+
+        return await OfferHandoffAsync(@case, turn, messageText, timings, now,
+            evidenceInsufficient: true, conditionDependent: false, normativeAnswerability.RiskFlags,
+            explicitHumanRequest: false, ct, normativeRetrieve.SnapshotId,
+            reason: "INSUFFICIENT_EVIDENCE", extraReasonCode: extraReasonCode,
+            checkedFragmentIds: normativeRetrieve.Candidates.Select(candidate => candidate.FragmentId).ToArray());
     }
 
     private async Task<TurnOutcome> OfferHandoffAsync(
