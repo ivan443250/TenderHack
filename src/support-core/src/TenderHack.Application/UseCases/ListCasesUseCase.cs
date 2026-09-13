@@ -11,6 +11,7 @@ public sealed class ListCasesUseCase(ICaseRepository cases)
         return
         [
             .. owned
+                .Where(c => c.HiddenAt is null)
                 .Where(c => archivedOnly ? c.ConversationStatus != ConversationStatus.Active : c.ConversationStatus == ConversationStatus.Active)
                 .OrderByDescending(c => c.LastActivityAt),
         ];

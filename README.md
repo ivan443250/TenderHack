@@ -76,6 +76,17 @@ scripts/          ingestion/dev/reproducibility helpers
 docs/             system of record + ADR/contracts/plans
 ```
 
+## Запуск для ручной проверки (без RunPod)
+
+Образы не пересобираются автоматически — после `git pull` всегда `docker compose build`, иначе стек может часами работать на образах со старым кодом.
+
+```bash
+docker compose --profile stub up -d --build
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-knowledge.ps1
+```
+
+Профиль `stub` поднимает `generator-stub` — извлекающий тестовый дублёр реального генератора (`infra/inference/stub/README.md`), без него ветка `ANSWER` падает в `MODEL_UNAVAILABLE`. `bootstrap-knowledge.ps1` идемпотентно загружает корпус (6 PDF, ~3900 фрагментов). После этого UI — `http://localhost:5173`.
+
 ## Базовые проверки
 
 Актуальный список и интерпретация результатов — [`docs/quality.md`](docs/quality.md). Основные команды:

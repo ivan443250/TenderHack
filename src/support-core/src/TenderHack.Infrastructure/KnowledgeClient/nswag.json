@@ -52,6 +52,7 @@
       "dictionaryBaseType": "System.Collections.Generic.Dictionary",
       "classStyle": "Poco",
       "jsonLibrary": "SystemTextJson",
+      "jsonLibraryVersion": "10.0",
       "generateDefaultValues": true,
       "generateDataAnnotations": false,
       "excludedTypeNames": [],

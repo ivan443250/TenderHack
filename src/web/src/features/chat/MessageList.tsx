@@ -1,5 +1,5 @@
 import type { ApiClient } from "../../api/client";
-import type { AnswerSource, CaseSnapshot, SourceDetail, TimelineItem } from "../../api/types";
+import type { Applicability, AnswerSource, CaseSnapshot, SourceDetail, TimelineItem } from "../../api/types";
 import {
   AssistantResponse,
   ClarificationNotice,
@@ -10,6 +10,7 @@ import {
   TurnStageNotice,
   UserMessage
 } from "./Messages";
+import { ApplicabilityCard } from "./ApplicabilityCard";
 import { SourceCitation } from "./SourceCitation";
 import { HandoffCard } from "./HandoffCard";
 import { ResolutionFeedback } from "./ResolutionFeedback";
@@ -38,6 +39,7 @@ function renderItem(item: TimelineItem, snapshot: CaseSnapshot, api: ApiClient, 
     case "AI_ANSWER": {
       // web-api-v0.md §4.3: sources carry fragment_id/title/page/label.
       const sources = Array.isArray(payload.sources) ? (payload.sources as AnswerSource[]) : [];
+      const applicability = payload.applicability as Applicability | undefined;
       return (
         <div key={item.item_id} className="flex w-full flex-col items-start gap-3">
           <AssistantResponse markdown={String(payload.markdown ?? "")} />
@@ -51,6 +53,7 @@ function renderItem(item: TimelineItem, snapshot: CaseSnapshot, api: ApiClient, 
               onOpen={onOpenSource}
             />
           ))}
+          {applicability && <ApplicabilityCard applicability={applicability} api={api} onOpenSource={onOpenSource} />}
         </div>
       );
     }
@@ -60,14 +63,15 @@ function renderItem(item: TimelineItem, snapshot: CaseSnapshot, api: ApiClient, 
         <ClarificationNotice
           key={item.item_id}
           missingConditions={Array.isArray(payload.missing_conditions) ? (payload.missing_conditions as string[]) : []}
+          questions={Array.isArray(payload.questions) ? (payload.questions as string[]) : undefined}
         />
       );
 
     case "NO_CONFIRMED_ANSWER":
-      return <NoConfirmedAnswerNotice key={item.item_id} />;
+      return <NoConfirmedAnswerNotice key={item.item_id} reason={typeof payload.reason === "string" ? payload.reason : undefined} />;
 
     case "MODERATION_WARNING":
-      return <ModerationWarningNotice key={item.item_id} />;
+      return <ModerationWarningNotice key={item.item_id} message={String(payload.message ?? "")} />;
 
     case "CONVERSATION_CLOSED":
       // A moderation close is shown by the ModerationBlockedNotice in the composer slot (ChatScreen),
@@ -97,7 +101,10 @@ export function MessageList({
   onSubmitFeedback
 }: MessageListProps) {
   const showHandoff = snapshot.last_decision === "HANDOFF_OFFER" || snapshot.last_decision === "ANSWER_AND_HANDOFF" || snapshot.handoff;
-  const showFeedback = snapshot.completed_at !== null;
+  // B5/architecture.md §5.8: a moderation close never asks for feedback — the server never
+  // publishes FEEDBACK_REQUESTED for it, and the UI must not fabricate the ask on its own just
+  // because completed_at is set.
+  const showFeedback = snapshot.completed_at !== null && snapshot.completion_reason !== "MODERATION";
 
   return (
     <div className="flex w-full flex-col items-start gap-4">

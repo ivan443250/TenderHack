@@ -128,3 +128,18 @@ public sealed record SourceResponse(
     string? Anchor,
     string Text,
     string SnapshotId);
+
+/// <summary>E3 (docs/plans/active/2026-09-demo-readiness.md) — «Материалы» tab, web-api-v0.md §15.</summary>
+public sealed record MaterialSummaryResponse(
+    string DocumentId,
+    string Title,
+    string? DeclaredVersion,
+    string? DeclaredDate,
+    int PageCount,
+    int FragmentCount);
+
+public sealed record MaterialsResponse(string SnapshotId, IReadOnlyList<MaterialSummaryResponse> Materials);
+
+public sealed record MaterialSectionResponse(string? Section, int PageStart, int PageEnd, string FirstFragmentId);
+
+public sealed record MaterialSectionsResponse(string SnapshotId, string DocumentId, IReadOnlyList<MaterialSectionResponse> Sections);

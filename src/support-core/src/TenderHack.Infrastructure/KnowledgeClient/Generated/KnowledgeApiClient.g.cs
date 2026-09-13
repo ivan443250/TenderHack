@@ -150,6 +150,36 @@ namespace TenderHack.Infrastructure.KnowledgeClient.Generated
         System.Threading.Tasks.Task<SourceResponse> GetSourceAsync(System.Guid x_Trace_Id, string fragment_id, System.Threading.CancellationToken cancellationToken);
 
         /// <summary>
+        /// List documents in the current normative snapshot (Materials tab, E3).
+        /// </summary>
+        /// <returns>Materials in the current normative snapshot.</returns>
+        /// <exception cref="KnowledgeApiClientException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<MaterialsResponse> ListMaterialsAsync(System.Guid x_Trace_Id);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// List documents in the current normative snapshot (Materials tab, E3).
+        /// </summary>
+        /// <returns>Materials in the current normative snapshot.</returns>
+        /// <exception cref="KnowledgeApiClientException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<MaterialsResponse> ListMaterialsAsync(System.Guid x_Trace_Id, System.Threading.CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Table of contents for one document in the current normative snapshot (E3).
+        /// </summary>
+        /// <returns>Sections in page order; a fragment with no section sorts last.</returns>
+        /// <exception cref="KnowledgeApiClientException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<MaterialSectionsResponse> ListMaterialSectionsAsync(System.Guid x_Trace_Id, string document_id);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Table of contents for one document in the current normative snapshot (E3).
+        /// </summary>
+        /// <returns>Sections in page order; a fragment with no section sorts last.</returns>
+        /// <exception cref="KnowledgeApiClientException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<MaterialSectionsResponse> ListMaterialSectionsAsync(System.Guid x_Trace_Id, string document_id, System.Threading.CancellationToken cancellationToken);
+
+        /// <summary>
         /// Current active knowledge base snapshot.
         /// </summary>
         /// <returns>Current snapshot metadata.</returns>
@@ -1384,6 +1414,217 @@ namespace TenderHack.Infrastructure.KnowledgeClient.Generated
         }
 
         /// <summary>
+        /// List documents in the current normative snapshot (Materials tab, E3).
+        /// </summary>
+        /// <returns>Materials in the current normative snapshot.</returns>
+        /// <exception cref="KnowledgeApiClientException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<MaterialsResponse> ListMaterialsAsync(System.Guid x_Trace_Id)
+        {
+            return ListMaterialsAsync(x_Trace_Id, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// List documents in the current normative snapshot (Materials tab, E3).
+        /// </summary>
+        /// <returns>Materials in the current normative snapshot.</returns>
+        /// <exception cref="KnowledgeApiClientException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<MaterialsResponse> ListMaterialsAsync(System.Guid x_Trace_Id, System.Threading.CancellationToken cancellationToken)
+        {
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+
+                    if (x_Trace_Id == null)
+                        throw new System.ArgumentNullException("x_Trace_Id");
+                    request_.Headers.TryAddWithoutValidation("X-Trace-Id", ConvertToString(x_Trace_Id, System.Globalization.CultureInfo.InvariantCulture));
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v0/materials"
+                    urlBuilder_.Append("v0/materials");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<MaterialsResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new KnowledgeApiClientException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new KnowledgeApiClientException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new KnowledgeApiClientException<ErrorResponse>("Unhandled error \u2014 maps to KnowledgeFailure.UNAVAILABLE.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new KnowledgeApiClientException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Table of contents for one document in the current normative snapshot (E3).
+        /// </summary>
+        /// <returns>Sections in page order; a fragment with no section sorts last.</returns>
+        /// <exception cref="KnowledgeApiClientException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<MaterialSectionsResponse> ListMaterialSectionsAsync(System.Guid x_Trace_Id, string document_id)
+        {
+            return ListMaterialSectionsAsync(x_Trace_Id, document_id, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Table of contents for one document in the current normative snapshot (E3).
+        /// </summary>
+        /// <returns>Sections in page order; a fragment with no section sorts last.</returns>
+        /// <exception cref="KnowledgeApiClientException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<MaterialSectionsResponse> ListMaterialSectionsAsync(System.Guid x_Trace_Id, string document_id, System.Threading.CancellationToken cancellationToken)
+        {
+            if (document_id == null)
+                throw new System.ArgumentNullException("document_id");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+
+                    if (x_Trace_Id == null)
+                        throw new System.ArgumentNullException("x_Trace_Id");
+                    request_.Headers.TryAddWithoutValidation("X-Trace-Id", ConvertToString(x_Trace_Id, System.Globalization.CultureInfo.InvariantCulture));
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v0/materials/{document_id}/sections"
+                    urlBuilder_.Append("v0/materials/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(document_id, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/sections");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<MaterialSectionsResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new KnowledgeApiClientException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new KnowledgeApiClientException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new KnowledgeApiClientException<ErrorResponse>("document_id is not part of the current normative snapshot.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new KnowledgeApiClientException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new KnowledgeApiClientException<ErrorResponse>("Unhandled error \u2014 maps to KnowledgeFailure.UNAVAILABLE.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new KnowledgeApiClientException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <summary>
         /// Current active knowledge base snapshot.
         /// </summary>
         /// <returns>Current snapshot metadata.</returns>
@@ -2227,20 +2468,20 @@ namespace TenderHack.Infrastructure.KnowledgeClient.Generated
     public enum EntityProvenance
     {
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"user_explicit")]
         [System.Runtime.Serialization.EnumMember(Value = @"user_explicit")]
-        [System.Text.Json.Serialization.JsonStringEnumMemberName("user_explicit")]
         User_explicit = 0,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"trusted_portal_context")]
         [System.Runtime.Serialization.EnumMember(Value = @"trusted_portal_context")]
-        [System.Text.Json.Serialization.JsonStringEnumMemberName("trusted_portal_context")]
         Trusted_portal_context = 1,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"inferred")]
         [System.Runtime.Serialization.EnumMember(Value = @"inferred")]
-        [System.Text.Json.Serialization.JsonStringEnumMemberName("inferred")]
         Inferred = 2,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"unknown")]
         [System.Runtime.Serialization.EnumMember(Value = @"unknown")]
-        [System.Text.Json.Serialization.JsonStringEnumMemberName("unknown")]
         Unknown = 3,
 
     }
@@ -2347,12 +2588,15 @@ namespace TenderHack.Infrastructure.KnowledgeClient.Generated
     public enum ModerationAmbiguity
     {
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"OFFENSIVE")]
         [System.Runtime.Serialization.EnumMember(Value = @"OFFENSIVE")]
         OFFENSIVE = 0,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"NOT_OFFENSIVE")]
         [System.Runtime.Serialization.EnumMember(Value = @"NOT_OFFENSIVE")]
         NOT_OFFENSIVE = 1,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"UNCERTAIN")]
         [System.Runtime.Serialization.EnumMember(Value = @"UNCERTAIN")]
         UNCERTAIN = 2,
 
@@ -2432,9 +2676,11 @@ namespace TenderHack.Infrastructure.KnowledgeClient.Generated
     public enum Corpus
     {
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"NORMATIVE")]
         [System.Runtime.Serialization.EnumMember(Value = @"NORMATIVE")]
         NORMATIVE = 0,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"HISTORICAL")]
         [System.Runtime.Serialization.EnumMember(Value = @"HISTORICAL")]
         HISTORICAL = 1,
 
@@ -2590,12 +2836,15 @@ namespace TenderHack.Infrastructure.KnowledgeClient.Generated
     public enum EvidenceSufficiency
     {
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"SUFFICIENT")]
         [System.Runtime.Serialization.EnumMember(Value = @"SUFFICIENT")]
         SUFFICIENT = 0,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"CONDITION_DEPENDENT")]
         [System.Runtime.Serialization.EnumMember(Value = @"CONDITION_DEPENDENT")]
         CONDITION_DEPENDENT = 1,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"INSUFFICIENT")]
         [System.Runtime.Serialization.EnumMember(Value = @"INSUFFICIENT")]
         INSUFFICIENT = 2,
 
@@ -2849,6 +3098,111 @@ namespace TenderHack.Infrastructure.KnowledgeClient.Generated
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MaterialSummary
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("document_id")]
+        public string Document_id { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("title")]
+        public string Title { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("declared_version")]
+        public string? Declared_version { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("declared_date")]
+        public string? Declared_date { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("page_count")]
+        public int Page_count { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("fragment_count")]
+        public int Fragment_count { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MaterialsResponse
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("snapshot_id")]
+        public string Snapshot_id { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("materials")]
+        public System.Collections.Generic.IReadOnlyList<MaterialSummary> Materials { get; set; } = new System.Collections.Generic.List<MaterialSummary>();
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MaterialSection
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("section")]
+        public string? Section { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("page_start")]
+        public int Page_start { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("page_end")]
+        public int Page_end { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("first_fragment_id")]
+        public string First_fragment_id { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MaterialSectionsResponse
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("snapshot_id")]
+        public string Snapshot_id { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("document_id")]
+        public string Document_id { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("sections")]
+        public System.Collections.Generic.IReadOnlyList<MaterialSection> Sections { get; set; } = new System.Collections.Generic.List<MaterialSection>();
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class SnapshotResponse
     {
 
@@ -2986,9 +3340,11 @@ namespace TenderHack.Infrastructure.KnowledgeClient.Generated
     public enum FeedbackRating
     {
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"POSITIVE")]
         [System.Runtime.Serialization.EnumMember(Value = @"POSITIVE")]
         POSITIVE = 0,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"NEGATIVE")]
         [System.Runtime.Serialization.EnumMember(Value = @"NEGATIVE")]
         NEGATIVE = 1,
 
@@ -3104,18 +3460,23 @@ namespace TenderHack.Infrastructure.KnowledgeClient.Generated
     public enum DimensionValue
     {
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"0")]
         [System.Runtime.Serialization.EnumMember(Value = @"0")]
         _0 = 0,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"1")]
         [System.Runtime.Serialization.EnumMember(Value = @"1")]
         _1 = 1,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"2")]
         [System.Runtime.Serialization.EnumMember(Value = @"2")]
         _2 = 2,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"UNKNOWN")]
         [System.Runtime.Serialization.EnumMember(Value = @"UNKNOWN")]
         UNKNOWN = 3,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"NOT_APPLICABLE")]
         [System.Runtime.Serialization.EnumMember(Value = @"NOT_APPLICABLE")]
         NOT_APPLICABLE = 4,
 
@@ -3216,15 +3577,19 @@ namespace TenderHack.Infrastructure.KnowledgeClient.Generated
     public enum HypothesisType
     {
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"KNOWLEDGE_GAP")]
         [System.Runtime.Serialization.EnumMember(Value = @"KNOWLEDGE_GAP")]
         KNOWLEDGE_GAP = 0,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"PROCESS_ISSUE")]
         [System.Runtime.Serialization.EnumMember(Value = @"PROCESS_ISSUE")]
         PROCESS_ISSUE = 1,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"PORTAL_ISSUE")]
         [System.Runtime.Serialization.EnumMember(Value = @"PORTAL_ISSUE")]
         PORTAL_ISSUE = 2,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"OTHER")]
         [System.Runtime.Serialization.EnumMember(Value = @"OTHER")]
         OTHER = 3,
 
@@ -3317,26 +3682,37 @@ namespace TenderHack.Infrastructure.KnowledgeClient.Generated
     public enum ErrorResponseCode
     {
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"VALIDATION_ERROR")]
         [System.Runtime.Serialization.EnumMember(Value = @"VALIDATION_ERROR")]
         VALIDATION_ERROR = 0,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"MISSING_TRACE_HEADER")]
         [System.Runtime.Serialization.EnumMember(Value = @"MISSING_TRACE_HEADER")]
         MISSING_TRACE_HEADER = 1,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"UNKNOWN_SNAPSHOT")]
         [System.Runtime.Serialization.EnumMember(Value = @"UNKNOWN_SNAPSHOT")]
         UNKNOWN_SNAPSHOT = 2,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"UNKNOWN_FRAGMENT")]
         [System.Runtime.Serialization.EnumMember(Value = @"UNKNOWN_FRAGMENT")]
         UNKNOWN_FRAGMENT = 3,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"UNKNOWN_DOCUMENT")]
+        [System.Runtime.Serialization.EnumMember(Value = @"UNKNOWN_DOCUMENT")]
+        UNKNOWN_DOCUMENT = 4,
+
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"MODEL_UNAVAILABLE")]
         [System.Runtime.Serialization.EnumMember(Value = @"MODEL_UNAVAILABLE")]
-        MODEL_UNAVAILABLE = 4,
+        MODEL_UNAVAILABLE = 5,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"MODEL_ERROR")]
         [System.Runtime.Serialization.EnumMember(Value = @"MODEL_ERROR")]
-        MODEL_ERROR = 5,
+        MODEL_ERROR = 6,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"INTERNAL_ERROR")]
         [System.Runtime.Serialization.EnumMember(Value = @"INTERNAL_ERROR")]
-        INTERNAL_ERROR = 6,
+        INTERNAL_ERROR = 7,
 
     }
 
@@ -3344,6 +3720,7 @@ namespace TenderHack.Infrastructure.KnowledgeClient.Generated
     public enum HealthResponseStatus
     {
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"ok")]
         [System.Runtime.Serialization.EnumMember(Value = @"ok")]
         Ok = 0,
 
@@ -3353,6 +3730,7 @@ namespace TenderHack.Infrastructure.KnowledgeClient.Generated
     public enum AcceptedResponseStatus
     {
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"stored")]
         [System.Runtime.Serialization.EnumMember(Value = @"stored")]
         Stored = 0,
 
@@ -3383,9 +3761,11 @@ namespace TenderHack.Infrastructure.KnowledgeClient.Generated
     public enum QualityFeedbackPushIntegration_mode
     {
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"REAL")]
         [System.Runtime.Serialization.EnumMember(Value = @"REAL")]
         REAL = 0,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"SIMULATED")]
         [System.Runtime.Serialization.EnumMember(Value = @"SIMULATED")]
         SIMULATED = 1,
 
@@ -3395,9 +3775,11 @@ namespace TenderHack.Infrastructure.KnowledgeClient.Generated
     public enum QualityCompletionPushIntegration_mode
     {
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"REAL")]
         [System.Runtime.Serialization.EnumMember(Value = @"REAL")]
         REAL = 0,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"SIMULATED")]
         [System.Runtime.Serialization.EnumMember(Value = @"SIMULATED")]
         SIMULATED = 1,
 
@@ -3407,12 +3789,15 @@ namespace TenderHack.Infrastructure.KnowledgeClient.Generated
     public enum HypothesisConfidence
     {
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"LOW")]
         [System.Runtime.Serialization.EnumMember(Value = @"LOW")]
         LOW = 0,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"MEDIUM")]
         [System.Runtime.Serialization.EnumMember(Value = @"MEDIUM")]
         MEDIUM = 1,
 
+        [System.Text.Json.Serialization.JsonStringEnumMemberName(@"HIGH")]
         [System.Runtime.Serialization.EnumMember(Value = @"HIGH")]
         HIGH = 2,
 

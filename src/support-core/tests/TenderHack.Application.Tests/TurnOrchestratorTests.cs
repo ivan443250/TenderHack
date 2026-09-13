@@ -3,6 +3,7 @@ using TenderHack.Application.Orchestration;
 using TenderHack.Application.Ports;
 using TenderHack.Application.Tests.Fakes;
 using TenderHack.Domain.Cases;
+using TenderHack.Domain.Common;
 using Xunit;
 
 namespace TenderHack.Application.Tests;
@@ -14,9 +15,11 @@ public sealed class TurnOrchestratorTests
     private readonly FakeTurnEventStream _events = new();
     private readonly FakeOutbox _outbox = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
+    private readonly FakeNotificationSink _notifications = new();
 
     private TurnOrchestrator CreateSut(int closeAfterWarnings = 1) =>
         new(_knowledge, _moderation, _events, _outbox, _unitOfWork, new ModerationOptions(closeAfterWarnings), TimeProvider.System,
+            new CaseCompletionPublisher(_events, _notifications, _outbox),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<TurnOrchestrator>.Instance);
 
     private static Case NewCase() => new(CaseId.New(), ownerId: "owner-1", DateTimeOffset.UtcNow);
@@ -57,6 +60,14 @@ public sealed class TurnOrchestratorTests
         Assert.Equal("PROFANITY_001", closed.Event.Payload["rule_id"]);
         Assert.Equal(1, closed.Event.Payload["close_after_warnings"]);
         Assert.IsType<string>(closed.Event.Payload["message"]);
+
+        // B5 (docs/plans/active/2026-09-demo-readiness.md): moderation close must still complete the
+        // case like any other terminal path (architecture.md §5.8) — exactly one CASE_COMPLETED with
+        // completion_reason MODERATION, and never a feedback prompt (product-spec.md §14).
+        var completed = Assert.Single(_events.Published, e => e.Event.Type == "CASE_COMPLETED");
+        Assert.Equal("MODERATION", completed.Event.Payload["completion_reason"]);
+        Assert.DoesNotContain(_events.Published, e => e.Event.Type == "FEEDBACK_REQUESTED");
+        Assert.Contains(_notifications.Enqueued, n => n.Type == "CASE_COMPLETED");
     }
 
     [Fact]
@@ -116,6 +127,24 @@ public sealed class TurnOrchestratorTests
         Assert.Equal("Ответ.", outcome.AnswerMarkdown);
         Assert.Contains(_events.Published, e => e.Event.Type == "AI_ANSWER");
         Assert.Contains(_events.Published, e => e.Event.Type == "HANDOFF_OFFER");
+    }
+
+    [Fact]
+    public async Task AnswerApplicabilityCarriesMappedQuestionsAlongsideRawMissingConditions()
+    {
+        // F1.3 (docs/plans/active/2026-09-product-enhancements.md): the Applicability Card's own
+        // "Нужно уточнить" block reuses B1's slot→question mapping — same list, same order.
+        var sut = CreateSut();
+        var @case = NewCase();
+        _knowledge.Answerability = new AnswerabilityResult(EvidenceSufficiency.Sufficient, ["frag-1"], ["role"], []);
+
+        await sut.RunAsync(@case, "вопрос", CancellationToken.None);
+
+        var answer = Assert.Single(_events.Published, e => e.Event.Type == "AI_ANSWER");
+        var applicability = answer.Event.Payload["applicability"]!;
+        var questions = Assert.IsAssignableFrom<System.Collections.IEnumerable>(
+            applicability.GetType().GetProperty("questions")!.GetValue(applicability)).Cast<string>().ToArray();
+        Assert.Equal(["Вы работаете на Портале как поставщик или как заказчик?"], questions);
     }
 
     [Fact]
@@ -273,9 +302,18 @@ public sealed class TurnOrchestratorTests
         Assert.Equal("stub-v0", answer.Event.Payload["model_version"]);
         Assert.Equal("stub-v0", answer.Event.Payload["retrieval_config_version"]);
 
+        // F1.3 (docs/plans/active/2026-09-product-enhancements.md): applicability.questions is
+        // additive and empty here since nothing was missing for a plain ANSWER.
+        var applicabilityForAnswer = answer.Event.Payload["applicability"]!;
+        var questionsForAnswer = Assert.IsAssignableFrom<System.Collections.IEnumerable>(
+            applicabilityForAnswer.GetType().GetProperty("questions")!.GetValue(applicabilityForAnswer));
+        Assert.Empty(questionsForAnswer.Cast<object>());
+
         var push = Assert.IsType<QualityTurnPush>(Assert.Single(_outbox.Enqueued).Payload);
         Assert.Equal(QualityOutboxMessages.Turn, _outbox.Enqueued[0].MessageType);
-        Assert.Equal("Answer", push.Decision);
+        // web-api-v0.md §4/knowledge-v0.md decision vocabulary is UPPER_SNAKE_CASE on the wire; this
+        // must never leak the C# PascalCase member name.
+        Assert.Equal("ANSWER", push.Decision);
         Assert.Equal("Ответ.", push.AnswerMarkdown);
         Assert.Equal(["frag-1"], push.EvidenceFragmentIds);
         Assert.Equal("snapshot-1", push.SnapshotId);
@@ -342,6 +380,25 @@ public sealed class TurnOrchestratorTests
     }
 
     [Fact]
+    public async Task ClarificationPublishesHumanReadableQuestionsAlongsideRawSlotIds()
+    {
+        // B1 (docs/plans/active/2026-09-demo-readiness.md): the UI must not render raw slot ids like
+        // "role"/"unknown_slot" as the question text — `questions` is additive next to
+        // `missing_conditions`, and an unmapped slot still gets a usable fallback question.
+        var sut = CreateSut();
+        var @case = NewCase();
+        _knowledge.Answerability = new AnswerabilityResult(EvidenceSufficiency.ConditionDependent, [], ["role", "unknown_slot"], []);
+
+        await sut.RunAsync(@case, "вопрос", CancellationToken.None);
+
+        var clarification = Assert.Single(_events.Published, e => e.Event.Type == "CLARIFICATION");
+        Assert.Equal(new[] { "role", "unknown_slot" }, clarification.Event.Payload["missing_conditions"]);
+        var questions = Assert.IsAssignableFrom<IReadOnlyList<string>>(clarification.Event.Payload["questions"]);
+        Assert.Equal("Вы работаете на Портале как поставщик или как заказчик?", questions[0]);
+        Assert.Equal("Уточните, пожалуйста: unknown_slot", questions[1]);
+    }
+
+    [Fact]
     public async Task AThirdConsecutiveClarificationEscalatesToHandoffInstead()
     {
         // product-spec.md §11: "не более двух последовательных clarifications в одном нерешенном сценарии".
@@ -359,6 +416,14 @@ public sealed class TurnOrchestratorTests
         var handoffEvent = _events.Published.Last(e => e.Event.Type == "HANDOFF_OFFER");
         var reasonCodes = Assert.IsAssignableFrom<IReadOnlyList<string>>(handoffEvent.Event.Payload["reason_codes"]);
         Assert.Contains("CLARIFICATION_LIMIT", reasonCodes);
+        // B4: a multi-word enum member (ServiceNeed.AccountOrStateCheck) is the case that a bare
+        // .ToString() previously got wrong (single-word members like SupportLine.L1 masked the bug).
+        Assert.Equal("ACCOUNT_OR_STATE_CHECK", handoffEvent.Event.Payload["service_need"]);
+        Assert.Equal("L1", handoffEvent.Event.Payload["recommended_line"]);
+        var push = Assert.IsType<QualityTurnPush>(_outbox.Enqueued.Last().Payload);
+        Assert.Equal("HANDOFF_OFFER", push.Decision);
+        Assert.Equal("ACCOUNT_OR_STATE_CHECK", push.ServiceNeed);
+        Assert.Equal("L1", push.RecommendedLine);
     }
 
     [Fact]
@@ -471,11 +536,12 @@ public sealed class TurnOrchestratorTests
         Assert.Equal(Decision.TechnicalError, outcome.Decision);
         Assert.Equal(category, outcome.FailureCategory);
         Assert.Equal(TurnStatus.Failed, @case.ActiveTurn!.Status);
-        Assert.Contains(_events.Published, e => e.Event.Type == "TECHNICAL_ERROR");
+        var technicalError = Assert.Single(_events.Published, e => e.Event.Type == "TECHNICAL_ERROR");
+        Assert.Equal(category.ToWire(), technicalError.Event.Payload["category"]);
 
         var push = Assert.IsType<QualityTurnPush>(Assert.Single(_outbox.Enqueued).Payload);
-        Assert.Equal("TechnicalError", push.Decision);
-        Assert.Equal(category.ToString(), push.ErrorCategory);
+        Assert.Equal("TECHNICAL_ERROR", push.Decision);
+        Assert.Equal(category.ToWire(), push.ErrorCategory);
         Assert.NotNull(push.StageTimings.UnderstandMs);
         Assert.Null(push.StageTimings.RetrieveMs);
     }

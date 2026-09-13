@@ -2,6 +2,8 @@ import type {
   CaseEvent,
   CaseListItem,
   CaseSnapshot,
+  MaterialSectionsResponse,
+  MaterialsResponse,
   Notification,
   SendMessageResponse,
   SourceDetail,
@@ -111,6 +113,14 @@ export function createApiClient(options: ApiClientOptions = {}) {
       return request<SourceDetail>(`/v0/sources/${encodeURIComponent(fragmentId)}`, { method: "GET" });
     },
 
+    async listMaterials(): Promise<MaterialsResponse> {
+      return request<MaterialsResponse>("/v0/materials", { method: "GET" });
+    },
+
+    async listMaterialSections(documentId: string): Promise<MaterialSectionsResponse> {
+      return request<MaterialSectionsResponse>(`/v0/materials/${encodeURIComponent(documentId)}/sections`, { method: "GET" });
+    },
+
     async prepareHandoff(caseId: string): Promise<CaseSnapshot> {
       return request<CaseSnapshot>(`/v0/cases/${encodeURIComponent(caseId)}/handoff/prepare`, {
         method: "POST"
@@ -131,6 +141,10 @@ export function createApiClient(options: ApiClientOptions = {}) {
         body: JSON.stringify({ summary }),
         idempotent: true
       });
+    },
+
+    async hideCase(caseId: string): Promise<void> {
+      await request<void>(`/v0/cases/${encodeURIComponent(caseId)}`, { method: "DELETE" });
     },
 
     async completeCase(caseId: string, solved: boolean | null): Promise<CaseSnapshot> {

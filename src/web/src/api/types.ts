@@ -81,6 +81,24 @@ export type AnswerPayload = {
   sources: AnswerSource[];
 };
 
+export type ContextSlotProvenance = "user_explicit" | "trusted_portal_context" | "inferred" | "unknown";
+
+export type ApplicabilityEntity = {
+  type: string;
+  value: string;
+  provenance: ContextSlotProvenance;
+};
+
+/** `AI_ANSWER.applicability` (web-api-v0.md §4.3, additive 2026-09-13) — facts that already passed
+ * the Answerability Gate, never a re-derived confidence score. */
+export type Applicability = {
+  entities: ApplicabilityEntity[];
+  missing_conditions: string[];
+  questions: string[];
+  risk_flags: string[];
+  evidence_fragment_ids: string[];
+};
+
 export type TimelineItem = {
   item_id: string;
   type: TimelineItemType;
@@ -159,6 +177,33 @@ export type Notification = {
   occurred_at: string;
   read_at: string | null;
   payload: { title: string; body: string; integration_mode: IntegrationMode | null };
+};
+
+export type Material = {
+  document_id: string;
+  title: string;
+  declared_version: string | null;
+  declared_date: string | null;
+  page_count: number;
+  fragment_count: number;
+};
+
+export type MaterialsResponse = {
+  snapshot_id: string;
+  materials: Material[];
+};
+
+export type MaterialSection = {
+  section: string | null;
+  page_start: number;
+  page_end: number;
+  first_fragment_id: string;
+};
+
+export type MaterialSectionsResponse = {
+  snapshot_id: string;
+  document_id: string;
+  sections: MaterialSection[];
 };
 
 export type ApiErrorBody = {

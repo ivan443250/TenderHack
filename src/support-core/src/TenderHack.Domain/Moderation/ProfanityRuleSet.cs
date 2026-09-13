@@ -46,9 +46,15 @@ public static partial class ProfanityRuleSet
     [GeneratedRegex(@"\bпизд[а-яё]*\b", RegexOptions.IgnoreCase)]
     private static partial Regex PizdRegex();
 
-    /// <summary>Matches both "е" and "ё" spellings of the root ("ебать"/"ёбаный") with the same
-    /// optional glued prefix as <see cref="HuyRegex"/> (covers "заебал", "ёбаный").</summary>
-    [GeneratedRegex(@"\b(?:на|по|за|от|вы|о|до|пере)?[её]б[а-яё]{1,6}\b", RegexOptions.IgnoreCase)]
+    /// <summary>
+    /// Matches both "е" and "ё" spellings of the root ("ебать"/"ёбаный") with the same optional glued
+    /// prefix as <see cref="HuyRegex"/> (covers "заебал", "ёбаный"), plus an optional hard sign between
+    /// a prefix and the root ("отъебись") — the trailing suffix is unbounded like the sibling rules
+    /// above (quality.md §6: a `{1,6}` cap previously missed long inflected forms such as
+    /// "выебываться"). Excludes "ебитда" (the finance term), which is not a form of this root
+    /// (quality.md §6 "substrings inside benign words" regression, same pattern as <see cref="DuraRegex"/>).
+    /// </summary>
+    [GeneratedRegex(@"\b(?:(?:на|по|за|от|вы|о|до|пере)ъ?)?[её]б(?!итда)[а-яё]*\b", RegexOptions.IgnoreCase)]
     private static partial Regex EbatRegex();
 
     [GeneratedRegex(@"\bсук[аи][а-яё]*\b", RegexOptions.IgnoreCase)]

@@ -27,10 +27,10 @@ services:
       ConnectionStrings__Postgres: ${API_DATABASE_URL:-Host=postgres;Port=5432;Database=${POSTGRES_DB:-tenderhack};Username=api_rw;Password=${API_DB_PASSWORD:-api_dev_only}}
       Knowledge__BaseUrl: ${KNOWLEDGE_BASE_URL:-http://knowledge:8000}
       # Outer HttpClient safety net; must stay >= the largest per-stage value below (architecture.md §10).
-      Knowledge__Timeout: ${KNOWLEDGE_TIMEOUT:-00:02:00}
+      Knowledge__Timeout: ${KNOWLEDGE_TIMEOUT:-00:03:00}
       # Generation runs an actual local model and needs a materially larger budget than the
       # lexical/retrieval stages — tune per hardware profile, not per request.
-      Knowledge__Timeouts__Draft: ${KNOWLEDGE_DRAFT_TIMEOUT:-00:01:30}
+      Knowledge__Timeouts__Draft: ${KNOWLEDGE_DRAFT_TIMEOUT:-00:02:30}
       Knowledge__Timeouts__Verify: ${KNOWLEDGE_VERIFY_TIMEOUT:-00:00:30}
     ports:
       - "8080:8080"
@@ -72,6 +72,8 @@ services:
       KNOWLEDGE_EMBEDDING_BASE_URL: ${KNOWLEDGE_EMBEDDING_BASE_URL:-http://embedding-inference:8080}
       KNOWLEDGE_RERANKER_BASE_URL: ${KNOWLEDGE_RERANKER_BASE_URL:-}
       KNOWLEDGE_GENERATOR_BASE_URL: ${KNOWLEDGE_GENERATOR_BASE_URL:-http://generator-inference:8080}
+      KNOWLEDGE_GENERATOR_MODEL: ${KNOWLEDGE_GENERATOR_MODEL:-}
+      KNOWLEDGE_GENERATOR_TIMEOUT_SECONDS: ${KNOWLEDGE_GENERATOR_TIMEOUT_SECONDS:-120}
       KNOWLEDGE_INFERENCE_BEARER_TOKEN: ${KNOWLEDGE_INFERENCE_BEARER_TOKEN:-}
     expose:
       - "8000"
@@ -98,6 +100,8 @@ services:
       KNOWLEDGE_EMBEDDING_BASE_URL: ${KNOWLEDGE_EMBEDDING_BASE_URL:-http://embedding-inference:8080}
       KNOWLEDGE_RERANKER_BASE_URL: ${KNOWLEDGE_RERANKER_BASE_URL:-}
       KNOWLEDGE_GENERATOR_BASE_URL: ${KNOWLEDGE_GENERATOR_BASE_URL:-http://generator-inference:8080}
+      KNOWLEDGE_GENERATOR_MODEL: ${KNOWLEDGE_GENERATOR_MODEL:-}
+      KNOWLEDGE_GENERATOR_TIMEOUT_SECONDS: ${KNOWLEDGE_GENERATOR_TIMEOUT_SECONDS:-120}
       KNOWLEDGE_INFERENCE_BEARER_TOKEN: ${KNOWLEDGE_INFERENCE_BEARER_TOKEN:-}
     depends_on:
       postgres:
@@ -142,6 +146,22 @@ services:
       - ${MODEL_ARTIFACTS_DIR:-./infra/inference/models}:/models:ro
     expose:
       - "8080"
+
+  # Extractive test double for local E2E without RunPod/GPU (docs/plans/active/2026-09-demo-readiness.md, A1).
+  # Never started by a plain `docker compose up`; point KNOWLEDGE_GENERATOR_BASE_URL at it via .env
+  # and run with `--profile stub`. See infra/inference/stub/README.md.
+  generator-stub:
+    profiles: ["stub"]
+    build:
+      context: ./infra/inference/stub
+      dockerfile: Dockerfile
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 6
 
 volumes:
   postgres-data:

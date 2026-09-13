@@ -38,8 +38,19 @@ function Invoke-Compose {
 function Invoke-ComposeOutput {
     param([Parameter(Mandatory = $true)][string[]]$Arguments)
 
-    $output = & docker compose --project-directory $repoRoot @Arguments 2>&1
-    $exitCode = $LASTEXITCODE
+    # Windows PowerShell 5.1: with `2>&1` every stderr line of a native command becomes a
+    # NativeCommandError record, and under the script-wide `Stop` preference the first
+    # progress line compose prints to stderr ("Container ... Creating") would abort the run
+    # before the bootstrap result is read. Exit code is still checked explicitly below.
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & docker compose --project-directory $repoRoot @Arguments 2>&1
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousPreference
+    }
     if ($exitCode -ne 0) {
         throw "docker compose $($Arguments -join ' ') failed with exit code $exitCode"
     }

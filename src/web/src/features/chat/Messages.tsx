@@ -33,37 +33,46 @@ export function HandoffCta({ label = "Не получили ответ? Пере
   );
 }
 
-export function ClarificationNotice({ missingConditions }: { missingConditions: string[] }) {
+export function ClarificationNotice({ missingConditions, questions }: { missingConditions: string[]; questions?: string[] }) {
+  // web-api-v0.md §4.2: `questions` is additive next to `missing_conditions` — a server that hasn't
+  // rolled the mapping out yet (or a slot with no known question) still renders, via the raw fallback.
+  const items = questions && questions.length > 0 ? questions : missingConditions;
   return (
     <div className="w-full max-w-[560px] animate-fade-up rounded-[18px] border border-[var(--border-default)] bg-white p-4 text-sm text-[var(--content-primary)]">
       <p className="font-medium">Нужны уточнения, чтобы ответить точно:</p>
       <ul className="mt-1.5 list-inside list-disc text-[var(--content-secondary)]">
-        {missingConditions.map((condition) => (
-          <li key={condition}>{condition}</li>
+        {items.map((item) => (
+          <li key={item}>{item}</li>
         ))}
       </ul>
     </div>
   );
 }
 
-export function NoConfirmedAnswerNotice() {
+export function NoConfirmedAnswerNotice({ reason }: { reason?: string }) {
+  // product-spec.md §21: a direct request for a human is not "no answer found in the knowledge
+  // base" — it never went through the FAQ loop in the first place.
+  const text =
+    reason === "EXPLICIT_HUMAN_REQUEST"
+      ? "Соединяю вас со специалистом поддержки."
+      : "В базе знаний не нашлось подтверждённого ответа на этот вопрос.";
   return (
     <div className="w-full max-w-[560px] animate-fade-up rounded-[18px] border border-[var(--border-default)] bg-white p-4 text-sm text-[var(--content-primary)]">
-      В базе знаний не нашлось подтверждённого ответа на этот вопрос.
+      {text}
     </div>
   );
 }
 
-/** Chat/Moderation Warning (Figma 321:1486): warning-first policy, product-spec.md §14. */
-export function ModerationWarningNotice() {
+/** Chat/Moderation Warning (Figma 321:1486): warning-first policy, product-spec.md §14. The
+ * message/count come from the server event (quality.md §12 "warning text and count come from the
+ * server event"), never hardcoded copy — a rule change on the backend must not require a UI release. */
+export function ModerationWarningNotice({ message }: { message: string }) {
   return (
     <div className="flex w-full max-w-[560px] animate-pop-in items-center gap-3 rounded-[18px] border border-[#f0c9cc] bg-[#fff7f7] p-4">
       <img src={moderationAlert} alt="" className="size-7 shrink-0" />
       <div className="flex min-w-0 flex-col gap-1">
         <p className="text-sm font-semibold leading-snug text-[var(--content-primary)]">Пожалуйста, без нецензурной лексики</p>
-        <p className="text-xs leading-snug text-[var(--content-secondary)]">
-          Я продолжу диалог, но при повторном нарушении чат будет заблокирован.
-        </p>
+        <p className="text-xs leading-snug text-[var(--content-secondary)]">{message}</p>
       </div>
     </div>
   );

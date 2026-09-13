@@ -121,6 +121,19 @@ public static class CaseEndpoints
             return Results.Ok(response);
         });
 
+        app.MapDelete("/api/v0/cases/{caseId}", async (
+            HttpContext context, string caseId, HideCaseUseCase useCase, CancellationToken ct) =>
+        {
+            if (!CaseEndpointHelpers.TryRequireCaseId(caseId, out var id, out var badRequest))
+            {
+                return badRequest;
+            }
+
+            var ownerId = CaseEndpointHelpers.RequireOwner(context);
+            await useCase.ExecuteAsync(id, ownerId, ct);
+            return Results.NoContent();
+        });
+
         app.MapGet("/api/v0/cases/{caseId}/events", async (
             HttpContext context, string caseId, long? after, GetCaseSnapshotUseCase ownershipCheck, ICaseEventReader events, CancellationToken ct) =>
         {

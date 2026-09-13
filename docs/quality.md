@@ -316,6 +316,7 @@ Done only if:
 
 - happy, clarify, handoff, moderation, technical error and restore states render;
 - source opens correctly;
+- Materials tab renders from `GET /api/v0/materials`/`.../sections`, not a placeholder (E3, 2026-09-13);
 - no dead controls for unimplemented features;
 - progress is semantic, not fake percentage;
 - state comes from API.
@@ -369,6 +370,16 @@ pnpm --dir src/web build
 docker compose config --quiet
 docker compose build web knowledge api api-worker
 # Start/run only with the required env/model/data mounts for the profile being verified.
+
+# Full local E2E baseline without RunPod/GPU (docs/plans/active/2026-09-demo-readiness.md): after
+# `git pull`, images are NOT rebuilt automatically — always `--build` again, or a stack can run for
+# hours on stale code with the bug you just fixed still present.
+docker compose --profile stub up -d --build
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-knowledge.ps1
+# `--profile stub` starts generator-stub (infra/inference/stub/README.md), an extractive test double
+# for the OpenAI-compatible generator endpoint — without it `POST /v0/draft` 503s MODEL_UNAVAILABLE
+# and the ANSWER branch cannot be exercised at all. `bootstrap-knowledge.ps1` idempotently loads the
+# corpus (6 PDF, ~3900 fragments) and is the baseline E2E fixture environment for the checklist below.
 ```
 
 A documented command is not evidence of a pass. Report what actually ran, on which commit/config/profile, including failures/skips.

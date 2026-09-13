@@ -33,6 +33,10 @@ public sealed class Case
 
     public FeedbackId? FeedbackId { get; private set; }
 
+    /// <summary>E1: soft-hide timestamp (docs/plans/active/2026-09-demo-readiness.md). Hiding never
+    /// deletes case_events/turns/feedback — it only removes the case from the owner's lists.</summary>
+    public DateTimeOffset? HiddenAt { get; private set; }
+
     /// <summary>Continuity across turns within one still-open clarification scenario (product-spec.md §7, §11).</summary>
     public TurnContext TurnContext { get; private set; } = TurnContext.Empty;
 
@@ -348,4 +352,33 @@ public sealed class Case
 
     private Handoff RequireHandoff() =>
         Handoff ?? throw new HandoffNotFoundException(Id);
+
+    /// <summary>
+    /// E1 (docs/plans/active/2026-09-demo-readiness.md): soft-hide, not delete — `case_events`,
+    /// `turns`, `feedback` and the knowledge quality corpus are untouched (AGENTS.md §3: the analytics
+    /// trail and "history is readable" are invariants). Idempotent: a second call is a no-op. A case
+    /// with a live handoff (requested but not yet terminal) cannot be hidden — the specialist has a
+    /// real open request and its status/notifications must still reach the user. An active
+    /// conversation is completed first through the existing user-completion path, so there is still
+    /// exactly one way a case becomes `CLOSED_USER` and exactly one `CASE_COMPLETED` for it.
+    /// </summary>
+    public void Hide(DateTimeOffset now)
+    {
+        if (HiddenAt is not null)
+        {
+            return;
+        }
+
+        if (Handoff is { Terminal: null } handoff && handoff.Status is HandoffStatus.Pending or HandoffStatus.Accepted or HandoffStatus.SimulatedAccepted)
+        {
+            throw new HandoffInProgressException(Id);
+        }
+
+        if (ConversationStatus == ConversationStatus.Active)
+        {
+            CompleteByUser(solved: null, now);
+        }
+
+        HiddenAt = now;
+    }
 }

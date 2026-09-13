@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { forwardRef, useImperativeHandle, useRef, useState, type FormEvent } from "react";
 
 import { SendArrowIcon } from "../../design-system/icons";
 
@@ -10,9 +10,25 @@ type ComposerProps = {
   autoFocus?: boolean;
 };
 
-/** Chat/Composer (Figma 181:41): Context=Home|Conversation, State=Default|Focus|Filled. */
-export function Composer({ context, onSubmit, disabled, placeholder = "Введите свой вопрос", autoFocus = true }: ComposerProps) {
+export type ComposerHandle = {
+  focus: () => void;
+  setText: (text: string) => void;
+};
+
+/** Chat/Composer (Figma 181:41): Context=Home|Conversation, State=Default|Focus|Filled.
+ * Exposes an imperative handle so a parent (E2's "Еще один вопрос к поддержке" chip, a future
+ * handoff-prefill flow) can focus or prefill the input without owning its state. */
+export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer(
+  { context, onSubmit, disabled, placeholder = "Введите свой вопрос", autoFocus = true },
+  ref
+) {
   const [value, setValue] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    focus: () => inputRef.current?.focus(),
+    setText: (text: string) => setValue(text)
+  }));
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -35,6 +51,7 @@ export function Composer({ context, onSubmit, disabled, placeholder = "Введ�
       }`}
     >
       <input
+        ref={inputRef}
         value={value}
         onChange={(event) => setValue(event.target.value)}
         placeholder={placeholder}
@@ -54,4 +71,4 @@ export function Composer({ context, onSubmit, disabled, placeholder = "Введ�
       </button>
     </form>
   );
-}
+});

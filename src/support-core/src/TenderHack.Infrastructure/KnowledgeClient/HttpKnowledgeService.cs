@@ -177,6 +177,23 @@ public sealed class HttpKnowledgeService(Generated.IKnowledgeApiClient client, I
             response.Document_id, response.Title, response.Version, response.Page, response.Anchor, response.Text, response.Snapshot_id);
     }
 
+    public async Task<AppKnowledge.Materials> ListMaterialsAsync(CancellationToken ct)
+    {
+        var response = await CallAsync(token => client.ListMaterialsAsync(Guid.NewGuid(), token), Timeouts.Source, ct);
+        return new AppKnowledge.Materials(
+            response.Snapshot_id,
+            [.. response.Materials.Select(m => new AppKnowledge.MaterialSummary(m.Document_id, m.Title, m.Declared_version, m.Declared_date, m.Page_count, m.Fragment_count))]);
+    }
+
+    public async Task<AppKnowledge.MaterialSections> ListMaterialSectionsAsync(string documentId, CancellationToken ct)
+    {
+        var response = await CallAsync(token => client.ListMaterialSectionsAsync(Guid.NewGuid(), documentId, token), Timeouts.Source, ct);
+        return new AppKnowledge.MaterialSections(
+            response.Snapshot_id,
+            response.Document_id,
+            [.. response.Sections.Select(s => new AppKnowledge.MaterialSection(s.Section, s.Page_start, s.Page_end, s.First_fragment_id))]);
+    }
+
     public Task PushQualityTurnAsync(AppKnowledge.QualityTurnPush push, CancellationToken ct) =>
         CallAsync(token => client.PushQualityTurnAsync(Guid.NewGuid(), new Generated.QualityTurnPush
         {

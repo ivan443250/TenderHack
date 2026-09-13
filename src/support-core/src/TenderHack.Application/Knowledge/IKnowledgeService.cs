@@ -21,6 +21,11 @@ public interface IKnowledgeService
 
     Task<SourceFragment> GetSourceAsync(string fragmentId, CancellationToken ct);
 
+    // E3 (docs/plans/active/2026-09-demo-readiness.md): read-only "Материалы" tab, no Decision fields.
+    Task<Materials> ListMaterialsAsync(CancellationToken ct);
+
+    Task<MaterialSections> ListMaterialSectionsAsync(string documentId, CancellationToken ct);
+
     // Quality push/read (knowledge-v0.md §10) — called by api-worker's outbox consumer and by the
     // Api's read-only analytics proxy, never by TurnOrchestrator itself.
     Task PushQualityTurnAsync(QualityTurnPush push, CancellationToken ct);

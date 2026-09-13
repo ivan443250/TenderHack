@@ -13,7 +13,17 @@ namespace TenderHack.Application.Orchestration;
 /// </summary>
 public sealed class CaseCompletionPublisher(ITurnEventStream events, INotificationSink notifications, IOutbox outbox)
 {
-    public async Task PublishAsync(Case @case, ResolutionStatus resolutionBefore, DateTimeOffset now, CancellationToken ct)
+    /// <summary>
+    /// <paramref name="notify"/>/<paramref name="requestFeedback"/> let a caller suppress the
+    /// user-visible completion notification and the feedback ask while still emitting
+    /// `CASE_COMPLETED` and the quality completion push — used by E1's hide-case flow
+    /// (docs/plans/active/2026-09-demo-readiness.md), where the case is leaving the user's own list
+    /// and neither a "case completed" toast nor a feedback prompt makes sense. Existing callers are
+    /// unaffected: both default to `true`, matching prior behavior.
+    /// </summary>
+    public async Task PublishAsync(
+        Case @case, ResolutionStatus resolutionBefore, DateTimeOffset now, CancellationToken ct,
+        bool notify = true, bool requestFeedback = true)
     {
         if (@case.ResolutionStatus != resolutionBefore)
         {
@@ -28,8 +38,11 @@ public sealed class CaseCompletionPublisher(ITurnEventStream events, INotificati
                 ["resolution_status"] = @case.ResolutionStatus.ToWire(),
             }), ct);
 
-        notifications.Enqueue(@case.OwnerId, @case.Id, "CASE_COMPLETED", "Обращение завершено",
-            BuildCompletionBody(@case), integrationMode: null, completedEventId);
+        if (notify)
+        {
+            notifications.Enqueue(@case.OwnerId, @case.Id, "CASE_COMPLETED", "Обращение завершено",
+                BuildCompletionBody(@case), integrationMode: null, completedEventId);
+        }
 
         outbox.Enqueue(QualityOutboxMessages.Completion, new QualityCompletionPush(
             @case.Id.ToString(),
@@ -44,7 +57,7 @@ public sealed class CaseCompletionPublisher(ITurnEventStream events, INotificati
             TurnCount: @case.Turns.Count));
 
         // Moderation close ends the case but never asks for feedback (product-spec.md §14).
-        if (@case.CompletionReason == CompletionReason.Moderation)
+        if (!requestFeedback || @case.CompletionReason == CompletionReason.Moderation)
         {
             return;
         }

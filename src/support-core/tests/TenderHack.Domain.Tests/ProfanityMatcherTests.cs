@@ -17,12 +17,26 @@ public sealed class ProfanityMatcherTests
     [InlineData("да меня уже заебал этот портал")] // glued prefix "за-" onto the "еб" root
     [InlineData("можно просто охуеть с этой формы")] // glued prefix "о-" onto the root
     [InlineData("ёбаный сайт опять лежит")] // ё-spelling of the root
+    [InlineData("хватит выебываться с этой формой")] // long inflected form — {1,6} previously missed this (B7)
+    [InlineData("да отъебись ты от меня")] // hard sign between the "от-" prefix and the root (B7)
     public void ConfirmedTermIsNotAmbiguous(string text)
     {
         var match = ProfanityMatcher.Evaluate(text);
 
         Assert.NotNull(match);
         Assert.False(match!.RequiresContextCheck);
+    }
+
+    [Theory]
+    [InlineData("смотрим на ебитда компании за квартал")] // finance term, not a form of "ебать" (B7)
+    [InlineData("это наша маленькая победа")]
+    [InlineData("снизили потребление электроэнергии")]
+    [InlineData("в лесу живёт выхухоль")]
+    public void BenignWordsDoNotMatchTheEbatRule(string text)
+    {
+        var match = ProfanityMatcher.Evaluate(text);
+
+        Assert.Null(match);
     }
 
     [Fact]

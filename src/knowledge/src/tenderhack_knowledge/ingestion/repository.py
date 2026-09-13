@@ -33,6 +33,11 @@ class UnknownSnapshotError(SourceResolutionError):
     pass
 
 
+class UnknownDocumentError(SourceResolutionError):
+    """E3 (docs/plans/active/2026-09-demo-readiness.md): a materials lookup for a document_id that
+    is not part of the given snapshot — distinct from a document that exists but has no sections."""
+
+
 class CorpusBoundaryError(ValueError):
     """Raised when normative and historical corpora are mixed."""
 
@@ -146,6 +151,68 @@ class InMemoryKnowledgeRepository(SourceRepository):
 
     def get_snapshot(self, snapshot_id: str) -> KnowledgeSnapshot | None:
         return self._snapshots.get(snapshot_id)
+
+    def get_current_normative_snapshot(self) -> KnowledgeSnapshot | None:
+        normative = [s for s in self._snapshots.values() if getattr(s.corpus, "value", s.corpus) == "NORMATIVE"]
+        if not normative:
+            return None
+        return max(normative, key=lambda s: (s.created_at, s.snapshot_id))
+
+    def list_snapshot_materials(self, snapshot_id: str) -> tuple[dict, ...]:
+        """E3: one row per document in the snapshot — `document_id`/`original_filename`/
+        `declared_version`/`declared_date`/`page_count` from its version, `fragment_count` from
+        the snapshot's own fragment projection (not the canonical version's full fragment set)."""
+
+        if snapshot_id not in self._snapshots:
+            raise UnknownSnapshotError(snapshot_id)
+        snapshot = self._snapshots[snapshot_id]
+        fragment_counts: dict[str, int] = {}
+        for fragment in self._snapshot_fragments[snapshot_id].values():
+            fragment_counts[fragment.document_version_id] = fragment_counts.get(fragment.document_version_id, 0) + 1
+        rows = []
+        for version_id in snapshot.document_version_ids:
+            version = self._versions[version_id]
+            document = self._documents[version.document_id]
+            rows.append(
+                {
+                    "document_id": document.document_id,
+                    "original_filename": document.original_filename,
+                    "declared_version": version.declared_version,
+                    "declared_date": version.declared_date,
+                    "page_count": version.page_count,
+                    "fragment_count": fragment_counts.get(version_id, 0),
+                }
+            )
+        rows.sort(key=lambda row: row["original_filename"])
+        return tuple(rows)
+
+    def list_document_sections(self, snapshot_id: str, document_id: str) -> tuple[dict, ...]:
+        if snapshot_id not in self._snapshots:
+            raise UnknownSnapshotError(snapshot_id)
+        snapshot = self._snapshots[snapshot_id]
+        version_ids = {vid for vid in snapshot.document_version_ids if self._versions[vid].document_id == document_id}
+        if not version_ids:
+            raise UnknownDocumentError(document_id)
+
+        by_section: dict[str | None, list[KnowledgeFragment]] = {}
+        for fragment in self._snapshot_fragments[snapshot_id].values():
+            if fragment.document_version_id in version_ids:
+                by_section.setdefault(fragment.section, []).append(fragment)
+
+        rows = []
+        for section, fragments in by_section.items():
+            ordered = sorted(fragments, key=lambda f: (f.page_start, f.fragment_id))
+            rows.append(
+                {
+                    "section": section,
+                    "page_start": min(f.page_start for f in fragments),
+                    "page_end": max(f.page_end for f in fragments),
+                    "first_fragment_id": ordered[0].fragment_id,
+                }
+            )
+        # "Без раздела" (section is None) sorts last, per document page order otherwise.
+        rows.sort(key=lambda row: (row["section"] is None, row["page_start"]))
+        return tuple(rows)
 
     def resolve_source(self, fragment_id: str, snapshot_id: str | None = None) -> SourceResolution:
         if snapshot_id is None:

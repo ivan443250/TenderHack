@@ -60,6 +60,17 @@ public sealed class HandoffNotAcceptedException(HandoffId handoffId, HandoffStat
     public HandoffStatus Status { get; } = status;
 }
 
+/// <summary>
+/// E1 (docs/plans/active/2026-09-demo-readiness.md): a case with a live handoff (requested but not
+/// yet terminal) cannot be hidden — a specialist has a real request open, and its status/notifications
+/// must still reach the user.
+/// </summary>
+public sealed class HandoffInProgressException(CaseId caseId)
+    : InvalidOperationException($"Case {caseId} has a handoff in progress and cannot be hidden.")
+{
+    public CaseId CaseId { get; } = caseId;
+}
+
 /// <summary>A status update cannot target a different handoff/case than it was issued for (architecture.md §6).</summary>
 public sealed class HandoffMismatchException(
     HandoffId expectedHandoffId,

@@ -505,6 +505,69 @@ public sealed class CaseTests
     }
 
     [Fact]
+    public void HidingAnActiveCaseCompletesItAsClosedUserWithUnknownResolution()
+    {
+        var sut = NewCase();
+
+        sut.Hide(Now);
+
+        Assert.NotNull(sut.HiddenAt);
+        Assert.Equal(ConversationStatus.ClosedUser, sut.ConversationStatus);
+        Assert.Equal(Cases.CompletionReason.User, sut.CompletionReason);
+        Assert.Equal(ResolutionStatus.Unknown, sut.ResolutionStatus);
+    }
+
+    [Fact]
+    public void HidingAnAlreadyClosedCaseJustSetsHiddenAt()
+    {
+        var sut = NewCase();
+        sut.CompleteByUser(solved: true, Now);
+
+        sut.Hide(Now.AddSeconds(1));
+
+        Assert.Equal(Now.AddSeconds(1), sut.HiddenAt);
+        Assert.Equal(ConversationStatus.ClosedUser, sut.ConversationStatus);
+        Assert.Equal(ResolutionStatus.Resolved, sut.ResolutionStatus);
+    }
+
+    [Fact]
+    public void HidingACaseWithALiveHandoffThrows()
+    {
+        var sut = NewCase();
+        sut.PrepareHandoff(NewHandoffPackage());
+        sut.ConfirmHandoff("Резюме");
+        sut.AcknowledgeHandoff(simulated: false, "ext-1", Now);
+
+        Assert.Throws<HandoffInProgressException>(() => sut.Hide(Now));
+        Assert.Null(sut.HiddenAt);
+    }
+
+    [Fact]
+    public void HidingACaseWithATerminalHandoffSucceeds()
+    {
+        var sut = NewCase();
+        sut.PrepareHandoff(NewHandoffPackage());
+        sut.ConfirmHandoff("Резюме");
+        sut.AcknowledgeHandoff(simulated: false, "ext-1", Now);
+        sut.IngestHandoffStatus(sut.Handoff!.Id, externalRevision: 1, null, null, HandoffTerminalOutcome.Resolved, Now);
+
+        sut.Hide(Now.AddMinutes(1));
+
+        Assert.NotNull(sut.HiddenAt);
+    }
+
+    [Fact]
+    public void HidingATwiceIsANoOpAndKeepsTheFirstHiddenAt()
+    {
+        var sut = NewCase();
+        sut.Hide(Now);
+
+        sut.Hide(Now.AddMinutes(5));
+
+        Assert.Equal(Now, sut.HiddenAt);
+    }
+
+    [Fact]
     public void ACompletedTurnCannotBeFailedOrRepublished()
     {
         var sut = NewCase();

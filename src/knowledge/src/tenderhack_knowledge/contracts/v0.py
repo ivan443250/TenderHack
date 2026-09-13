@@ -17,6 +17,7 @@ class ErrorCode(str, Enum):
     MISSING_TRACE_HEADER = "MISSING_TRACE_HEADER"
     UNKNOWN_SNAPSHOT = "UNKNOWN_SNAPSHOT"
     UNKNOWN_FRAGMENT = "UNKNOWN_FRAGMENT"
+    UNKNOWN_DOCUMENT = "UNKNOWN_DOCUMENT"
     MODEL_UNAVAILABLE = "MODEL_UNAVAILABLE"
     MODEL_ERROR = "MODEL_ERROR"
     INTERNAL_ERROR = "INTERNAL_ERROR"
@@ -201,6 +202,33 @@ class SourceResponse(BaseModel):
     anchor: str | None = None
     text: str
     snapshot_id: str
+
+
+class MaterialSummary(BaseModel):
+    document_id: str
+    title: str
+    declared_version: str | None = None
+    declared_date: str | None = None
+    page_count: int
+    fragment_count: int
+
+
+class MaterialsResponse(BaseModel):
+    snapshot_id: str
+    materials: list[MaterialSummary]
+
+
+class MaterialSection(BaseModel):
+    section: str | None = None
+    page_start: int
+    page_end: int
+    first_fragment_id: str
+
+
+class MaterialSectionsResponse(BaseModel):
+    snapshot_id: str
+    document_id: str
+    sections: list[MaterialSection]
 
 
 class SnapshotResponse(BaseModel):

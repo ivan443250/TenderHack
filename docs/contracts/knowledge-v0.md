@@ -64,6 +64,7 @@
 | `MISSING_TRACE_HEADER` | 400 | обязательный заголовок §2 отсутствует |
 | `UNKNOWN_SNAPSHOT` | 404 | `snapshot_id` не существует |
 | `UNKNOWN_FRAGMENT` | 404 | `fragment_id` не найден в `GET /v0/sources/{fragment_id}` |
+| `UNKNOWN_DOCUMENT` | 404 | `document_id` не входит в текущий нормативный snapshot (`GET /v0/materials/{document_id}/sections`; E3, 2026-09-13) |
 | `MODEL_UNAVAILABLE` | 503 | inference runtime (embedder/reranker/generator) не отвечает → маппится в `KnowledgeFailure.UNAVAILABLE` |
 | `MODEL_ERROR` | 500 | inference runtime ответил, но генерация/оценка упала (напр. structured output parse failure) → маппится в `KnowledgeFailure.MODEL_ERROR` |
 | `INTERNAL_ERROR` | 500 | любая иная необработанная ошибка → `KnowledgeFailure.UNAVAILABLE` |
@@ -97,6 +98,8 @@
 | `POST /v0/draft` | генерация черновика | да |
 | `POST /v0/verify` | проверка claims черновика | да |
 | `GET /v0/sources/{fragment_id}` | открытие источника (вне хода, из UI) | нет |
+| `GET /v0/materials` | список документов текущего нормативного snapshot (вкладка «Материалы», E3, 2026-09-13) | нет |
+| `GET /v0/materials/{document_id}/sections` | оглавление одного документа по `section` фрагментов (E3, 2026-09-13) | нет |
 | `GET /v0/snapshots/current` | текущий snapshot базы знаний | нет |
 | `POST /v0/quality/turns` | push факта о ходе (`api-worker`) | нет (`turn_id` в теле) |
 | `POST /v0/quality/feedback` | push фидбэка: `specialist_rating`, `information_quality_rating`, `solved`, `comment_text` (`api-worker`) | нет (`turn_id` в теле) |

@@ -238,6 +238,45 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /v0/materials:
+    get:
+      operationId: listMaterials
+      summary: List documents in the current normative snapshot (Materials tab, E3).
+      parameters:
+        - $ref: "#/components/parameters/XTraceId"
+      responses:
+        "200":
+          description: Materials in the current normative snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialsResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v0/materials/{document_id}/sections:
+    get:
+      operationId: listMaterialSections
+      summary: Table of contents for one document in the current normative snapshot (E3).
+      parameters:
+        - $ref: "#/components/parameters/XTraceId"
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Sections in page order; a fragment with no section sorts last.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialSectionsResponse"
+        "404":
+          $ref: "#/components/responses/UnknownDocument"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /v0/snapshots/current:
     get:
       operationId: getCurrentSnapshot
@@ -416,6 +455,12 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+    UnknownDocument:
+      description: document_id is not part of the current normative snapshot.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     ModelUnavailable:
       description: Inference runtime unreachable — maps to KnowledgeFailure.UNAVAILABLE.
       content:
@@ -447,6 +492,7 @@ components:
             - MISSING_TRACE_HEADER
             - UNKNOWN_SNAPSHOT
             - UNKNOWN_FRAGMENT
+            - UNKNOWN_DOCUMENT
             - MODEL_UNAVAILABLE
             - MODEL_ERROR
             - INTERNAL_ERROR
@@ -806,6 +852,63 @@ components:
           type: string
         snapshot_id:
           type: string
+
+    MaterialSummary:
+      type: object
+      required: [document_id, title, page_count, fragment_count]
+      properties:
+        document_id:
+          type: string
+        title:
+          type: string
+        declared_version:
+          type: string
+          nullable: true
+        declared_date:
+          type: string
+          nullable: true
+        page_count:
+          type: integer
+        fragment_count:
+          type: integer
+
+    MaterialsResponse:
+      type: object
+      required: [snapshot_id, materials]
+      properties:
+        snapshot_id:
+          type: string
+        materials:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaterialSummary"
+
+    MaterialSection:
+      type: object
+      required: [page_start, page_end, first_fragment_id]
+      properties:
+        section:
+          type: string
+          nullable: true
+        page_start:
+          type: integer
+        page_end:
+          type: integer
+        first_fragment_id:
+          type: string
+
+    MaterialSectionsResponse:
+      type: object
+      required: [snapshot_id, document_id, sections]
+      properties:
+        snapshot_id:
+          type: string
+        document_id:
+          type: string
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaterialSection"
 
     SnapshotResponse:
       type: object

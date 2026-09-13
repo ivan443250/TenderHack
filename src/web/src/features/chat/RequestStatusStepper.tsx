@@ -1,6 +1,11 @@
 import type { CaseSnapshot } from "../../api/types";
 
+/** B6 (docs/plans/active/2026-09-demo-readiness.md): a failed turn is a distinct end state, not
+ * "still on step 1" — it must never be confused with a fresh, not-yet-processed request. */
+export const FAILED_STAGE = -1;
+
 const STAGE_COPY: Record<number, { eyebrow: string; title: string }> = {
+  [FAILED_STAGE]: { eyebrow: "Ошибка", title: "Техническая ошибка" },
   1: { eyebrow: "Этап 1 из 7", title: "Запрос принят" },
   2: { eyebrow: "Этап 2 из 7", title: "Ищем решение" },
   3: { eyebrow: "Этап 3 из 7", title: "Проверяем ответ" },
@@ -33,26 +38,28 @@ export function deriveRequestStage(snapshot: CaseSnapshot): number {
   if (turnStatus === "QUEUED") return 1;
   if (turnStatus === "RUNNING") return 2;
   if (turnStatus === "COMPLETED" && snapshot.timeline.length > 0) return 4;
+  if (turnStatus === "FAILED") return FAILED_STAGE;
   return 1;
 }
 
 export function RequestStatusStepper({ snapshot }: { snapshot: CaseSnapshot }) {
   const stage = deriveRequestStage(snapshot);
   const copy = STAGE_COPY[stage];
-  const progress = stage / 7;
+  const isFailed = stage === FAILED_STAGE;
+  const progress = isFailed ? 1 : stage / 7;
 
   return (
     <div className="flex h-12 items-center gap-3">
       <div
         className="relative size-12 shrink-0 rounded-full transition-[background] duration-500"
-        style={{ background: `conic-gradient(var(--action-primary) ${progress * 360}deg, var(--border-default) 0deg)` }}
+        style={{ background: `conic-gradient(${isFailed ? "#d92d20" : "var(--action-primary)"} ${progress * 360}deg, var(--border-default) 0deg)` }}
       >
-        <div className={`absolute inset-1 flex items-center justify-center rounded-full bg-white text-xs font-semibold text-[var(--content-primary)] ${stage < 7 ? "animate-pulse [animation-duration:2.5s]" : ""}`}>
-          {stage}/7
+        <div className={`absolute inset-1 flex items-center justify-center rounded-full bg-white text-xs font-semibold ${isFailed ? "text-[#d92d20]" : "text-[var(--content-primary)]"} ${stage > 0 && stage < 7 ? "animate-pulse [animation-duration:2.5s]" : ""}`}>
+          {isFailed ? "!" : `${stage}/7`}
         </div>
       </div>
       <div key={stage} className="flex h-12 animate-fade-up flex-col justify-center gap-px">
-        <p className="text-xs text-[var(--content-secondary)]">{copy.eyebrow}</p>
+        <p className={`text-xs ${isFailed ? "text-[#d92d20]" : "text-[var(--content-secondary)]"}`}>{copy.eyebrow}</p>
         <p className="text-sm font-medium text-[var(--content-primary)]">{copy.title}</p>
       </div>
     </div>

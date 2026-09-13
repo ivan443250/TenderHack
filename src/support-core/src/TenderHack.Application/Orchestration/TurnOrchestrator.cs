@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using TenderHack.Application.Knowledge;
 using TenderHack.Application.Ports;
 using TenderHack.Domain.Cases;
+using TenderHack.Domain.Common;
 using TenderHack.Domain.Routing;
 
 namespace TenderHack.Application.Orchestration;
@@ -21,6 +22,7 @@ public sealed class TurnOrchestrator(
     IUnitOfWork unitOfWork,
     ModerationOptions moderationOptions,
     TimeProvider clock,
+    CaseCompletionPublisher completionPublisher,
     ILogger<TurnOrchestrator> logger)
 {
     /// <summary>`TECHNICAL_ERROR` category for a failure that is not a classified `knowledge` call failure.</summary>
@@ -129,9 +131,9 @@ public sealed class TurnOrchestrator(
         {
             @case.TryFailTurn(turn.Id, turn.Revision);
             await PublishAsync(@case.Id, turn.Id, turn.Revision, "TECHNICAL_ERROR", now,
-                new Dictionary<string, object?> { ["category"] = ex.Category.ToString() }, ct);
+                new Dictionary<string, object?> { ["category"] = ex.Category.ToWire() }, ct);
             EnqueueQualityTurnPush(@case, turn, messageText, Decision.TechnicalError, timings,
-                answerMarkdown: null, evidenceFragmentIds: null, snapshotId: null, routing: null, errorCategory: ex.Category.ToString());
+                answerMarkdown: null, evidenceFragmentIds: null, snapshotId: null, routing: null, errorCategory: ex.Category.ToWire());
             return TurnOutcome.TechnicalError(turn.Id, turn.Revision, @case.ModerationWarningCount, ex.Category);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
@@ -231,6 +233,16 @@ public sealed class TurnOrchestrator(
         EnqueueQualityTurnPush(@case, turn, messageText, decision, timings,
             answerMarkdown: null, evidenceFragmentIds: null, snapshotId: null, routing: null, errorCategory: null);
 
+        if (decision == Decision.ModerationClose)
+        {
+            // architecture.md §5.8: completion emits CASE_COMPLETED + a notification for every close
+            // path, moderation included — it only skips FEEDBACK_REQUESTED, which
+            // CaseCompletionPublisher already decides on its own from CompletionReason.Moderation
+            // (set by Case.RecordModerationViolation above). Reusing it here is the only way this
+            // path was missing CASE_COMPLETED/the notification at all (B5).
+            await completionPublisher.PublishAsync(@case, @case.ResolutionStatus, now, ct);
+        }
+
         return TurnOutcome.Moderation(turn.Id, turn.Revision, decision, @case.ModerationWarningCount);
     }
 
@@ -268,7 +280,11 @@ public sealed class TurnOrchestrator(
                 @case.RecordClarification(answerability.MissingConditions);
                 @case.TryPublishDecision(turn.Id, turn.Revision, Decision.Clarify);
                 await PublishAsync(@case.Id, turn.Id, turn.Revision, "CLARIFICATION", now,
-                    new Dictionary<string, object?> { ["missing_conditions"] = answerability.MissingConditions }, ct);
+                    new Dictionary<string, object?>
+                    {
+                        ["missing_conditions"] = answerability.MissingConditions,
+                        ["questions"] = answerability.MissingConditions.Select(ToClarificationQuestion).ToArray(),
+                    }, ct);
                 EnqueueQualityTurnPush(@case, turn, messageText, Decision.Clarify, timings,
                     answerMarkdown: null, evidenceFragmentIds: null, retrieve.SnapshotId, routing: null, errorCategory: null);
                 return TurnOutcome.Clarify(turn.Id, turn.Revision, @case.ModerationWarningCount, answerability.MissingConditions);
@@ -445,14 +461,14 @@ public sealed class TurnOrchestrator(
             turn.CreatedAt,
             messageText,
             PriorTurnsSummary: null,
-            decision.ToString(),
+            decision.ToWire(),
             routing?.ReasonCodes ?? [],
             answerMarkdown,
             evidenceFragmentIds,
             snapshotId,
-            HandoffStatus: @case.Handoff?.Status.ToString(),
-            RecommendedLine: routing?.RecommendedLine.ToString(),
-            ServiceNeed: routing?.ServiceNeed.ToString(),
+            HandoffStatus: @case.Handoff?.Status.ToWire(),
+            RecommendedLine: routing?.RecommendedLine.ToWire(),
+            ServiceNeed: routing?.ServiceNeed.ToWire(),
             timings.ToPush(),
             errorCategory,
             modelVersion,
@@ -487,10 +503,30 @@ public sealed class TurnOrchestrator(
             {
                 entities = @case.TurnContext.KnownSlots.Select(s => new { type = s.Type, value = s.Value, provenance = ToWireProvenance(s.Provenance) }).ToArray(),
                 missing_conditions = answerability.MissingConditions,
+                // F1.3 (docs/plans/active/2026-09-product-enhancements.md): reuse B1's slot→question
+                // mapping so the Applicability Card's "Нужно уточнить" block never has to render a
+                // raw slot id either.
+                questions = answerability.MissingConditions.Select(ToClarificationQuestion).ToArray(),
                 risk_flags = answerability.RiskFlags,
                 evidence_fragment_ids = answerability.EvidenceFragmentIds,
             },
         }, ct);
+
+    /// <summary>
+    /// B1 (docs/plans/active/2026-09-demo-readiness.md): `missing_conditions` slot ids come straight
+    /// through from `knowledge` (e.g. `"role"`, `"provider"`) and are not user-facing copy on their
+    /// own. `questions` is an additive companion field (web-api-v0.md §4.2) carrying an actual
+    /// question the UI can render; a slot without a known mapping still gets a usable, if generic,
+    /// question rather than being dropped.
+    /// </summary>
+    private static string ToClarificationQuestion(string slot) => slot switch
+    {
+        "role" => "Вы работаете на Портале как поставщик или как заказчик?",
+        "provider" => "Через какого оператора ЭДО вы работаете?",
+        "status" => "Какой сейчас статус документа?",
+        "document_type" => "О каком документе речь — УПД, акт, счёт?",
+        _ => $"Уточните, пожалуйста: {slot}",
+    };
 
     private static string ToWireProvenance(ContextSlotProvenance provenance) => provenance switch
     {
@@ -522,8 +558,8 @@ public sealed class TurnOrchestrator(
     private Task PublishHandoffOfferAsync(Case @case, Turn turn, DateTimeOffset now, RoutingDecision routing, CancellationToken ct) =>
         PublishAsync(@case.Id, turn.Id, turn.Revision, "HANDOFF_OFFER", now, new Dictionary<string, object?>
         {
-            ["service_need"] = routing.ServiceNeed.ToString(),
-            ["recommended_line"] = routing.RecommendedLine.ToString(),
+            ["service_need"] = routing.ServiceNeed.ToWire(),
+            ["recommended_line"] = routing.RecommendedLine.ToWire(),
             ["dispatch_queue"] = routing.DispatchQueue,
             ["engineering_review_suggested"] = routing.EngineeringReviewSuggested,
             ["reason_codes"] = routing.ReasonCodes,

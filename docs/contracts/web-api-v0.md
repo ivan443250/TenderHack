@@ -58,6 +58,7 @@ Route names and semantics below are the `v0` public contract. A rename/removal o
 | Confirm handoff | `POST /api/v0/cases/{case_id}/handoff/confirm` | durable outbox submission request |
 | Retry failed handoff | `POST /api/v0/cases/{case_id}/handoff/retry` | same logical handoff/idempotency semantics |
 | Complete case | `POST /api/v0/cases/{case_id}/complete` | user-initiated completion (§9) |
+| Hide case | `DELETE /api/v0/cases/{case_id}` | soft-hide: removes the case from the owner's own lists; nothing is deleted (§9.4) |
 | Submit feedback | `POST /api/v0/cases/{case_id}/feedback` | stores user feedback after completion; once per case |
 | Notifications catch-up | `GET /api/v0/notifications?after=` | owner-scoped, monotonic `notification_id` (§12) |
 | Notifications stream | `GET /api/v0/notifications/stream` | owner-level SSE, independent of any case (§12) |
@@ -142,6 +143,8 @@ Minimum item/event types:
 
 `HANDOFF_STATUS` payload is the handoff view (§4.4) plus `changed: ["status" | "stage" | "assigned_specialist" | "terminal"]` so the UI can highlight what moved.
 
+`CLARIFICATION` payload: `{ "missing_conditions": ["role"], "questions": ["Вы работаете на Портале как поставщик или как заказчик?"] }`. `questions` is additive (2026-09-13, docs/plans/active/2026-09-demo-readiness.md B1) — a server-authored question per slot in `missing_conditions`, so the UI never has to render a raw slot id as user-facing copy; an unmapped slot still gets a usable generic question. If empty/absent, the UI falls back to rendering `missing_conditions` directly.
+
 `CASE_COMPLETED` payload: `{ "completion_reason": "USER | SUPPORT | MODERATION", "resolution_status": "..." }`.
 
 UI may combine events into richer widgets, but must not change their meaning.
@@ -167,6 +170,7 @@ UI may combine events into richer widgets, but must not change their meaning.
       { "type": "role", "value": "поставщик", "provenance": "user_explicit" }
     ],
     "missing_conditions": ["..."],
+    "questions": ["..."],
     "risk_flags": ["..."],
     "evidence_fragment_ids": ["..."]
   }
@@ -177,7 +181,7 @@ A source button appears only when `fragment_id` is persisted for the published a
 
 `snapshot_id`/`model_version`/`retrieval_config_version` are additive fields (2026-09-12, architecture.md §8 "Knowledge versioning") — technical trace detail, not shown as end-user UI (§1). They are recorded on the persisted `AI_ANSWER` timeline event; `POST /messages`'s own synchronous `answer.sources` reply carries `{fragment_id, title, page, label}` per source (`title` falls back to `document_id` when `knowledge` did not supply one — `Candidate.title` in `knowledge-v0` is additive/optional).
 
-`applicability` is an additive field on the persisted `AI_ANSWER` timeline event (2026-09-13, product-experience.md §5 "Applicability Card") — the "why this applies to you" panel, built entirely from facts that already passed the Answerability Gate, not a re-derived confidence score. `entities` echoes `TurnContext`'s known slots (`type`/`value`/`provenance`, `provenance ∈ user_explicit | trusted_portal_context | inferred | unknown`, matching `ContextSlotProvenance` in `TenderHack.Domain`); `missing_conditions`, `risk_flags` and `evidence_fragment_ids` are passed through verbatim from `knowledge.assess_answerability`'s response. Not present on `POST /messages`'s synchronous reply — read it from the timeline.
+`applicability` is an additive field on the persisted `AI_ANSWER` timeline event (2026-09-13, product-experience.md §5 "Applicability Card") — the "why this applies to you" panel, built entirely from facts that already passed the Answerability Gate, not a re-derived confidence score. `entities` echoes `TurnContext`'s known slots (`type`/`value`/`provenance`, `provenance ∈ user_explicit | trusted_portal_context | inferred | unknown`, matching `ContextSlotProvenance` in `TenderHack.Domain`); `missing_conditions`, `risk_flags` and `evidence_fragment_ids` are passed through verbatim from `knowledge.assess_answerability`'s response. `questions` (additive, 2026-09-13, `2026-09-product-enhancements.md` F1.3) is the same slot→question mapping `CLARIFICATION.questions` uses (§4.2) — one question per entry in `missing_conditions`, same order; empty when `missing_conditions` is empty. Not present on `POST /messages`'s synchronous reply — read it from the timeline.
 
 ### 4.4. Handoff view
 
@@ -303,6 +307,16 @@ Rules:
 - negative feedback is not evidence of employee fault;
 - API owns feedback persistence, emits `FEEDBACK_SUBMITTED`; analytics receives a copy asynchronously.
 
+### 9.4. Hide case
+
+`DELETE /api/v0/cases/{case_id}` — soft-hide (E1, 2026-09-13). This is not deletion: `case_events`, `turns`, and `feedback` are untouched, and the knowledge quality corpus is unaffected — the case simply stops appearing in the owner's own lists.
+
+Responses: `204` on success (idempotent — hiding an already-hidden case is also `204`); `404 NOT_FOUND` for an unknown case or one owned by a different owner; `409 HANDOFF_IN_PROGRESS` when the case has a handoff that has been requested but has no terminal outcome yet (`PENDING`/`ACCEPTED`/`SIMULATED_ACCEPTED`) — a specialist has a real open request, and its status/notifications must still reach the user, so the case cannot disappear out from under it.
+
+Effects: hidden cases are excluded from `GET /api/v0/cases` (both `status=active` and `status=archived`) and from `unread_notifications` counts. `GET /api/v0/cases/{case_id}` remains fully readable by direct link — hiding never breaks a bookmarked/shared URL. `CaseSnapshot` gets no new field for this; the client infers hidden state only from the case's absence in the list responses.
+
+If the case was still `ACTIVE` when hidden, it is completed first through the same path as `POST /.../complete` with `solved: null` (§9.1) — `resolution_status` becomes `UNKNOWN` unless already set, `conversation_status = CLOSED_USER`, and exactly one `CASE_COMPLETED` is published. Unlike §9.1, hiding never emits `FEEDBACK_REQUESTED` and never sends the `CASE_COMPLETED` notification — the case is leaving the owner's own view, so neither a completion toast nor a feedback ask makes sense.
+
 ## 10. Error semantics
 
 Public errors use stable machine `code` + safe user message. At minimum distinguish:
@@ -362,3 +376,34 @@ The cookie is the only credential the browser holds. `case_id` alone never grant
 ## 14. Support status webhook (not for browsers)
 
 `POST /api/v0/integrations/support/status` — inbound channel for a real support adapter; semantics, signature and idempotency in `support-adapter-v0.md §6.2`. It is registered only when `Support:Webhook:Enabled=true`, requires `X-Support-Signature` and `X-Support-Timestamp`, and never reads the owner cookie. It exists in this document only so the public surface list is complete.
+
+## 15. Materials
+
+E3 (2026-09-13, docs/plans/active/2026-09-demo-readiness.md). Read-only proxy to `knowledge-v0`'s `GET /v0/materials`/`GET /v0/materials/{document_id}/sections`, backing the "Материалы" tab in the context panel. No Decision fields; owner session required like `GET /api/v0/sources/{fragment_id}` (§11).
+
+`GET /api/v0/materials` → list of documents in the current normative snapshot:
+
+```json
+{
+  "snapshot_id": "...",
+  "materials": [
+    { "document_id": "...", "title": "...", "declared_version": "v11", "declared_date": "2025-03-01", "page_count": 93, "fragment_count": 1200 }
+  ]
+}
+```
+
+`GET /api/v0/materials/{document_id}/sections` → that document's table of contents, in page order (a fragment with no `section` sorts last, rendered as "Без раздела"):
+
+```json
+{
+  "snapshot_id": "...",
+  "document_id": "...",
+  "sections": [
+    { "section": "1. Общие положения", "page_start": 1, "page_end": 5, "first_fragment_id": "frag_1" }
+  ]
+}
+```
+
+Opening a section reuses `GET /api/v0/sources/{fragment_id}` (§9's source drawer) with `first_fragment_id` — there is no separate materials-specific fragment view. `401 UNAUTHENTICATED` without an owner session. Any failed `knowledge` call — including `knowledge`'s own `404 UNKNOWN_DOCUMENT` for an unknown `document_id` — surfaces as `503 KNOWLEDGE_UNAVAILABLE`: `HttpKnowledgeService`'s generic `KnowledgeFailureException` mapping does not distinguish "not found" from "unreachable" for any `IKnowledgeService` call today, the same known imperfection `GET /api/v0/sources/{fragment_id}` already has for `UNKNOWN_FRAGMENT` (tracked, not fixed by this change). Responses carry `Cache-Control: private, max-age=300`: content is static for a given snapshot, so a short client-side cache is safe and does not need per-request revalidation.
+
+Retrieving the underlying PDF file itself (e.g. "Скачать инструкцию") is out of scope for this section — the corpus PDFs are not mounted into `knowledge` at runtime, only at bootstrap.

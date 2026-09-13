@@ -9,10 +9,15 @@ namespace TenderHack.Application.Tests;
 
 public sealed class UseCasesTests
 {
-    private static TurnOrchestrator NewOrchestrator(FakeUnitOfWork unitOfWork) =>
-        new(new FakeKnowledgeService(), new FakeModerationRuleEngine(), new FakeTurnEventStream(), new FakeOutbox(),
+    private static TurnOrchestrator NewOrchestrator(FakeUnitOfWork unitOfWork)
+    {
+        var events = new FakeTurnEventStream();
+        var outbox = new FakeOutbox();
+        return new(new FakeKnowledgeService(), new FakeModerationRuleEngine(), events, outbox,
             unitOfWork, new ModerationOptions(), TimeProvider.System,
+            new CaseCompletionPublisher(events, new FakeNotificationSink(), outbox),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<TurnOrchestrator>.Instance);
+    }
 
     [Fact]
     public async Task CreateCasePersistsAndReturnsANewCaseForTheOwner()

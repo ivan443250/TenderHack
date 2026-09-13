@@ -84,6 +84,21 @@ public sealed class FakeKnowledgeService : IKnowledgeService
         return Task.FromResult(new SourceFragment("doc-1", "Title", "v1", 1, null, "text", "snapshot-1"));
     }
 
+    public Materials Materials { get; set; } = new("snapshot-1", [new MaterialSummary("doc-1", "Инструкция.pdf", "v1", "2025-01-01", 10, 5)]);
+    public MaterialSections MaterialSections { get; set; } = new("snapshot-1", "doc-1", [new MaterialSection("Раздел 1", 1, 3, "frag-1")]);
+
+    public Task<Materials> ListMaterialsAsync(CancellationToken ct)
+    {
+        ThrowIfConfiguredToFail(nameof(ListMaterialsAsync));
+        return Task.FromResult(Materials);
+    }
+
+    public Task<MaterialSections> ListMaterialSectionsAsync(string documentId, CancellationToken ct)
+    {
+        ThrowIfConfiguredToFail(nameof(ListMaterialSectionsAsync));
+        return Task.FromResult(MaterialSections);
+    }
+
     public List<QualityTurnPush> PushedTurns { get; } = [];
     public List<QualityFeedbackPush> PushedFeedback { get; } = [];
     public List<QualityCompletionPush> PushedCompletions { get; } = [];

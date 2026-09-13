@@ -16,6 +16,10 @@ from tenderhack_knowledge.contracts.v0 import (
     ErrorResponse,
     HealthResponse,
     IssueGroupsResponse,
+    MaterialSection,
+    MaterialSectionsResponse,
+    MaterialsResponse,
+    MaterialSummary,
     ModerationContextRequest,
     ModerationContextResponse,
     QualityCompletionPush,
@@ -39,7 +43,12 @@ from tenderhack_knowledge.generation.service import GeneratorModelError, Generat
 from tenderhack_knowledge.inference.config import InferenceSettings
 from tenderhack_knowledge.inference.generator import LocalOpenAIChatGenerator
 from tenderhack_knowledge.ingestion.ids import normalize_source_name
-from tenderhack_knowledge.ingestion.repository import CorpusBoundaryError, UnknownFragmentError, UnknownSnapshotError
+from tenderhack_knowledge.ingestion.repository import (
+    CorpusBoundaryError,
+    UnknownDocumentError,
+    UnknownFragmentError,
+    UnknownSnapshotError,
+)
 from tenderhack_knowledge.persistence.db import create_engine
 from tenderhack_knowledge.persistence.repository import PostgresKnowledgeRepository
 from tenderhack_knowledge.quality.service import QualityPayloadConflict, QualityRepository
@@ -399,6 +408,82 @@ async def source(fragment_id: str, x_trace_id: TraceIdHeader) -> SourceResponse:
         anchor=_anchor_text(resolution),
         text=resolution.text,
         snapshot_id=resolution.snapshot_id or "",
+    )
+
+
+@router.get(
+    "/v0/materials",
+    response_model=MaterialsResponse,
+    responses={500: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
+)
+async def materials(x_trace_id: TraceIdHeader) -> MaterialsResponse:
+    del x_trace_id
+    repository = get_knowledge_repository()
+    if repository is None:
+        raise _internal_error("knowledge database is not configured")
+    try:
+        snapshot = await repository.get_current_normative_snapshot()
+        if snapshot is None:
+            raise UnknownSnapshotError("no current normative snapshot")
+        rows = await repository.list_snapshot_materials(snapshot.snapshot_id)
+    except UnknownSnapshotError as exc:
+        raise _internal_error("no current normative snapshot") from exc
+    except Exception as exc:  # pragma: no cover - depends on external DB
+        raise _internal_error("unable to list materials") from exc
+    return MaterialsResponse(
+        snapshot_id=snapshot.snapshot_id,
+        materials=[
+            MaterialSummary(
+                document_id=row["document_id"],
+                title=_safe_title(row["original_filename"]),
+                declared_version=row["declared_version"],
+                declared_date=row["declared_date"].isoformat() if row["declared_date"] else None,
+                page_count=row["page_count"],
+                fragment_count=row["fragment_count"],
+            )
+            for row in rows
+        ],
+    )
+
+
+@router.get(
+    "/v0/materials/{document_id}/sections",
+    response_model=MaterialSectionsResponse,
+    responses={404: {"model": ErrorResponse}, 500: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
+)
+async def material_sections(document_id: str, x_trace_id: TraceIdHeader) -> MaterialSectionsResponse:
+    del x_trace_id
+    repository = get_knowledge_repository()
+    if repository is None:
+        raise _internal_error("knowledge database is not configured")
+    try:
+        snapshot = await repository.get_current_normative_snapshot()
+        if snapshot is None:
+            raise UnknownSnapshotError("no current normative snapshot")
+        rows = await repository.list_document_sections(snapshot.snapshot_id, document_id)
+    except UnknownDocumentError as exc:
+        from tenderhack_knowledge.contracts.v0 import ErrorCode
+
+        raise HTTPException(
+            status_code=404,
+            detail={"code": ErrorCode.UNKNOWN_DOCUMENT.value, "message": f"Unknown document: {document_id}"},
+        ) from exc
+    except UnknownSnapshotError as exc:
+        raise _internal_error("no current normative snapshot") from exc
+    except Exception as exc:  # pragma: no cover - depends on external DB
+        raise _internal_error("unable to list document sections") from exc
+    return MaterialSectionsResponse(
+        snapshot_id=snapshot.snapshot_id,
+        document_id=document_id,
+        sections=[
+            MaterialSection(
+                section=row["section"],
+                page_start=row["page_start"],
+                page_end=row["page_end"],
+                first_fragment_id=row["first_fragment_id"],
+            )
+            for row in rows
+        ],
     )
 
 

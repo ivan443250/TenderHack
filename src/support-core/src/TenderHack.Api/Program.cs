@@ -28,6 +28,7 @@ builder.Services.AddScoped<RetryHandoffUseCase>();
 builder.Services.AddScoped<IngestHandoffStatusUseCase>();
 builder.Services.AddScoped<CaseCompletionPublisher>();
 builder.Services.AddScoped<CompleteCaseUseCase>();
+builder.Services.AddScoped<HideCaseUseCase>();
 builder.Services.AddScoped<SubmitFeedbackUseCase>();
 builder.Services.AddScoped<ListNotificationsUseCase>();
 builder.Services.AddScoped<AckNotificationsUseCase>();
@@ -78,6 +79,7 @@ app.MapGet("/health/ready", async (TenderHackDbContext db, CancellationToken ct)
 app.MapSessionEndpoints();
 app.MapCaseEndpoints();
 app.MapSourceEndpoints();
+app.MapMaterialsEndpoints();
 app.MapHandoffEndpoints();
 app.MapCompletionEndpoints();
 app.MapNotificationEndpoints();

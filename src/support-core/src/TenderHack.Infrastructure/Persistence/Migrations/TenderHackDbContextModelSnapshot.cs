@@ -49,6 +49,10 @@ namespace TenderHack.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("feedback_id");
 
+                    b.Property<DateTimeOffset?>("HiddenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("hidden_at");
+
                     b.Property<int>("ModerationWarningCount")
                         .HasColumnType("integer")
                         .HasColumnName("moderation_warning_count");

@@ -32,6 +32,7 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
             HandoffAlreadyExistsException => (StatusCodes.Status409Conflict, "HANDOFF_ALREADY_EXISTS", "This case already has a handoff."),
             HandoffNotAcceptedException => (StatusCodes.Status409Conflict, "HANDOFF_INVALID_STATE", "Status facts are only accepted for an acknowledged handoff."),
             HandoffNotFoundException => (StatusCodes.Status404NotFound, "HANDOFF_NOT_FOUND", "This case has no handoff yet."),
+            HandoffInProgressException => (StatusCodes.Status409Conflict, "HANDOFF_IN_PROGRESS", "Дождитесь завершения обращения у специалиста."),
             IdempotencyConflictException => (StatusCodes.Status409Conflict, "IDEMPOTENCY_KEY_CONFLICT", "Idempotency-Key was already used with a different request body."),
             ConcurrencyConflictException => (StatusCodes.Status409Conflict, "CONCURRENCY_CONFLICT", "This case was updated concurrently — reload and retry."),
             KnowledgeFailureException { Category: KnowledgeFailureCategory.Timeout } => (StatusCodes.Status504GatewayTimeout, "KNOWLEDGE_TIMEOUT", "Knowledge service timed out."),

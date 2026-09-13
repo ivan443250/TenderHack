@@ -92,3 +92,21 @@ public sealed record SourceFragment(
     string? Anchor,
     string Text,
     string SnapshotId);
+
+/// <summary>E3 (docs/plans/active/2026-09-demo-readiness.md): one document in the current normative
+/// snapshot, for the "Материалы" tab's document list.</summary>
+public sealed record MaterialSummary(
+    string DocumentId,
+    string Title,
+    string? DeclaredVersion,
+    string? DeclaredDate,
+    int PageCount,
+    int FragmentCount);
+
+public sealed record Materials(string SnapshotId, IReadOnlyList<MaterialSummary> Items);
+
+/// <summary>One entry in a document's table of contents; `Section` is null for fragments outside
+/// any named section — the UI renders that entry last, as "Без раздела".</summary>
+public sealed record MaterialSection(string? Section, int PageStart, int PageEnd, string FirstFragmentId);
+
+public sealed record MaterialSections(string SnapshotId, string DocumentId, IReadOnlyList<MaterialSection> Items);

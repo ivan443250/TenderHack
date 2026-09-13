@@ -9,29 +9,9 @@ import { ModerationBlockedNotice } from "./Messages";
 import { MessageList } from "./MessageList";
 import { ContextPanel } from "./ContextPanel";
 import { RequestStatusStepper } from "./RequestStatusStepper";
+import { SourceModal } from "./SourceModal";
 import { IconButton } from "../../design-system/IconButton";
 import { BookOpenIcon } from "../../design-system/icons";
-
-function SourceModal({ source, onClose }: { source: SourceDetail; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex animate-fade-in items-center justify-center bg-black/30 p-6 backdrop-blur-[2px]" onClick={onClose}>
-      <div
-        className="max-h-[80vh] w-full max-w-xl animate-pop-in overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <p className="text-sm font-semibold text-[var(--content-primary)]">{source.title}</p>
-        <p className="mt-1 text-xs text-[var(--content-tertiary)]">
-          {source.version}
-          {source.page ? ` · стр. ${source.page}` : ""}
-        </p>
-        <p className="mt-3 whitespace-pre-wrap text-sm text-[var(--content-primary)]">{source.text}</p>
-        <button type="button" onClick={onClose} className="mt-5 text-sm font-medium text-[var(--action-primary)] transition-opacity hover:opacity-80">
-          Закрыть
-        </button>
-      </div>
-    </div>
-  );
-}
 
 export function ChatScreen({ api }: { api: ApiClient }) {
   const { caseId } = useParams<{ caseId: string }>();
@@ -97,7 +77,7 @@ export function ChatScreen({ api }: { api: ApiClient }) {
         )}
       </div>
 
-      {panelOpen && <ContextPanel usedSources={usedSourcesList} onClose={() => setPanelOpen(false)} />}
+      {panelOpen && <ContextPanel api={api} usedSources={usedSourcesList} onClose={() => setPanelOpen(false)} />}
       {openedSource && <SourceModal source={openedSource} onClose={() => setOpenedSource(null)} />}
     </div>
   );

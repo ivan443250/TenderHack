@@ -28,6 +28,7 @@ from tenderhack_knowledge.ingestion.models import (
 )
 from tenderhack_knowledge.ingestion.repository import (
     CorpusBoundaryError,
+    UnknownDocumentError,
     UnknownFragmentError,
     UnknownSnapshotError,
 )
@@ -330,6 +331,83 @@ class PostgresKnowledgeRepository:
                 _fragment_from_row(row).model_copy(update={"snapshot_id": snapshot_id})
                 for row in result.mappings()
             )
+
+    async def list_snapshot_materials(self, snapshot_id: str) -> tuple[Mapping, ...]:
+        """E3 (docs/plans/active/2026-09-demo-readiness.md): one row per document version in the
+        snapshot, with `fragment_count` scoped to this snapshot's own fragment membership — not the
+        version's full canonical fragment set, which could outgrow what was actually published here."""
+
+        async with self.engine.connect() as connection:
+            if await self._one(connection, select(kb_snapshots.c.snapshot_id).where(kb_snapshots.c.snapshot_id == snapshot_id)) is None:
+                raise UnknownSnapshotError(snapshot_id)
+
+            fragment_count = (
+                select(
+                    kb_fragments.c.document_version_id,
+                    sa.func.count(kb_snapshot_fragments.c.fragment_id).label("fragment_count"),
+                )
+                .join(kb_snapshot_fragments, kb_snapshot_fragments.c.fragment_id == kb_fragments.c.fragment_id)
+                .where(kb_snapshot_fragments.c.snapshot_id == snapshot_id)
+                .group_by(kb_fragments.c.document_version_id)
+                .subquery()
+            )
+            result = await connection.execute(
+                select(
+                    kb_documents.c.document_id,
+                    kb_documents.c.original_filename,
+                    kb_document_versions.c.declared_version,
+                    kb_document_versions.c.declared_date,
+                    kb_document_versions.c.page_count,
+                    sa.func.coalesce(fragment_count.c.fragment_count, 0).label("fragment_count"),
+                )
+                .select_from(kb_snapshot_document_versions)
+                .join(kb_document_versions, kb_document_versions.c.document_version_id == kb_snapshot_document_versions.c.document_version_id)
+                .join(kb_documents, kb_documents.c.document_id == kb_document_versions.c.document_id)
+                .join(fragment_count, fragment_count.c.document_version_id == kb_document_versions.c.document_version_id, isouter=True)
+                .where(kb_snapshot_document_versions.c.snapshot_id == snapshot_id)
+                .order_by(kb_documents.c.original_filename)
+            )
+            return tuple(result.mappings())
+
+    async def list_document_sections(self, snapshot_id: str, document_id: str) -> tuple[Mapping, ...]:
+        async with self.engine.connect() as connection:
+            if await self._one(connection, select(kb_snapshots.c.snapshot_id).where(kb_snapshots.c.snapshot_id == snapshot_id)) is None:
+                raise UnknownSnapshotError(snapshot_id)
+
+            version_in_snapshot = (
+                select(kb_document_versions.c.document_version_id)
+                .select_from(kb_snapshot_document_versions)
+                .join(kb_document_versions, kb_document_versions.c.document_version_id == kb_snapshot_document_versions.c.document_version_id)
+                .where(
+                    kb_snapshot_document_versions.c.snapshot_id == snapshot_id,
+                    kb_document_versions.c.document_id == document_id,
+                )
+            )
+            version_ids = tuple(row.document_version_id for row in await connection.execute(version_in_snapshot))
+            if not version_ids:
+                raise UnknownDocumentError(document_id)
+
+            # Postgres-specific ARRAY_AGG(... ORDER BY ...) picks "first fragment_id by
+            # (page_start, fragment_id)" within the same aggregation as the page range, avoiding a
+            # second round trip per section — consistent with the raw-SQL aggregates already used
+            # elsewhere in this repository for the same reason.
+            sections_query = sa.text(
+                """
+                SELECT
+                    f.section,
+                    MIN(f.page_start) AS page_start,
+                    MAX(f.page_end) AS page_end,
+                    (ARRAY_AGG(f.fragment_id ORDER BY f.page_start, f.fragment_id))[1] AS first_fragment_id
+                FROM kb_snapshot_fragments m
+                JOIN kb_fragments f ON f.fragment_id = m.fragment_id
+                WHERE m.snapshot_id = :snapshot_id
+                  AND f.document_version_id IN :version_ids
+                GROUP BY f.section
+                ORDER BY (f.section IS NULL), MIN(f.page_start)
+                """
+            ).bindparams(sa.bindparam("version_ids", expanding=True))
+            result = await connection.execute(sections_query, {"snapshot_id": snapshot_id, "version_ids": list(version_ids)})
+            return tuple(result.mappings())
 
     async def store_condition_cards(self, cards: Iterable[ConditionCard]) -> int:
         """Persist immutable card versions after a normative provenance check."""

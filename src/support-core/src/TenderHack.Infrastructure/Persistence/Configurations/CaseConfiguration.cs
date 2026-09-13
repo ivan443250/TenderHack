@@ -33,6 +33,7 @@ public sealed class CaseConfiguration : IEntityTypeConfiguration<Case>
         builder.Property(c => c.ModerationWarningCount).IsRequired();
         builder.Property(c => c.CompletionReason).HasConversion<string>();
         builder.Property(c => c.CompletedAt);
+        builder.Property(c => c.HiddenAt).HasColumnName("hidden_at");
 
         // TurnContext (architecture.md §10 continuity) is stored as one JSON column rather than an
         // owned collection: it is always read/written whole per turn, never queried by SQL, and its
