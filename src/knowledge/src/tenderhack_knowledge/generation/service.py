@@ -10,6 +10,7 @@ from typing import Any
 from tenderhack_knowledge.answerability import assess_answerability
 from tenderhack_knowledge.contracts.v0 import Claim, DraftRequest, DraftResponse, EvidenceSufficiency, TokenUsage
 from tenderhack_knowledge.inference.errors import GeneratorClientError
+from tenderhack_knowledge.inference.generator import GeneratorOutputTruncatedError
 from tenderhack_knowledge.inference.safety import strip_reasoning
 from tenderhack_knowledge.inference.prompts import DRAFT_PROMPT_VERSION, build_draft_prompt
 from tenderhack_knowledge.ingestion.models import Corpus, KnowledgeFragment
@@ -87,8 +88,8 @@ class GroundedDraftService:
     """Build a draft only after the deterministic answerability gate passes.
 
     The service intentionally performs one generation and one verification
-    pass. A future controlled rewrite can be added behind the same bounded
-    interface; it must never turn into an unbounded retry loop.
+    pass. An explicit provider truncation may trigger one compact-output
+    retry; this remains bounded and never turns into an unbounded retry loop.
     """
 
     def __init__(self, repository: Any, generator: Any | None = None, *, generator_factory: Any | None = None) -> None:
@@ -122,15 +123,35 @@ class GroundedDraftService:
             raise GeneratorUnavailableError("local generator is unavailable")
         fragments = await _normative_fragments(self.repository, payload.snapshot_id, payload.evidence_fragment_ids)
         prompt = build_draft_prompt(payload.query, fragments, payload.constraints)
+        # Request the smallest structured-output mode supported by the
+        # OpenAI-compatible local runtime.  The parser below remains strict:
+        # this hint never turns prose into a grounded draft.
+        response_format = _grounded_draft_response_format()
         try:
-            # Request the smallest structured-output mode supported by the
-            # OpenAI-compatible local runtime.  The parser below remains
-            # strict: this hint never turns prose into a grounded draft.
             raw = await generator.draft(
                 prompt,
-                response_format=_grounded_draft_response_format(),
+                response_format=response_format,
                 max_tokens=max_tokens,
             )
+        except GeneratorOutputTruncatedError:
+            # A provider-confirmed length stop is the only generation failure
+            # eligible for the one compact-output retry.  No evidence or
+            # grounding data is changed, and the public generator interface
+            # remains ``draft(...) -> str`` for existing fakes/adapters.
+            try:
+                raw = await generator.draft(
+                    _compact_retry_prompt(prompt),
+                    response_format=response_format,
+                    max_tokens=max_tokens,
+                )
+            except GeneratorOutputTruncatedError as retry_exc:
+                raise GeneratorModelError("local generator output was truncated after bounded retry") from retry_exc
+            except GeneratorClientError as retry_exc:
+                if _is_unavailable(retry_exc):
+                    raise GeneratorUnavailableError("local generator is unavailable") from retry_exc
+                raise GeneratorModelError("local generator failed") from retry_exc
+            except (TimeoutError, ConnectionError, OSError) as retry_exc:
+                raise GeneratorUnavailableError("local generator is unavailable") from retry_exc
         except GeneratorClientError as exc:
             if _is_unavailable(exc):
                 raise GeneratorUnavailableError("local generator is unavailable") from exc
@@ -207,6 +228,16 @@ async def _normative_fragments(repository: Any, snapshot_id: str, requested_ids:
 def _is_unavailable(error: GeneratorClientError) -> bool:
     message = str(error).casefold()
     return any(marker in message for marker in ("request failed", "returned http 502", "returned http 503", "returned http 504", "timed out", "connection"))
+
+
+def _compact_retry_prompt(prompt: str) -> str:
+    """Ask for a shorter JSON response without changing supplied evidence."""
+
+    return (
+        prompt
+        + "\n\nTRUNCATION RETRY: The previous response was truncated. Return the shortest valid JSON in the same schema. "
+        "Use a concise draft_markdown and the minimum necessary grounded claims; do not repeat explanations outside JSON."
+    )
 
 
 def _model_version(generator: Any) -> str:

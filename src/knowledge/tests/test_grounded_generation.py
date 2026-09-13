@@ -14,9 +14,14 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from tenderhack_knowledge.api import routes
 from tenderhack_knowledge.contracts.v0 import Corpus, DraftConstraints, DraftRequest, Claim, EvidenceSufficiency
 from tenderhack_knowledge.generation.models import ModelOutputError, parse_model_output
-from tenderhack_knowledge.generation.service import GeneratorModelError, create_grounded_draft
+from tenderhack_knowledge.generation.service import (
+    GeneratorModelError,
+    GeneratorUnavailableError,
+    create_grounded_draft,
+)
 from tenderhack_knowledge.ingestion.models import KnowledgeFragment, KnowledgeSnapshot, SourceAnchor
 from tenderhack_knowledge.inference.errors import GeneratorClientError
+from tenderhack_knowledge.inference.generator import GeneratorOutputTruncatedError
 from tenderhack_knowledge.inference.prompts import DRAFT_PROMPT_VERSION, VERIFY_PROMPT_VERSION, build_draft_prompt, build_verify_prompt
 from tenderhack_knowledge.ingestion.repository import CorpusBoundaryError
 from tenderhack_knowledge.main import app
@@ -108,6 +113,46 @@ class UnavailableGenerator(FakeGenerator):
         raise GeneratorClientError("vLLM request failed at http://inference:8000/v1/completions")
 
 
+class SequencedGenerator(FakeGenerator):
+    def __init__(self, outputs: list[str | Exception]) -> None:
+        super().__init__("")
+        self.outputs = outputs
+
+    async def draft(
+        self,
+        prompt: str,
+        *,
+        response_format: Mapping[str, object] | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
+        self.prompts.append(prompt)
+        self.response_formats.append(response_format)
+        self.max_tokens.append(max_tokens)
+        output = self.outputs[min(len(self.prompts) - 1, len(self.outputs) - 1)]
+        if isinstance(output, Exception):
+            raise output
+        return output
+
+
+def _valid_grounded_output(fragment_id: str, text: str) -> str:
+    return json.dumps(
+        {
+            "draft_markdown": text,
+            "claims": [{"claim_id": "c1", "text": text, "fragment_ids": [fragment_id]}],
+        },
+        ensure_ascii=False,
+    )
+
+
+def _answerable_fragment(fragment_id: str) -> KnowledgeFragment:
+    text = (
+        "\u0427\u0442\u043e\u0431\u044b \u0441\u0444\u043e\u0440\u043c\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0423\u041f\u0414, "
+        "\u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0442\u0438\u043f \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0430 \u0438 \u043d\u0430\u0436\u043c\u0438\u0442\u0435 "
+        "\u043a\u043d\u043e\u043f\u043a\u0443 \u0421\u0444\u043e\u0440\u043c\u0438\u0440\u043e\u0432\u0430\u0442\u044c."
+    )
+    return _fragment(fragment_id, text)
+
+
 def _payload(
     fragment_ids: list[str],
     query: str = "Как сформировать УПД, выбрав тип документа?",
@@ -170,6 +215,124 @@ async def test_grounded_draft_passes_explicit_lower_output_budget() -> None:
         generator,
     )
     assert generator.max_tokens == [300]
+
+
+@pytest.mark.asyncio
+async def test_valid_stop_response_is_single_generation_call() -> None:
+    fragment = _answerable_fragment("frag-stop")
+    text = fragment.text
+    generator = SequencedGenerator([_valid_grounded_output(fragment.fragment_id, text)])
+
+    result = await create_grounded_draft(_payload([fragment.fragment_id]), Repository((fragment,)), generator)
+
+    assert result.response.draft_markdown == text
+    assert len(generator.prompts) == 1
+
+
+@pytest.mark.asyncio
+async def test_truncation_retries_once_with_compact_instruction_and_then_passes() -> None:
+    fragment = _answerable_fragment("frag-length-success")
+    text = fragment.text
+    generator = SequencedGenerator(
+        [GeneratorOutputTruncatedError("local generator output was truncated"), _valid_grounded_output(fragment.fragment_id, text)]
+    )
+
+    result = await create_grounded_draft(_payload([fragment.fragment_id]), Repository((fragment,)), generator)
+
+    assert result.response.draft_markdown == text
+    assert len(generator.prompts) == 2
+    assert "TRUNCATION RETRY" in generator.prompts[1]
+    assert generator.max_tokens == [800, 800]
+
+
+@pytest.mark.asyncio
+async def test_second_truncation_fails_closed_after_exactly_two_calls() -> None:
+    fragment = _answerable_fragment("frag-double-length")
+    generator = SequencedGenerator(
+        [
+            GeneratorOutputTruncatedError("local generator output was truncated"),
+            GeneratorOutputTruncatedError("local generator output was truncated"),
+        ]
+    )
+
+    with pytest.raises(GeneratorModelError, match="truncated after bounded retry"):
+        await create_grounded_draft(_payload([fragment.fragment_id]), Repository((fragment,)), generator)
+
+    assert len(generator.prompts) == 2
+
+
+@pytest.mark.asyncio
+async def test_invalid_json_after_stop_is_not_retried() -> None:
+    fragment = _answerable_fragment("frag-invalid-stop")
+    generator = SequencedGenerator(['{"draft_markdown":"broken","claims":'])
+
+    with pytest.raises(GeneratorModelError, match="invalid JSON"):
+        await create_grounded_draft(_payload([fragment.fragment_id]), Repository((fragment,)), generator)
+
+    assert len(generator.prompts) == 1
+
+
+@pytest.mark.asyncio
+async def test_schema_error_after_stop_is_not_retried() -> None:
+    fragment = _answerable_fragment("frag-schema-stop")
+    generator = SequencedGenerator(
+        [
+            _valid_grounded_output(fragment.fragment_id, ""),
+        ]
+    )
+    # The empty claim text violates the strict internal schema while retaining
+    # the same response envelope as a normal stop response.
+    generator.outputs[0] = json.dumps(
+        {
+            "draft_markdown": "broken",
+            "claims": [{"claim_id": "c1", "text": "", "fragment_ids": [fragment.fragment_id]}],
+        },
+        ensure_ascii=False,
+    )
+
+    with pytest.raises(GeneratorModelError, match="schema validation"):
+        await create_grounded_draft(_payload([fragment.fragment_id]), Repository((fragment,)), generator)
+
+    assert len(generator.prompts) == 1
+
+
+@pytest.mark.asyncio
+async def test_http_503_preserves_unavailable_semantics_without_retrying_in_service() -> None:
+    fragment = _answerable_fragment("frag-503")
+    generator = SequencedGenerator([GeneratorClientError("local generator returned HTTP 503: upstream unavailable")])
+
+    with pytest.raises(GeneratorUnavailableError):
+        await create_grounded_draft(_payload([fragment.fragment_id]), Repository((fragment,)), generator)
+
+    assert len(generator.prompts) == 1
+
+
+@pytest.mark.asyncio
+async def test_unsupported_claim_is_not_retried() -> None:
+    fragment = _fragment("frag-unsupported", "UPD status does not change after 1 hour; contact support.")
+    output = json.dumps(
+        {
+            "draft_markdown": "UPD status changes after 2 hours.",
+            "claims": [
+                {
+                    "claim_id": "c1",
+                    "text": "UPD status changes after 2 hours.",
+                    "fragment_ids": [fragment.fragment_id],
+                }
+            ],
+        },
+        ensure_ascii=False,
+    )
+    generator = SequencedGenerator([output])
+
+    with pytest.raises(GeneratorModelError, match="verification"):
+        await create_grounded_draft(
+            _payload([fragment.fragment_id], "UPD status does not change: document processing error"),
+            Repository((fragment,)),
+            generator,
+        )
+
+    assert len(generator.prompts) == 1
 
 
 @pytest.mark.asyncio

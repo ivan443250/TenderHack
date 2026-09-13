@@ -13,6 +13,15 @@ from .model_refs import GENERATOR_MODEL_ID, GENERATOR_REVISION, GENERATOR_RUNTIM
 from .safety import strip_reasoning
 
 
+class GeneratorOutputTruncatedError(GeneratorClientError):
+    """Raised when the local runtime stops at its output token limit.
+
+    The exception intentionally carries no model content, prompt, or source
+    evidence.  It is an internal signal used by the grounded generation
+    service to perform one bounded compact-output retry.
+    """
+
+
 class LocalOpenAIChatGenerator:
     """Call ``/v1/chat/completions`` without exposing a serving brand upstream."""
 
@@ -127,6 +136,7 @@ class LocalOpenAIChatGenerator:
             raise GeneratorClientError("local generator returned invalid JSON") from exc
         if not isinstance(body, Mapping):
             raise GeneratorClientError("local generator response must be a JSON object")
+        _raise_if_truncated(body)
         return body
 
 
@@ -149,6 +159,20 @@ def _extract_content(body: Mapping[str, object]) -> str:
     if isinstance(message, Mapping) and isinstance(message.get("content"), str):
         return str(message["content"])
     raise GeneratorClientError("local generator choice has no message content")
+
+
+def _raise_if_truncated(body: Mapping[str, object]) -> None:
+    """Convert the provider's explicit length stop into a safe internal signal."""
+
+    choices = body.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return
+    first = choices[0]
+    if not isinstance(first, Mapping):
+        return
+    finish_reason = first.get("finish_reason")
+    if isinstance(finish_reason, str) and finish_reason.casefold() == "length":
+        raise GeneratorOutputTruncatedError("local generator output was truncated")
 
 
 class VllmGeneratorClient(LocalOpenAIChatGenerator):

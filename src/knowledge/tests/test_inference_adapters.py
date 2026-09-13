@@ -8,7 +8,7 @@ import pytest
 from tenderhack_knowledge.inference.config import InferenceSettings
 from tenderhack_knowledge.inference.embedding import Qwen3EmbeddingAdapter
 from tenderhack_knowledge.inference.errors import AdapterOutputError, GeneratorClientError, ModelLoadError
-from tenderhack_knowledge.inference.generator import VllmGeneratorClient
+from tenderhack_knowledge.inference.generator import GeneratorOutputTruncatedError, LocalOpenAIChatGenerator, VllmGeneratorClient
 from tenderhack_knowledge.inference.reranker import BgeRerankerAdapter, _RerankerBundle
 
 
@@ -177,6 +177,24 @@ class FakeHttpClient:
         return self.response
 
 
+class HeaderAwareFakeHttpClient:
+    def __init__(self, response: FakeResponse | Exception) -> None:
+        self.response = response
+        self.calls: list[tuple[str, dict[str, object], dict[str, str] | None]] = []
+
+    async def post(
+        self,
+        url: str,
+        *,
+        json: dict[str, object],
+        headers: dict[str, str] | None = None,
+    ) -> FakeResponse:
+        self.calls.append((url, json, headers))
+        if isinstance(self.response, Exception):
+            raise self.response
+        return self.response
+
+
 @pytest.mark.asyncio
 async def test_generator_client_uses_local_vllm_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
     # Do not let a developer's optional bearer token change this legacy
@@ -201,6 +219,35 @@ async def test_generator_client_rejects_malformed_response_and_transport_failure
     failed = VllmGeneratorClient(client=FakeHttpClient(httpx.ConnectError("offline")))
     with pytest.raises(GeneratorClientError, match="request failed"):
         await failed.draft("тест")
+
+
+@pytest.mark.asyncio
+async def test_local_generator_raises_safe_truncation_signal(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("KNOWLEDGE_INFERENCE_BEARER_TOKEN", raising=False)
+    content = '{"draft_markdown":"private-content-must-not-escape"'
+    fake = HeaderAwareFakeHttpClient(
+        FakeResponse({"choices": [{"finish_reason": "length", "message": {"content": content}}]})
+    )
+    generator = LocalOpenAIChatGenerator(client=fake, max_tokens=12)
+
+    with pytest.raises(GeneratorOutputTruncatedError, match="truncated") as error:
+        await generator.draft("test")
+
+    assert content not in str(error.value)
+    assert fake.calls[0][2] is None
+
+
+@pytest.mark.asyncio
+async def test_local_generator_accepts_stop_response_without_retry_signal(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("KNOWLEDGE_INFERENCE_BEARER_TOKEN", raising=False)
+    content = '{"draft_markdown":"grounded","claims":[]}'
+    fake = HeaderAwareFakeHttpClient(
+        FakeResponse({"choices": [{"finish_reason": "stop", "message": {"content": content}}]})
+    )
+    generator = LocalOpenAIChatGenerator(client=fake, max_tokens=12)
+
+    assert await generator.draft("test") == content
+    assert len(fake.calls) == 1
 
 
 def test_inference_config_parses_without_loading_models(monkeypatch: pytest.MonkeyPatch) -> None:
