@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from tenderhack_knowledge.contracts.v0 import Candidate, CandidateScores, Corpus, RetrieveRequest
+from tenderhack_knowledge.ingestion.ids import normalize_source_name
 from tenderhack_knowledge.ingestion.repository import CorpusBoundaryError, UnknownSnapshotError
 from tenderhack_knowledge.persistence.repository import PostgresKnowledgeRepository, TRIGRAM_MIN_SCORE
 from tenderhack_knowledge.understanding import normalize_query
@@ -76,6 +77,7 @@ class LexicalRetriever:
                     document_id=row["document_id"],
                     page=row["page_start"],
                     anchor=anchor,
+                    title=_source_title(row.get("original_filename")),
                     scores=CandidateScores(
                         exact=exact if exact > 0 else None,
                         fts=fts if fts > 0 else None,
@@ -123,3 +125,12 @@ def _anchor_text(anchor: object) -> str | None:
         return "bbox:" + ",".join(str(value) for value in bbox)
     section = anchor.get("section")
     return str(section) if section else None
+
+
+def _source_title(filename: object) -> str | None:
+    """Return the normalized basename, never a local source path."""
+
+    if not isinstance(filename, str) or not filename.strip():
+        return None
+    normalized = normalize_source_name(filename)
+    return normalized.rsplit("/", 1)[-1] or None

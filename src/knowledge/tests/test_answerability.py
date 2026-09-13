@@ -191,6 +191,38 @@ async def test_top10_candidates_are_reduced_to_relevant_evidence_before_gate() -
 
 
 @pytest.mark.asyncio
+async def test_role_mention_in_one_context_fragment_is_not_role_ambiguity() -> None:
+    fragment = _fragment(
+        "f-offer",
+        "Поставщик создаёт СТЕ для оферты, после чего заказчик получает предложение.",
+    )
+    assessment = await assess_answerability(
+        "Как создать СТЕ для оферты?",
+        SNAPSHOT_ID,
+        [fragment.fragment_id],
+        _Repository((fragment,)),
+    )
+
+    assert assessment.evidence_sufficiency is EvidenceSufficiency.SUFFICIENT
+    assert "ROLE_AMBIGUITY" not in assessment.risk_flags
+
+
+@pytest.mark.asyncio
+async def test_independent_supplier_and_customer_fragments_remain_ambiguous() -> None:
+    supplier = _fragment("f-supplier", "Поставщик создаёт СТЕ для оферты.")
+    customer = _fragment("f-customer", "Заказчик утверждает СТЕ для оферты.")
+    assessment = await assess_answerability(
+        "Как создать СТЕ для оферты?",
+        SNAPSHOT_ID,
+        [supplier.fragment_id, customer.fragment_id],
+        _Repository((supplier, customer)),
+    )
+
+    assert assessment.evidence_sufficiency is EvidenceSufficiency.INSUFFICIENT
+    assert "ROLE_AMBIGUITY" in assessment.risk_flags
+
+
+@pytest.mark.asyncio
 async def test_simple_inability_is_not_post_instruction_failure_but_explicit_retry_is() -> None:
     fragment = _fragment("f-signing", "Для подписания УПД требуется КриптоПро CSP.")
     repository = _Repository((fragment,))

@@ -116,6 +116,9 @@ class Candidate(BaseModel):
     document_id: str
     page: int | None = None
     anchor: str | None = None
+    # Additive v0 field: source document filename when retrieval metadata has
+    # it.  Missing titles remain valid and callers may fall back to the id.
+    title: str | None = None
     scores: CandidateScores
     applicability_flags: list[str]
 

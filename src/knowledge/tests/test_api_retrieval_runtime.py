@@ -1,7 +1,7 @@
 from tenderhack_knowledge.api import routes
 from tenderhack_knowledge.contracts.v0 import Candidate, CandidateScores
 from tenderhack_knowledge.main import app
-from tenderhack_knowledge.retrieval.service import RetrievalResult
+from tenderhack_knowledge.retrieval.service import RetrievalResult, _source_title
 from fastapi.testclient import TestClient
 
 
@@ -93,3 +93,23 @@ def test_retrieve_preserves_explicit_and_understood_exact_codes(monkeypatch) -> 
 
     assert response.status_code == 200, response.text
     assert observed["exact_codes"] == ["CUSTOM-42", "УПД"]
+
+
+def test_candidate_title_is_optional_and_uses_only_source_basename() -> None:
+    candidate = Candidate(
+        fragment_id="frag-title",
+        document_id="doc-title",
+        page=1,
+        anchor=None,
+        title=_source_title(r"C:\\manuals\\Инструкция.pdf"),
+        scores=CandidateScores(exact=1.0),
+        applicability_flags=[],
+    )
+
+    assert candidate.title == "Инструкция.pdf"
+    assert Candidate(
+        fragment_id="frag-no-title",
+        document_id="doc-no-title",
+        scores=CandidateScores(),
+        applicability_flags=[],
+    ).title is None

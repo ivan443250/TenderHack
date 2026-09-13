@@ -454,14 +454,26 @@ async def assess_answerability(
         human_need = True
         risk_flags.append("HUMAN_SUPPORT_REQUIRED")
 
-    role_markers = set()
+    # A source can mention the other party as context (for example, a
+    # supplier instruction can say that a customer performs the next step).
+    # Treating any co-occurrence as an unresolved role conflict made the
+    # answerability gate reject otherwise specific evidence.  Ambiguity is
+    # material only when independently role-specific fragments point at both
+    # sides and the caller did not provide a role.
+    role_specific_fragments: dict[str, set[str]] = {"supplier": set(), "customer": set()}
     for fragment in evidence:
         text = _normalize(fragment.text)
-        if "\u043f\u043e\u0441\u0442\u0430\u0432\u0449\u0438\u043a" in text:
-            role_markers.add("supplier")
-        if "\u0437\u0430\u043a\u0430\u0437\u0447\u0438\u043a" in text:
-            role_markers.add("customer")
-    role_ambiguous = len(role_markers) > 1 and context.role is None
+        declared_roles = {_normalize(str(role)) for role in (fragment.actor_roles or ())}
+        supplier = "supplier" in declared_roles or "\u043f\u043e\u0441\u0442\u0430\u0432\u0449\u0438\u043a" in declared_roles
+        customer = "customer" in declared_roles or "\u0437\u0430\u043a\u0430\u0437\u0447\u0438\u043a" in declared_roles
+        if not declared_roles:
+            supplier = "\u043f\u043e\u0441\u0442\u0430\u0432\u0449\u0438\u043a" in text
+            customer = "\u0437\u0430\u043a\u0430\u0437\u0447\u0438\u043a" in text
+        if supplier and not customer:
+            role_specific_fragments["supplier"].add(fragment.fragment_id)
+        if customer and not supplier:
+            role_specific_fragments["customer"].add(fragment.fragment_id)
+    role_ambiguous = all(role_specific_fragments[role] for role in ("supplier", "customer")) and context.role is None
     if role_ambiguous:
         risk_flags.append("ROLE_AMBIGUITY")
     conflict = _contradictory(evidence)

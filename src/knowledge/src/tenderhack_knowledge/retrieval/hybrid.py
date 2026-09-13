@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from tenderhack_knowledge.contracts.v0 import Candidate, CandidateScores, RetrieveRequest
+from tenderhack_knowledge.ingestion.ids import normalize_source_name
 from tenderhack_knowledge.inference.giga import GigaEmbeddingAdapter
 from tenderhack_knowledge.inference.errors import (
     AdapterOutputError,
@@ -324,10 +325,18 @@ class HybridRetriever:
             document_id=str(row["document_id"]),
             page=int(row["page_start"]),
             anchor=anchor_text,
+            title=_source_title(row.get("original_filename")),
             scores=CandidateScores(dense=score),
             applicability_flags=[],
         )
         return HybridRecord(candidate=candidate, text=str(row.get("text") or ""), channels=("dense",), rrf_score=0.0)
+
+
+def _source_title(filename: object) -> str | None:
+    if not isinstance(filename, str) or not filename.strip():
+        return None
+    normalized = normalize_source_name(filename)
+    return normalized.rsplit("/", 1)[-1] or None
 
 def _merge_scores(left: Candidate, right: Candidate) -> Candidate:
     values = {

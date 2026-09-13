@@ -487,6 +487,7 @@ class PostgresKnowledgeRepository:
             select(
                 kb_fragments.c.fragment_id,
                 kb_document_versions.c.document_id,
+                kb_documents.c.original_filename,
                 kb_fragments.c.page_start,
                 kb_fragments.c.source_anchor,
                 kb_fragments.c.text,
@@ -496,6 +497,7 @@ class PostgresKnowledgeRepository:
             )
             .join(membership, membership.c.fragment_id == kb_fragments.c.fragment_id)
             .join(kb_document_versions, kb_document_versions.c.document_version_id == kb_fragments.c.document_version_id)
+            .join(kb_documents, kb_documents.c.document_id == kb_document_versions.c.document_id)
             .where(membership.c.snapshot_id == snapshot_id)
             .where(sa.or_(*channels))
             .order_by(exact_score.desc(), fts_score.desc(), trigram_score.desc(), kb_fragments.c.fragment_id)
@@ -689,12 +691,13 @@ class PostgresKnowledgeRepository:
             result = await connection.execute(
                 sa.text(
                     """
-                    SELECT f.fragment_id, v.document_id, f.page_start,
+                    SELECT f.fragment_id, v.document_id, d.original_filename, f.page_start,
                            f.source_anchor, f.text,
                            1 - (e.embedding <=> CAST(:query_embedding AS vector)) AS dense_score
                     FROM kb_snapshot_fragments m
                     JOIN kb_fragments f ON f.fragment_id = m.fragment_id
                     JOIN kb_document_versions v ON v.document_version_id = f.document_version_id
+                    JOIN kb_documents d ON d.document_id = v.document_id
                     JOIN kb_fragment_embeddings e ON e.fragment_id = f.fragment_id
                     WHERE m.snapshot_id = :snapshot_id
                       AND e.model_id = :model_id

@@ -2228,15 +2228,19 @@ namespace TenderHack.Infrastructure.KnowledgeClient.Generated
     {
 
         [System.Runtime.Serialization.EnumMember(Value = @"user_explicit")]
+        [System.Text.Json.Serialization.JsonStringEnumMemberName("user_explicit")]
         User_explicit = 0,
 
         [System.Runtime.Serialization.EnumMember(Value = @"trusted_portal_context")]
+        [System.Text.Json.Serialization.JsonStringEnumMemberName("trusted_portal_context")]
         Trusted_portal_context = 1,
 
         [System.Runtime.Serialization.EnumMember(Value = @"inferred")]
+        [System.Text.Json.Serialization.JsonStringEnumMemberName("inferred")]
         Inferred = 2,
 
         [System.Runtime.Serialization.EnumMember(Value = @"unknown")]
+        [System.Text.Json.Serialization.JsonStringEnumMemberName("unknown")]
         Unknown = 3,
 
     }
