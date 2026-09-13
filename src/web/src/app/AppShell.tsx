@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useParams } from "react-router-dom";
 
 import { ApiError, type ApiClient } from "../api/client";
 import type { CaseListItem } from "../api/types";
+import { CASE_LIST_CHANGED_EVENT } from "../state/caseStore";
 import { Sidebar } from "../features/navigation/Sidebar";
 
 export function AppShell({ api }: { api: ApiClient }) {
@@ -29,8 +30,10 @@ export function AppShell({ api }: { api: ApiClient }) {
       }
     }
     void load();
+    window.addEventListener(CASE_LIST_CHANGED_EVENT, load);
     return () => {
       cancelled = true;
+      window.removeEventListener(CASE_LIST_CHANGED_EVENT, load);
     };
     // Re-list whenever the open case changes, so a freshly created/completed case shows up.
   }, [api, caseId]);

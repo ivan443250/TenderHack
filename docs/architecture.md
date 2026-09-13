@@ -71,7 +71,7 @@ Browser
    ▼
 api (.NET)  ── single public boundary
    ├── Case orchestration / turn state machine
-   ├── Decision (ANSWER / CLARIFY / HANDOFF_OFFER / ...)
+   ├── Decision (ANSWER / CLARIFY / HANDOFF_OFFER / OUT_OF_SCOPE / ...)
    ├── Deterministic moderation rules
    ├── Routing / handoff / outbox / status ingestion
    ├── Completion / archive / notifications
@@ -287,7 +287,7 @@ ResolutionStatus   = UNKNOWN | RESOLVED | UNRESOLVED
 TurnStatus         = QUEUED | RUNNING | COMPLETED | FAILED | SUPERSEDED
 HandoffStatus      = NOT_REQUESTED | PENDING | ACCEPTED | SIMULATED_ACCEPTED | FAILED
 Decision           = ANSWER | CLARIFY | HANDOFF_OFFER | ANSWER_AND_HANDOFF |
-                     MODERATION_WARNING | MODERATION_CLOSE | TECHNICAL_ERROR
+                     OUT_OF_SCOPE | MODERATION_WARNING | MODERATION_CLOSE | TECHNICAL_ERROR
 ```
 
 Additional case-scoped state that is not an enum:

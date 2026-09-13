@@ -7,8 +7,38 @@ namespace TenderHack.Api.Contracts;
 
 public static class CaseMapper
 {
-    public static CaseListItemResponse ToListItem(Case @case, int unreadNotifications = 0) =>
-        new(@case.Id.ToString(), @case.ConversationStatus, @case.ResolutionStatus, @case.LastActivityAt, unreadNotifications);
+    private const int MaxCaseTitleLength = 36;
+
+    public static CaseListItemResponse ToListItem(Case @case, int unreadNotifications = 0, string? firstUserMessage = null) =>
+        new(@case.Id.ToString(), BuildCaseTitle(firstUserMessage), @case.ConversationStatus, @case.ResolutionStatus, @case.LastActivityAt, unreadNotifications);
+
+    /// <summary>A stable, compact preview for the sidebar. It is derived from the persisted first
+    /// USER_MESSAGE and never stored as a second source of truth.</summary>
+    public static string BuildCaseTitle(string? firstUserMessage)
+    {
+        if (string.IsNullOrWhiteSpace(firstUserMessage))
+        {
+            return "Новый чат";
+        }
+
+        var normalized = string.Join(' ', firstUserMessage.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        var words = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var candidate = string.Join(' ', words.Take(6));
+        var truncated = words.Length > 6;
+
+        if (candidate.Length > MaxCaseTitleLength)
+        {
+            candidate = candidate[..(MaxCaseTitleLength - 1)].TrimEnd();
+            var lastSpace = candidate.LastIndexOf(' ');
+            if (lastSpace >= 12)
+            {
+                candidate = candidate[..lastSpace];
+            }
+            truncated = true;
+        }
+
+        return truncated ? $"{candidate}…" : candidate;
+    }
 
     public static CaseSnapshotResponse ToSnapshot(Case @case, IReadOnlyList<PersistedCaseEvent> events, TenderHack.Domain.Feedback.Feedback? feedback = null)
     {

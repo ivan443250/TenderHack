@@ -70,7 +70,6 @@ _PROCEDURAL_ACTION_RE = re.compile(
 )
 """
 _PROCEDURAL_ACTION_RE = re.compile(r"(?i)(?:нажм\w*|перейд\w*|выбер\w*|созда\w*|загруз\w*|оформ\w*|подпис\w*|укаж\w*|сформир\w*|импорт\w*|удал\w*|измен\w*|откро\w*|заполн\w*|добав\w*|проверь?\w*)")
-_OUT_OF_CORPUS_TECH_RE = re.compile(r"(?i)\bkafka\b")
 r"""
 _SUPPORT_RE = re.compile(
     r"(?i)(?:\u043e\u0431\u0440\u0430\u0442\u0438\u0442\u0435\u0441\u044c|\u043e\u0431\u0440\u0430\u0449\u0430\u0442\u044c\u0441\u044f|\u0441\u0442\u043f\s*\u043f\b|\u0442\u0435\u0445\u043d\u0438\u0447\u0435\u0441\uк\w*\s+\u043f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\w*)"
@@ -433,9 +432,6 @@ async def assess_answerability(
             risk_flags.append("HIGH_RISK_MISSING_CONDITION")
 
     specificity_ok, specificity_ratio = _specificity(query, evidence)
-    if _OUT_OF_CORPUS_TECH_RE.search(query):
-        specificity_ok = False
-        risk_flags.append("OUT_OF_CORPUS_TECHNOLOGY")
     if _NEGATED_ASSERTION_RE.search(query):
         negative_evidence = any(
             re.search(r"(?i)\u043d\u0435\s+\u043d\u0443\u0436\u043d\w*|\u043d\u0435\s+\u0442\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044f|\u043d\u0435\u043b\u044c\u0437\u044f|\u043d\u0435\u0432\u043e\u0437\u043c\u043e\u0436\u043d\w*", _normalize(fragment.text))

@@ -7,6 +7,11 @@ public interface ICaseEventReader
 {
     /// <summary>Events with `EventId &gt; after`, ordered by `EventId` ascending.</summary>
     Task<IReadOnlyList<PersistedCaseEvent>> ListAsync(CaseId caseId, long after, CancellationToken ct);
+
+    /// <summary>Returns the first persisted USER_MESSAGE text for each requested case in one read.</summary>
+    Task<IReadOnlyDictionary<CaseId, string>> ListFirstUserMessageTextsAsync(
+        IReadOnlyCollection<CaseId> caseIds,
+        CancellationToken ct);
 }
 
 public sealed record PersistedCaseEvent(

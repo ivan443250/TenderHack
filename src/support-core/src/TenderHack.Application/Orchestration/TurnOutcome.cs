@@ -40,6 +40,9 @@ public sealed record TurnOutcome(
     public static TurnOutcome HandoffOffer(TurnId turnId, int revision, int warningCount) =>
         new(turnId, revision, Decision.HandoffOffer, warningCount);
 
+    public static TurnOutcome OutOfScope(TurnId turnId, int revision, int warningCount) =>
+        new(turnId, revision, Decision.OutOfScope, warningCount);
+
     public static TurnOutcome TechnicalError(TurnId turnId, int revision, int warningCount, KnowledgeFailureCategory category) =>
         new(turnId, revision, Decision.TechnicalError, warningCount, FailureCategory: category);
 }

@@ -32,6 +32,7 @@ public enum Decision
     Clarify,
     HandoffOffer,
     AnswerAndHandoff,
+    OutOfScope,
     ModerationWarning,
     ModerationClose,
     TechnicalError,

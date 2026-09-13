@@ -34,6 +34,7 @@ export function ResolutionFeedback({ snapshot, onComplete, onSubmitFeedback }: R
   const showSolvedControl = snapshot.resolution_status === "UNKNOWN";
   const showSpecialistControl =
     snapshot.handoff?.status === "ACCEPTED" || snapshot.handoff?.status === "SIMULATED_ACCEPTED";
+  const canSubmit = !busy && (!showSolvedControl || solved !== null);
 
   async function handleSubmit() {
     setBusy(true);
@@ -105,7 +106,7 @@ export function ResolutionFeedback({ snapshot, onComplete, onSubmitFeedback }: R
             placeholder="Напишите комментарий"
             className="flex-1"
           />
-          <ButtonPrimary disabled={busy} onClick={handleSubmit} className="w-[150px]">
+          <ButtonPrimary disabled={!canSubmit} onClick={handleSubmit} className="w-[150px]">
             Отправить
           </ButtonPrimary>
         </div>

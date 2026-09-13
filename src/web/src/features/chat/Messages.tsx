@@ -5,13 +5,17 @@ import type { ReactNode } from "react";
 const THINK_BLOCK_RE = /<think\b[^>]*>[\s\S]*?<\/think>/gi;
 const OPEN_THINK_RE = /<think\b[\s\S]*$/i;
 const FRAGMENT_REFERENCE_RE = /\b(?:frag(?:ment)?)[_-][a-z0-9-]+\b/gi;
-const FRAGMENT_FIELD_RE = /\b(?:source[_ ]?)?fragment[_ ]ids?\s*[:=]\s*[^\s,;]+/gi;
+const FRAGMENT_FIELD_RE = /["']?\b(?:source[_ ]?)?fragment[_ ]ids?["']?\s*[:=]\s*["']?[^\s,;}\]"']+/gi;
+const INTERNAL_FIELD_RE = /["']?\b(?:claim_id|fragment_id|fragment_ids|evidence_fragment_ids|draft_markdown|response_format)\b["']?\s*[:=]\s*["']?[^\s,;}\]"']+/gi;
+const INTERNAL_HEADER_RE = /^\s*(?:json\s+schema|черновик\s+ответа|что\s+установлено\s+в\s+источниках)\s*:?.*$/gim;
 
 function cleanVisibleText(value: string): string {
   return value
     .replace(THINK_BLOCK_RE, "")
     .replace(OPEN_THINK_RE, "")
     .replace(FRAGMENT_FIELD_RE, "")
+    .replace(INTERNAL_FIELD_RE, "")
+    .replace(INTERNAL_HEADER_RE, "")
     .replace(FRAGMENT_REFERENCE_RE, "")
     .replace(/[ \t]{2,}/g, " ")
     .trim();
@@ -174,6 +178,14 @@ export function NoConfirmedAnswerNotice({ reason }: { reason?: string }) {
   return (
     <div className="w-full max-w-[560px] animate-fade-up rounded-[18px] border border-[var(--border-default)] bg-white p-4 text-sm text-[var(--content-primary)]">
       {text}
+    </div>
+  );
+}
+
+export function OutOfScopeNotice({ message }: { message: string }) {
+  return (
+    <div className="w-full max-w-[560px] animate-fade-up rounded-[18px] border border-[var(--border-default)] bg-white p-4 text-sm text-[var(--content-primary)]">
+      {message}
     </div>
   );
 }

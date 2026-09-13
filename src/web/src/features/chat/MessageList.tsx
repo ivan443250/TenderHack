@@ -6,6 +6,7 @@ import {
   ConversationClosedNotice,
   ModerationWarningNotice,
   NoConfirmedAnswerNotice,
+  OutOfScopeNotice,
   TechnicalErrorNotice,
   TurnStageNotice,
   UserMessage
@@ -17,6 +18,7 @@ import { ResolutionFeedback } from "./ResolutionFeedback";
 
 type MessageListProps = {
   snapshot: CaseSnapshot;
+  optimisticMessage?: string | null;
   api: ApiClient;
   onOpenSource: (source: SourceDetail) => void;
   onPrepareHandoff: () => Promise<void>;
@@ -25,6 +27,16 @@ type MessageListProps = {
   onComplete: (solved: boolean | null) => Promise<void>;
   onSubmitFeedback: Parameters<typeof ResolutionFeedback>[0]["onSubmitFeedback"];
 };
+
+function isProcessing(snapshot: CaseSnapshot): boolean {
+  return snapshot.active_turn?.status === "QUEUED" || snapshot.active_turn?.status === "RUNNING";
+}
+
+export function shouldShowFeedback(snapshot: CaseSnapshot): boolean {
+  if (isProcessing(snapshot)) return false;
+  const completedWithoutModeration = snapshot.completed_at !== null && snapshot.completion_reason !== "MODERATION";
+  return snapshot.last_decision === "ANSWER" || completedWithoutModeration;
+}
 
 function renderItem(item: TimelineItem, snapshot: CaseSnapshot, api: ApiClient, onOpenSource: (s: SourceDetail) => void) {
   const payload = item.payload as Record<string, unknown>;
@@ -67,6 +79,9 @@ function renderItem(item: TimelineItem, snapshot: CaseSnapshot, api: ApiClient, 
         />
       );
 
+    case "OUT_OF_SCOPE":
+      return <OutOfScopeNotice key={item.item_id} message={String(payload.message ?? "Я помогаю с вопросами по работе Портала поставщиков.")} />;
+
     case "NO_CONFIRMED_ANSWER":
       return <NoConfirmedAnswerNotice key={item.item_id} reason={typeof payload.reason === "string" ? payload.reason : undefined} />;
 
@@ -92,6 +107,7 @@ function renderItem(item: TimelineItem, snapshot: CaseSnapshot, api: ApiClient, 
 
 export function MessageList({
   snapshot,
+  optimisticMessage,
   api,
   onOpenSource,
   onPrepareHandoff,
@@ -104,10 +120,15 @@ export function MessageList({
   // B5/architecture.md §5.8: a moderation close never asks for feedback — the server never
   // publishes FEEDBACK_REQUESTED for it, and the UI must not fabricate the ask on its own just
   // because completed_at is set.
-  const showFeedback = snapshot.completed_at !== null && snapshot.completion_reason !== "MODERATION";
+  const showFeedback = shouldShowFeedback(snapshot);
+  const hasPersistedInitialMessage = optimisticMessage
+    ? snapshot.timeline.some((item) => item.type === "USER_MESSAGE" && item.payload.text === optimisticMessage)
+    : false;
 
   return (
     <div className="flex w-full flex-col items-start gap-4">
+      {optimisticMessage && !hasPersistedInitialMessage && <UserMessage text={optimisticMessage} />}
+      {optimisticMessage && !hasPersistedInitialMessage && <TurnStageNotice stage="Отправляем запрос" />}
       {snapshot.timeline.map((item) => renderItem(item, snapshot, api, onOpenSource))}
 
       {showHandoff && (

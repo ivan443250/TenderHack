@@ -5,7 +5,7 @@
 One aggregate accuracy is not sufficient. The system must be evaluated at the same boundaries where it can fail:
 
 1. source retrieval;
-2. decision (`ANSWER / CLARIFY / HANDOFF...`);
+2. decision (`ANSWER / CLARIFY / HANDOFF / OUT_OF_SCOPE...`);
 3. answer support/applicability;
 4. moderation;
 5. routing;

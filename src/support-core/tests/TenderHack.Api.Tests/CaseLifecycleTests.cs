@@ -15,6 +15,24 @@ namespace TenderHack.Api.Tests;
 public sealed class CaseLifecycleTests(ApiTestFixture fixture)
 {
     [Fact]
+    public async Task CaseListTitleComesFromFirstUserMessageAndDoesNotChangeOnLaterTurns()
+    {
+        fixture.Knowledge.Answerability = new AnswerabilityResult(EvidenceSufficiency.Sufficient, ["frag-1"], [], []);
+        var client = fixture.CreateClient();
+        var created = await client.PostAsync("/api/v0/cases", content: null);
+        var caseId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("case_id").GetString();
+
+        await client.PostAsJsonAsync($"/api/v0/cases/{caseId}/messages", new { text = "Как создать СТЕ для оферты?" });
+        await client.PostAsJsonAsync($"/api/v0/cases/{caseId}/messages", new { text = "Это второй вопрос" });
+
+        var response = await client.GetAsync("/api/v0/cases?status=active");
+        response.EnsureSuccessStatusCode();
+        var cases = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var item = cases.EnumerateArray().Single(value => value.GetProperty("case_id").GetString() == caseId);
+        Assert.Equal("Как создать СТЕ для оферты?", item.GetProperty("title").GetString());
+    }
+
+    [Fact]
     public async Task ACaseIdAloneGrantsNothingToADifferentOwnerSCookie()
     {
         var owner = fixture.CreateClient();
