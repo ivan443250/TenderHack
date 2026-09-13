@@ -59,6 +59,7 @@ class LocalOpenAIChatGenerator:
         self._bearer_token = bearer_token if bearer_token is not None else (os.getenv("KNOWLEDGE_INFERENCE_BEARER_TOKEN") or None)
         self._client = client
         self._transport = transport
+        self._last_finish_reason = "unknown"
 
     @property
     def endpoint(self) -> str:
@@ -107,6 +108,7 @@ class LocalOpenAIChatGenerator:
         return strip_reasoning(_extract_content(response))
 
     async def _post(self, payload: Mapping[str, object]) -> Mapping[str, object]:
+        self._last_finish_reason = "unknown"
         headers = {"Authorization": f"Bearer {self._bearer_token}"} if self._bearer_token else None
         try:
             if self._client is not None:
@@ -136,6 +138,7 @@ class LocalOpenAIChatGenerator:
             raise GeneratorClientError("local generator returned invalid JSON") from exc
         if not isinstance(body, Mapping):
             raise GeneratorClientError("local generator response must be a JSON object")
+        self._last_finish_reason = _classify_finish_reason(_finish_reason(body))
         _raise_if_truncated(body)
         return body
 
@@ -173,6 +176,25 @@ def _raise_if_truncated(body: Mapping[str, object]) -> None:
     finish_reason = first.get("finish_reason")
     if isinstance(finish_reason, str) and finish_reason.casefold() == "length":
         raise GeneratorOutputTruncatedError("local generator output was truncated")
+
+
+def _finish_reason(body: Mapping[str, object]) -> object:
+    choices = body.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return None
+    first = choices[0]
+    if not isinstance(first, Mapping):
+        return None
+    return first.get("finish_reason")
+
+
+def _classify_finish_reason(value: object) -> str:
+    if not isinstance(value, str) or not value.strip():
+        return "unknown"
+    normalized = value.casefold()
+    if normalized in {"stop", "length"}:
+        return normalized
+    return "other"
 
 
 class VllmGeneratorClient(LocalOpenAIChatGenerator):

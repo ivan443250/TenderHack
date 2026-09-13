@@ -87,9 +87,9 @@ class DraftGenerationResult:
 class GroundedDraftService:
     """Build a draft only after the deterministic answerability gate passes.
 
-    The service intentionally performs one generation and one verification
-    pass. An explicit provider truncation may trigger one compact-output
-    retry; this remains bounded and never turns into an unbounded retry loop.
+    The service intentionally performs one verification pass. A recoverable
+    structured-output failure may trigger one compact-output retry; this
+    remains bounded and never turns into an unbounded retry loop.
     """
 
     def __init__(self, repository: Any, generator: Any | None = None, *, generator_factory: Any | None = None) -> None:
@@ -127,44 +127,41 @@ class GroundedDraftService:
         # OpenAI-compatible local runtime.  The parser below remains strict:
         # this hint never turns prose into a grounded draft.
         response_format = _grounded_draft_response_format()
-        try:
-            raw = await generator.draft(
-                prompt,
-                response_format=response_format,
-                max_tokens=max_tokens,
-            )
-        except GeneratorOutputTruncatedError:
-            # A provider-confirmed length stop is the only generation failure
-            # eligible for the one compact-output retry.  No evidence or
-            # grounding data is changed, and the public generator interface
-            # remains ``draft(...) -> str`` for existing fakes/adapters.
+        grounded: GroundedDraft | None = None
+        for attempt in range(2):
+            retry_attempt = attempt == 1
+            attempt_prompt = _compact_retry_prompt(prompt) if retry_attempt else prompt
             try:
-                raw = await generator.draft(
-                    _compact_retry_prompt(prompt),
+                raw = await _request_generation(
+                    generator,
+                    attempt_prompt,
                     response_format=response_format,
                     max_tokens=max_tokens,
                 )
-            except GeneratorOutputTruncatedError as retry_exc:
-                raise GeneratorModelError("local generator output was truncated after bounded retry") from retry_exc
-            except GeneratorClientError as retry_exc:
-                if _is_unavailable(retry_exc):
-                    raise GeneratorUnavailableError("local generator is unavailable") from retry_exc
-                raise GeneratorModelError("local generator failed") from retry_exc
-            except (TimeoutError, ConnectionError, OSError) as retry_exc:
-                raise GeneratorUnavailableError("local generator is unavailable") from retry_exc
-        except GeneratorClientError as exc:
-            if _is_unavailable(exc):
-                raise GeneratorUnavailableError("local generator is unavailable") from exc
-            raise GeneratorModelError("local generator failed") from exc
-        except (TimeoutError, ConnectionError, OSError) as exc:
-            raise GeneratorUnavailableError("local generator is unavailable") from exc
-        try:
-            # Reasoning is private runtime material and is removed before the
-            # structured parser, regardless of which local generator adapter
-            # supplied the text.
-            grounded = parse_model_output(strip_reasoning(raw))
-        except (ModelOutputError, GeneratorClientError) as exc:
-            raise GeneratorModelError(str(exc)) from exc
+            except GeneratorOutputTruncatedError as exc:
+                if not retry_attempt:
+                    # A provider-confirmed length stop is recoverable. The
+                    # next request keeps exactly the same evidence and budget.
+                    continue
+                raise GeneratorModelError("local generator output was truncated after bounded retry") from exc
+
+            try:
+                # Reasoning is private runtime material and is removed before
+                # the structured parser, regardless of which local generator
+                # adapter supplied the text.
+                grounded = parse_model_output(strip_reasoning(raw))
+            except ModelOutputError as exc:
+                if not retry_attempt and _is_retryable_model_output_error(exc):
+                    continue
+                raise GeneratorModelError(str(exc)) from exc
+            except GeneratorClientError as exc:
+                # Safety-boundary, transport-shape, and contract errors fail
+                # closed; they are not evidence that a shorter prompt helps.
+                raise GeneratorModelError(str(exc)) from exc
+            break
+
+        if grounded is None:  # pragma: no cover - loop either succeeds or raises
+            raise GeneratorModelError("local generator returned no usable structured draft")
 
         # Verify the internal claims before projecting them. This preserves
         # ``applies_if`` and human-check markers for the condition-sensitive
@@ -230,13 +227,56 @@ def _is_unavailable(error: GeneratorClientError) -> bool:
     return any(marker in message for marker in ("request failed", "returned http 502", "returned http 503", "returned http 504", "timed out", "connection"))
 
 
+async def _request_generation(
+    generator: Any,
+    prompt: str,
+    *,
+    response_format: dict[str, object],
+    max_tokens: int,
+) -> str:
+    """Call one generation attempt while preserving unavailable semantics."""
+
+    try:
+        return await generator.draft(prompt, response_format=response_format, max_tokens=max_tokens)
+    except GeneratorOutputTruncatedError:
+        # Keep the internal provider signal distinct so the caller can spend
+        # the one bounded recovery attempt without changing the public DTO.
+        raise
+    except GeneratorClientError as exc:
+        if _is_unavailable(exc):
+            raise GeneratorUnavailableError("local generator is unavailable") from exc
+        raise GeneratorModelError("local generator failed") from exc
+    except (TimeoutError, ConnectionError, OSError) as exc:
+        raise GeneratorUnavailableError("local generator is unavailable") from exc
+
+
+def _is_retryable_model_output_error(error: ModelOutputError) -> bool:
+    """Identify parse-level shape failures safe for one compact retry.
+
+    Business-field rejection and duplicate-claim failures stay fail-closed;
+    they are not repaired by asking the model to restate the same payload.
+    """
+
+    message = str(error).casefold()
+    return any(
+        marker in message
+        for marker in (
+            "empty structured draft",
+            "invalid json",
+            "structured draft must be a json object",
+            "structured draft failed schema validation",
+        )
+    )
+
+
 def _compact_retry_prompt(prompt: str) -> str:
     """Ask for a shorter JSON response without changing supplied evidence."""
 
     return (
         prompt
-        + "\n\nTRUNCATION RETRY: The previous response was truncated. Return the shortest valid JSON in the same schema. "
-        "Use a concise draft_markdown and the minimum necessary grounded claims; do not repeat explanations outside JSON."
+        + "\n\nBOUNDED RECOVERY RETRY (TRUNCATION RETRY): Return only one shortest valid JSON object in the same schema. "
+        "Keep draft_markdown concise, use at most 3 grounded claims, do not repeat long source excerpts, "
+        "do not add markdown outside JSON, do not include reasoning, and use only the supplied fragment_ids."
     )
 
 

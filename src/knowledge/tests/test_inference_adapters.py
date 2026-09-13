@@ -8,7 +8,12 @@ import pytest
 from tenderhack_knowledge.inference.config import InferenceSettings
 from tenderhack_knowledge.inference.embedding import Qwen3EmbeddingAdapter
 from tenderhack_knowledge.inference.errors import AdapterOutputError, GeneratorClientError, ModelLoadError
-from tenderhack_knowledge.inference.generator import GeneratorOutputTruncatedError, LocalOpenAIChatGenerator, VllmGeneratorClient
+from tenderhack_knowledge.inference.generator import (
+    GeneratorOutputTruncatedError,
+    LocalOpenAIChatGenerator,
+    VllmGeneratorClient,
+    _classify_finish_reason,
+)
 from tenderhack_knowledge.inference.reranker import BgeRerankerAdapter, _RerankerBundle
 
 
@@ -235,6 +240,7 @@ async def test_local_generator_raises_safe_truncation_signal(monkeypatch: pytest
 
     assert content not in str(error.value)
     assert fake.calls[0][2] is None
+    assert generator._last_finish_reason == "length"
 
 
 @pytest.mark.asyncio
@@ -248,6 +254,15 @@ async def test_local_generator_accepts_stop_response_without_retry_signal(monkey
 
     assert await generator.draft("test") == content
     assert len(fake.calls) == 1
+    assert generator._last_finish_reason == "stop"
+
+
+@pytest.mark.parametrize(
+    ("finish_reason", "expected"),
+    [("stop", "stop"), ("length", "length"), ("content_filter", "other"), (None, "unknown"), ("", "unknown")],
+)
+def test_finish_reason_is_classified_internally(finish_reason: object, expected: str) -> None:
+    assert _classify_finish_reason(finish_reason) == expected
 
 
 def test_inference_config_parses_without_loading_models(monkeypatch: pytest.MonkeyPatch) -> None:

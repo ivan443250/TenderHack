@@ -262,38 +262,61 @@ async def test_second_truncation_fails_closed_after_exactly_two_calls() -> None:
 
 
 @pytest.mark.asyncio
-async def test_invalid_json_after_stop_is_not_retried() -> None:
+async def test_invalid_json_retries_once_with_compact_instruction() -> None:
     fragment = _answerable_fragment("frag-invalid-stop")
-    generator = SequencedGenerator(['{"draft_markdown":"broken","claims":'])
+    generator = SequencedGenerator(
+        [
+            '{"draft_markdown":"broken","claims":',
+            _valid_grounded_output(fragment.fragment_id, fragment.text),
+        ]
+    )
+
+    result = await create_grounded_draft(_payload([fragment.fragment_id]), Repository((fragment,)), generator)
+
+    assert result.response.draft_markdown == fragment.text
+    assert len(generator.prompts) == 2
+    assert "BOUNDED RECOVERY RETRY" in generator.prompts[1]
+    assert "at most 3" in generator.prompts[1]
+    assert "only one shortest valid JSON" in generator.prompts[1]
+    assert generator.max_tokens == [800, 800]
+
+
+@pytest.mark.asyncio
+async def test_two_parse_failures_fail_closed_after_exactly_two_calls() -> None:
+    fragment = _answerable_fragment("frag-double-invalid")
+    generator = SequencedGenerator(
+        [
+            '{"draft_markdown":"broken","claims":',
+            '{"draft_markdown":"still broken","claims":',
+        ]
+    )
 
     with pytest.raises(GeneratorModelError, match="invalid JSON"):
         await create_grounded_draft(_payload([fragment.fragment_id]), Repository((fragment,)), generator)
 
-    assert len(generator.prompts) == 1
+    assert len(generator.prompts) == 2
 
 
 @pytest.mark.asyncio
-async def test_schema_error_after_stop_is_not_retried() -> None:
+async def test_schema_error_retries_once_and_preserves_strict_parser() -> None:
     fragment = _answerable_fragment("frag-schema-stop")
     generator = SequencedGenerator(
         [
-            _valid_grounded_output(fragment.fragment_id, ""),
+            json.dumps(
+                {
+                    "draft_markdown": "broken",
+                    "claims": [{"claim_id": "c1", "text": "", "fragment_ids": [fragment.fragment_id]}],
+                },
+                ensure_ascii=False,
+            ),
+            _valid_grounded_output(fragment.fragment_id, fragment.text),
         ]
     )
-    # The empty claim text violates the strict internal schema while retaining
-    # the same response envelope as a normal stop response.
-    generator.outputs[0] = json.dumps(
-        {
-            "draft_markdown": "broken",
-            "claims": [{"claim_id": "c1", "text": "", "fragment_ids": [fragment.fragment_id]}],
-        },
-        ensure_ascii=False,
-    )
 
-    with pytest.raises(GeneratorModelError, match="schema validation"):
-        await create_grounded_draft(_payload([fragment.fragment_id]), Repository((fragment,)), generator)
+    result = await create_grounded_draft(_payload([fragment.fragment_id]), Repository((fragment,)), generator)
 
-    assert len(generator.prompts) == 1
+    assert result.response.draft_markdown == fragment.text
+    assert len(generator.prompts) == 2
 
 
 @pytest.mark.asyncio
