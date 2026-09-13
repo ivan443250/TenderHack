@@ -1,14 +1,30 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from tenderhack_knowledge.api.routes import router
+from tenderhack_knowledge.api.routes import get_knowledge_repository, router
 from tenderhack_knowledge.contracts.v0 import ErrorCode, ErrorResponse
 from tenderhack_knowledge.observability.logging import configure_logging
 from tenderhack_knowledge.settings.config import get_settings
 
 configure_logging()
-app = FastAPI(title="TenderHack Knowledge Service", version="0.1.0")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    del app
+    yield
+    # `get_knowledge_repository`/`get_quality_repository` are process-wide `lru_cache`
+    # singletons (one engine/pool for the process) — dispose the pool here rather than
+    # leaving connections open past the last request.
+    repository = get_knowledge_repository()
+    if repository is not None:
+        await repository.engine.dispose()
+
+
+app = FastAPI(title="TenderHack Knowledge Service", version="0.1.0", lifespan=lifespan)
 app.include_router(router)
 
 

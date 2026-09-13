@@ -497,6 +497,29 @@ class QualityRepository:
             await connection.execute(pg_insert(quality_evaluations).values(values).on_conflict_do_update(index_elements=["evaluation_id"], set_=values))
             return record
 
+    async def pending_evaluation_identities(self, *, limit: int = 200) -> tuple[tuple[str, int], ...]:
+        """`(turn_id, revision)` pairs pushed via `/v0/quality/turns` that have no evaluation yet."""
+
+        async with self.engine.connect() as connection:
+            rows = (
+                await connection.execute(
+                    sa.select(quality_cases.c.turn_id, quality_cases.c.revision)
+                    .select_from(
+                        quality_cases.outerjoin(
+                            quality_evaluations,
+                            sa.and_(
+                                quality_cases.c.turn_id == quality_evaluations.c.turn_id,
+                                quality_cases.c.revision == quality_evaluations.c.revision,
+                            ),
+                        )
+                    )
+                    .where(quality_evaluations.c.evaluation_id.is_(None))
+                    .order_by(quality_cases.c.created_at)
+                    .limit(limit)
+                )
+            ).all()
+            return tuple((row.turn_id, row.revision) for row in rows)
+
     async def evaluations_for_case(self, case_id: str) -> tuple[EvaluationRecord, ...]:
         async with self.engine.connect() as connection:
             rows = (await connection.execute(sa.select(quality_evaluations).where(quality_evaluations.c.case_id == case_id).order_by(quality_evaluations.c.turn_id, quality_evaluations.c.revision))).mappings()

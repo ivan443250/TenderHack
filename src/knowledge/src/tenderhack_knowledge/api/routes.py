@@ -42,6 +42,7 @@ from tenderhack_knowledge.ingestion.ids import normalize_source_name
 from tenderhack_knowledge.ingestion.repository import CorpusBoundaryError, UnknownFragmentError, UnknownSnapshotError
 from tenderhack_knowledge.persistence.db import create_engine
 from tenderhack_knowledge.persistence.repository import PostgresKnowledgeRepository
+from tenderhack_knowledge.quality.service import QualityPayloadConflict, QualityRepository
 from tenderhack_knowledge.retrieval import LexicalRetriever
 from tenderhack_knowledge.understanding import understand_query
 
@@ -51,10 +52,23 @@ logger = logging.getLogger(__name__)
 
 @lru_cache(maxsize=1)
 def get_knowledge_repository() -> PostgresKnowledgeRepository | None:
-    """Build the durable repository lazily; importing the API never opens a DB."""
+    """Build the durable repository lazily; importing the API never opens a DB.
+
+    Cached as a process-wide singleton — one engine/connection pool for the
+    life of the process, not one per request. `main.py`'s lifespan disposes
+    the underlying engine on shutdown.
+    """
 
     engine = create_engine()
     return PostgresKnowledgeRepository(engine) if engine is not None else None
+
+
+@lru_cache(maxsize=1)
+def get_quality_repository() -> QualityRepository | None:
+    """Reuse the same engine/pool as `get_knowledge_repository` — no second connection pool."""
+
+    knowledge_repository = get_knowledge_repository()
+    return QualityRepository(knowledge_repository.engine) if knowledge_repository is not None else None
 
 
 def get_generator() -> LocalOpenAIChatGenerator:
@@ -421,8 +435,16 @@ async def current_snapshot(x_trace_id: TraceIdHeader) -> SnapshotResponse:
     status_code=202,
     responses=QUALITY_ERRORS,
 )
-def quality_turn(payload: QualityTurnPush, x_trace_id: TraceIdHeader) -> AcceptedResponse:
-    del payload, x_trace_id
+async def quality_turn(payload: QualityTurnPush, x_trace_id: TraceIdHeader) -> AcceptedResponse:
+    del x_trace_id
+    repository = get_quality_repository()
+    if repository is not None:
+        try:
+            await repository.ingest_turn(payload)
+        except QualityPayloadConflict as exc:
+            # knowledge-v0.md §4: never a 409 here — a conflicting payload under the same
+            # (turn_id, revision) is an api-worker bug, not a legitimate concurrent write.
+            raise _internal_error("conflicting quality turn payload for the same (turn_id, revision)") from exc
     return AcceptedResponse(status="stored")
 
 
@@ -432,8 +454,14 @@ def quality_turn(payload: QualityTurnPush, x_trace_id: TraceIdHeader) -> Accepte
     status_code=202,
     responses=QUALITY_ERRORS,
 )
-def quality_feedback(payload: QualityFeedbackPush, x_trace_id: TraceIdHeader) -> AcceptedResponse:
-    del payload, x_trace_id
+async def quality_feedback(payload: QualityFeedbackPush, x_trace_id: TraceIdHeader) -> AcceptedResponse:
+    del x_trace_id
+    repository = get_quality_repository()
+    if repository is not None:
+        try:
+            await repository.ingest_feedback(payload)
+        except QualityPayloadConflict as exc:
+            raise _internal_error("conflicting quality feedback payload for the same feedback_id") from exc
     return AcceptedResponse(status="stored")
 
 
@@ -443,8 +471,14 @@ def quality_feedback(payload: QualityFeedbackPush, x_trace_id: TraceIdHeader) ->
     status_code=202,
     responses=QUALITY_ERRORS,
 )
-def quality_completion(payload: QualityCompletionPush, x_trace_id: TraceIdHeader) -> AcceptedResponse:
-    del payload, x_trace_id
+async def quality_completion(payload: QualityCompletionPush, x_trace_id: TraceIdHeader) -> AcceptedResponse:
+    del x_trace_id
+    repository = get_quality_repository()
+    if repository is not None:
+        try:
+            await repository.ingest_completion(payload)
+        except QualityPayloadConflict as exc:
+            raise _internal_error("conflicting quality completion payload for the same case_id") from exc
     return AcceptedResponse(status="stored")
 
 
@@ -453,9 +487,16 @@ def quality_completion(payload: QualityCompletionPush, x_trace_id: TraceIdHeader
     response_model=QualityEvaluationsResponse,
     responses={400: {"model": ErrorResponse}, 422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
 )
-def quality_evaluations(x_trace_id: TraceIdHeader, case_id: str = Query(...)) -> QualityEvaluationsResponse:
+async def quality_evaluations(x_trace_id: TraceIdHeader, case_id: str = Query(...)) -> QualityEvaluationsResponse:
     del x_trace_id
-    return QualityEvaluationsResponse(case_id=case_id, evaluations=[])
+    repository = get_quality_repository()
+    if repository is None:
+        return QualityEvaluationsResponse(case_id=case_id, evaluations=[])
+    try:
+        records = await repository.evaluations_for_case(case_id)
+    except Exception as exc:  # pragma: no cover - depends on external DB
+        raise _internal_error("unable to load quality evaluations") from exc
+    return QualityEvaluationsResponse(case_id=case_id, evaluations=[record.to_contract() for record in records])
 
 
 @router.get(
@@ -463,6 +504,13 @@ def quality_evaluations(x_trace_id: TraceIdHeader, case_id: str = Query(...)) ->
     response_model=IssueGroupsResponse,
     responses={400: {"model": ErrorResponse}, 422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
 )
-def issue_groups(x_trace_id: TraceIdHeader) -> IssueGroupsResponse:
+async def issue_groups(x_trace_id: TraceIdHeader) -> IssueGroupsResponse:
     del x_trace_id
-    return IssueGroupsResponse(groups=[])
+    repository = get_quality_repository()
+    if repository is None:
+        return IssueGroupsResponse(groups=[])
+    try:
+        groups = await repository.issue_groups_query()
+    except Exception as exc:  # pragma: no cover - depends on external DB
+        raise _internal_error("unable to load quality issue groups") from exc
+    return IssueGroupsResponse(groups=[group.to_contract() for group in groups])

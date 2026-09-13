@@ -1,16 +1,19 @@
 import json
 import logging
 import sys
-from collections.abc import Mapping
 
 
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
-        payload: Mapping[str, object] = {
+        payload: dict[str, object] = {
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
         }
+        # Without this, `logger.exception(...)` (used for 500s — routes.py `_internal_error`)
+        # silently drops the traceback: only the plain message would reach stdout.
+        if record.exc_info:
+            payload["traceback"] = self.formatException(record.exc_info)
         return json.dumps(payload, ensure_ascii=False)
 
 

@@ -91,8 +91,18 @@ services:
     command: ["tenderhack-knowledge-worker"]
     environment:
       DATABASE_URL: ${KNOWLEDGE_DATABASE_URL:-postgresql+asyncpg://knowledge_rw:${KNOWLEDGE_DB_PASSWORD:-knowledge_dev_only}@postgres:5432/${POSTGRES_DB:-tenderhack}}
+      # `knowledge` already ran `alembic upgrade head` in its entrypoint by the time its
+      # healthcheck passes (see depends_on below) — running it again here too would race
+      # two concurrent `alembic upgrade` against an empty schema.
+      KNOWLEDGE_SKIP_MIGRATIONS: "true"
+      KNOWLEDGE_EMBEDDING_BASE_URL: ${KNOWLEDGE_EMBEDDING_BASE_URL:-http://embedding-inference:8080}
+      KNOWLEDGE_RERANKER_BASE_URL: ${KNOWLEDGE_RERANKER_BASE_URL:-}
+      KNOWLEDGE_GENERATOR_BASE_URL: ${KNOWLEDGE_GENERATOR_BASE_URL:-http://generator-inference:8080}
+      KNOWLEDGE_INFERENCE_BEARER_TOKEN: ${KNOWLEDGE_INFERENCE_BEARER_TOKEN:-}
     depends_on:
       postgres:
+        condition: service_healthy
+      knowledge:
         condition: service_healthy
 
   postgres:
