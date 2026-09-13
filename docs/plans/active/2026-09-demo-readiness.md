@@ -247,8 +247,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-knowledge.ps1
 - [ ] Фаза 4 — полный прогон
   - [ ] 16. Cold start на чистом volume (время: —)
   - [ ] 17. E2E §11 чек-лист (таблица ниже)
-  - [ ] 18. Бенчмарк 18 сценариев + organizer questions, демо-набор
-  - [ ] 19. Evidence по D1/D2 в Open issues
+  - [~] 18. Бенчмарк 18 сценариев — **прогнан 2026-09-13 на `966fb75` с RunPod-генератором** (llama.cpp b9426, `Qwen3.8-4B-Q6_K.gguf`, `model_version=draft_v1:empero-ai/Qwen3.8-4B-Distill@c83cb7aa…`). Инфраструктура: **0 × `TECHNICAL_ERROR`**, p50 1.2 с (без draft), draft-ходы 16–18 с. Решения: `ANSWER` только на «как создать оферту» (6 источников) и на «Как изменить данные банковской карты?» (**false-positive**, gold `HANDOFF_OFFER` — D1 подтверждён); шесть gold-`ANSWER` вопросов про УПД/МЧД/YML → `HANDOFF_OFFER` (флаги `HUMAN_SUPPORT_REQUIRED`, `CONFLICTING_EVIDENCE`, `ROLE_AMBIGUITY`, `FORBIDDEN_GENERALIZATION`, `HIGH_RISK_MISSING_CONDITION`) или `CLARIFY(role, provider)`; «Статус УПД не обновляется» → handoff вместо `CLARIFY`; typo/exact/handoff/multiturn-сценарии — в допустимых исходах. Совпадение с gold: 8/17 (moderation-сценарий требует два сообщения, скрипт слал одно). Демо-набор пока: `ANSWER` — «как создать оферту»; `CLARIFY` — «Как изменить МЧД?»; handoff — «Хочу поговорить с оператором»; модерация. Organizer questions не гонялись.
+  - [~] 19. Evidence по D1/D2 — см. п.18: gate консервативен на обычных вопросах про УПД и пропускает вопрос про банковскую карту; разбор condition cards/answerability — отдельная задача до подбора демо-вопросов
   - [ ] 20. Issue group для демо
 - [ ] Фаза 5 — презентация
   - [ ] 21–24
@@ -281,6 +281,7 @@ Real behavior note (not a plan deviation, a discovered fact): `HttpKnowledgeServ
 | # | Сценарий | Ожидание | Факт | Commit |
 |---|---|---|---|---|
 | 1 | Вопрос с опечаткой → ANSWER + источник | grounded ответ, «Открыть источник» | 2026-09-13: PASS (UI, `--profile stub`) — «как создать оферту» → ANSWER, 6 источников, `model_version=draft_v1:stub-extractive-v0@...`, «Открыть источник» показывает фрагмент. Опечатка отдельно не проверялась | working tree |
+| 1′ | То же с реальной моделью (RunPod) | grounded ответ Qwen | 2026-09-13 на `966fb75`: PASS — «как создать оферту» → ANSWER, draft 15.2 с / verify 135 мс, `model_version=draft_v1:empero-ai/Qwen3.8-4B-Distill@…`, связный markdown, 6 источников. Замечание: одна фраза сместила смысл источника («после создания… переходит» vs «после истечения срока… вернётся») — `verify_v1` лексический, семантику не ловит | `966fb75` |
 | 2 | Похожая тема без ответа | «подтверждённого ответа нет» + оператор | — | — |
 | 3 | Условие меняет ветку (МЧД) | CLARIFY → ответ | 2026-09-13: «Как изменить МЧД?» дало `HANDOFF_OFFER` (`INSUFFICIENT_EVIDENCE`/`LOW_SPECIFICITY`), не `CLARIFY` — это известный D2 (answerability gate), не трогали | working tree |
 | 4 | Другой код ошибки | нет подмены | — | — |
