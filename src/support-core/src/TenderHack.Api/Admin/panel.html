@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TenderHack · тестовая админ-панель</title>
+  <style>
+    :root { --bg: #f5f6f8; --card: #fff; --border: #e3e6ea; --text: #1f2933; --muted: #5e6975; --accent: #e21d2d; --ok: #1a7f37; --warn: #b54708; --err: #d92d20; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); background: var(--bg); }
+    header { padding: 16px 24px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; }
+    header h1 { font-size: 16px; margin: 0; }
+    header .note { color: var(--muted); font-size: 12px; }
+    main { padding: 16px 24px 48px; max-width: 1400px; margin: 0 auto; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: end; margin-bottom: 16px; }
+    .controls label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+    .controls input { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font: inherit; }
+    .controls button { padding: 7px 12px; border: 1px solid var(--border); background: var(--card); border-radius: 6px; cursor: pointer; font: inherit; }
+    .controls button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .presets { display: flex; gap: 4px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+    .card h2 { font-size: 13px; margin: 0 0 8px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .02em; }
+    .kpi { font-size: 26px; font-weight: 700; }
+    .kpi small { font-size: 12px; font-weight: 400; color: var(--muted); margin-left: 6px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; font-size: 12px; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .badge { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; background: #eef0f3; color: var(--muted); }
+    .badge.ANSWER, .badge.ANSWER_AND_HANDOFF { background: #e6f4ea; color: var(--ok); }
+    .badge.CLARIFY { background: #fff4e5; color: var(--warn); }
+    .badge.HANDOFF_OFFER { background: #fde8ea; color: var(--accent); }
+    .badge.TECHNICAL_ERROR { background: #fdecec; color: var(--err); }
+    .badge.MODERATION_WARNING, .badge.MODERATION_CLOSE { background: #f1e8fd; color: #6b21a8; }
+    .status { margin: 8px 0 16px; color: var(--muted); font-size: 12px; }
+    .status.error { color: var(--err); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+    .wrap { overflow-x: auto; }
+    .empty { color: var(--muted); font-style: italic; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>TenderHack · тестовая админ-панель</h1>
+    <span class="note">Сводка по вопросам из БД <code>api</code> (cases / turns / case_events / feedback). Read-only, без ролей — только для команды. Не связана с основным UI.</span>
+  </header>
+  <main>
+    <div class="controls">
+      <div class="presets">
+        <button type="button" data-hours="1">1 ч</button>
+        <button type="button" data-hours="24">24 ч</button>
+        <button type="button" data-hours="168">7 дн</button>
+        <button type="button" data-hours="720">30 дн</button>
+      </div>
+      <label>С <input id="from" type="datetime-local" /></label>
+      <label>По <input id="to" type="datetime-local" /></label>
+      <label>Лимит вопросов <input id="limit" type="number" min="1" max="1000" value="200" style="width:90px" /></label>
+      <label>Токен (если задан <code>Admin:Token</code>) <input id="token" type="password" placeholder="X-Admin-Token" /></label>
+      <button type="button" class="primary" id="refresh">Обновить</button>
+      <a id="json-link" href="#" target="_blank" rel="noopener">JSON</a>
+    </div>
+    <div id="status" class="status">Выберите период и нажмите «Обновить».</div>
+
+    <div class="grid" id="kpis"></div>
+
+    <div class="grid">
+      <div class="card"><h2>Решения по ходам</h2><div id="decisions"></div></div>
+      <div class="card"><h2>Статусы ходов</h2><div id="turn-statuses"></div></div>
+      <div class="card"><h2>Handoff (кейсы периода)</h2><div id="handoffs"></div></div>
+      <div class="card"><h2>Завершения (по completed_at)</h2><div id="completions"></div></div>
+      <div class="card"><h2>Feedback (по submitted_at)</h2><div id="feedback"></div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px"><h2>По дням (UTC)</h2><div class="wrap" id="by-day"></div></div>
+    <div class="card" style="margin-bottom:12px"><h2>Частые вопросы</h2><div class="wrap" id="top-questions"></div></div>
+    <div class="card"><h2>Вопросы за период</h2><div class="wrap" id="questions"></div></div>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const pad = (n) => String(n).padStart(2, "0");
+    const toLocalInput = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const fmtTime = (iso) => { const d = new Date(iso); return `${pad(d.getDate())}.${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+    const badge = (v) => `<span class="badge ${esc(v || "NONE")}">${esc(v || "—")}</span>`;
+
+    function setPreset(hours) {
+      const to = new Date();
+      const from = new Date(to.getTime() - hours * 3600 * 1000);
+      $("from").value = toLocalInput(from);
+      $("to").value = toLocalInput(to);
+    }
+
+    function countTable(obj, labelHeader) {
+      const entries = Object.entries(obj || {});
+      if (entries.length === 0) return `<div class="empty">нет данных</div>`;
+      return `<table><thead><tr><th>${esc(labelHeader)}</th><th class="num">n</th></tr></thead><tbody>` +
+        entries.map(([k, v]) => `<tr><td>${badge(k)}</td><td class="num">${v}</td></tr>`).join("") + `</tbody></table>`;
+    }
+
+    function render(data) {
+      const t = data.totals;
+      $("kpis").innerHTML = [
+        ["Ходов (вопросов с решением)", t.turns],
+        ["Сообщений пользователей", t.user_messages],
+        ["Кейсов создано", t.cases_created],
+        ["Активных кейсов", t.cases_active],
+        ["Уникальных владельцев", t.unique_owners],
+        ["Скрытых кейсов", t.hidden_cases],
+      ].map(([label, value]) => `<div class="card"><h2>${esc(label)}</h2><div class="kpi">${value}</div></div>`).join("");
+
+      $("decisions").innerHTML = countTable(data.decisions, "Decision");
+      $("turn-statuses").innerHTML = countTable(data.turn_statuses, "Status");
+      $("handoffs").innerHTML = countTable(data.handoff_statuses, "HandoffStatus");
+      $("completions").innerHTML = countTable(data.completions, "CompletionReason");
+      const fb = data.feedback;
+      $("feedback").innerHTML = `<div class="kpi">${fb.total}<small>всего</small></div>` +
+        `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">` +
+        `<div><div class="mono">information_quality</div>${countTable(fb.information_quality, "")}</div>` +
+        `<div><div class="mono">specialist</div>${countTable(fb.specialist, "")}</div>` +
+        `<div><div class="mono">solved</div>${countTable(fb.solved, "")}</div></div>`;
+
+      $("by-day").innerHTML = data.by_day.length === 0 ? `<div class="empty">нет ходов за период</div>` :
+        `<table><thead><tr><th>Дата</th><th class="num">Ходов</th><th class="num">ANSWER</th><th class="num">CLARIFY</th><th class="num">HANDOFF</th><th class="num">TECH_ERR</th><th class="num">MODERATION</th></tr></thead><tbody>` +
+        data.by_day.map((d) => `<tr><td>${esc(d.date)}</td><td class="num">${d.turns}</td><td class="num">${d.answers}</td><td class="num">${d.clarifications}</td><td class="num">${d.handoffs}</td><td class="num">${d.technical_errors}</td><td class="num">${d.moderation}</td></tr>`).join("") + `</tbody></table>`;
+
+      $("top-questions").innerHTML = data.top_questions.length === 0 ? `<div class="empty">нет данных</div>` :
+        `<table><thead><tr><th class="num">n</th><th>Вопрос</th><th>Решения</th></tr></thead><tbody>` +
+        data.top_questions.map((q) => `<tr><td class="num">${q.count}</td><td>${esc(q.text)}</td><td>${Object.entries(q.decisions).map(([k, v]) => `${badge(k)} ${v}`).join(" ")}</td></tr>`).join("") + `</tbody></table>`;
+
+      $("questions").innerHTML = data.questions.length === 0 ? `<div class="empty">нет сообщений за период</div>` :
+        `<table><thead><tr><th>Время</th><th>Кейс</th><th>Вопрос</th><th>Decision</th><th>Status</th></tr></thead><tbody>` +
+        data.questions.map((q) => `<tr><td class="mono">${esc(fmtTime(q.occurred_at))}</td><td class="mono" title="${esc(q.case_id)}">${esc(String(q.case_id).slice(0, 8))}</td><td>${esc(q.text)}</td><td>${badge(q.decision)}</td><td>${esc(q.turn_status || "—")}</td></tr>`).join("") + `</tbody></table>`;
+
+      $("status").className = "status";
+      $("status").textContent = `Период ${fmtTime(data.range.from)} — ${fmtTime(data.range.to)} · сформировано ${fmtTime(data.generated_at)} · показано ${data.questions.length} из ${t.user_messages} сообщений`;
+    }
+
+    function buildUrl() {
+      const params = new URLSearchParams();
+      if ($("from").value) params.set("from", new Date($("from").value).toISOString());
+      if ($("to").value) params.set("to", new Date($("to").value).toISOString());
+      params.set("limit", $("limit").value || "200");
+      return `/admin/api/summary?${params.toString()}`;
+    }
+
+    async function refresh() {
+      const url = buildUrl();
+      const token = $("token").value.trim();
+      sessionStorage.setItem("admin-token", token);
+      $("json-link").href = token ? `${url}&token=${encodeURIComponent(token)}` : url;
+      $("status").className = "status";
+      $("status").textContent = "Загрузка…";
+      try {
+        const response = await fetch(url, { headers: token ? { "X-Admin-Token": token } : {} });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          $("status").className = "status error";
+          $("status").textContent = `HTTP ${response.status} ${body.code || ""}: ${body.message || body.title || "ошибка"}`;
+          return;
+        }
+        render(body);
+      } catch (error) {
+        $("status").className = "status error";
+        $("status").textContent = `Ошибка запроса: ${error}`;
+      }
+    }
+
+    document.querySelectorAll(".presets button").forEach((b) => b.addEventListener("click", () => { setPreset(Number(b.dataset.hours)); refresh(); }));
+    $("refresh").addEventListener("click", refresh);
+    $("token").value = sessionStorage.getItem("admin-token") || "";
+    setPreset(24);
+    refresh();
+  </script>
+</body>
+</html>

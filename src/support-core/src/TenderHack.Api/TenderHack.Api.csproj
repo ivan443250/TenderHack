@@ -16,6 +16,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Test admin panel page (Admin/AdminEndpoints.cs) ships inside the assembly, not under
+         wwwroot: it must be gated by Admin:Enabled/Token at request time, which static files are not. -->
+    <EmbeddedResource Include="Admin\panel.html" LogicalName="TenderHack.Api.Admin.panel.html" />
+  </ItemGroup>
+
+  <ItemGroup>
     <WebSpaSource Include="$(WebSpaDir)\src\**;$(WebSpaDir)\index.html;$(WebSpaDir)\package.json;$(WebSpaDir)\vite.config.ts;$(WebSpaDir)\tsconfig*.json" />
   </ItemGroup>
 

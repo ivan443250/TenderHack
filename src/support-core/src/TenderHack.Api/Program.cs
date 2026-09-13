@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using TenderHack.Api.Admin;
 using TenderHack.Api.Endpoints;
 using TenderHack.Api.ExceptionHandling;
 using TenderHack.Application.Orchestration;
@@ -32,6 +33,11 @@ builder.Services.AddScoped<HideCaseUseCase>();
 builder.Services.AddScoped<SubmitFeedbackUseCase>();
 builder.Services.AddScoped<ListNotificationsUseCase>();
 builder.Services.AddScoped<AckNotificationsUseCase>();
+
+// Test admin panel (/admin): read-only summary over api-owned tables, gated by Admin:Enabled/Token
+// (Admin/AdminOptions.cs). Outside web-api-v0 and never linked from the SPA.
+builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection(AdminOptions.SectionName));
+builder.Services.AddScoped<AdminSummaryQuery>();
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -87,6 +93,7 @@ app.MapAnalyticsEndpoints();
 
 var supportOptions = app.Services.GetRequiredService<IOptions<SupportOptions>>().Value;
 app.MapSupportWebhookEndpoints(supportOptions);
+app.MapAdminEndpoints();
 
 // SPA fallback must be mapped last: it only catches GET requests that missed every route above
 // (i.e. never /api/v0/*, /health/*), and serves the SPA's own client-side router for e.g. /cases/123.

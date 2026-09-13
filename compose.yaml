@@ -32,6 +32,10 @@ services:
       # lexical/retrieval stages — tune per hardware profile, not per request.
       Knowledge__Timeouts__Draft: ${KNOWLEDGE_DRAFT_TIMEOUT:-00:02:30}
       Knowledge__Timeouts__Verify: ${KNOWLEDGE_VERIFY_TIMEOUT:-00:00:30}
+      # Test admin panel at http://localhost:8080/admin (read-only summary over api tables; no roles —
+      # set ADMIN_PANEL_TOKEN or ADMIN_PANEL_ENABLED=false on any shared host).
+      Admin__Enabled: ${ADMIN_PANEL_ENABLED:-true}
+      Admin__Token: ${ADMIN_PANEL_TOKEN:-}
     ports:
       - "8080:8080"
     depends_on:

@@ -87,6 +87,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-knowledge.ps1
 
 Профиль `stub` поднимает `generator-stub` — извлекающий тестовый дублёр реального генератора (`infra/inference/stub/README.md`), без него ветка `ANSWER` падает в `MODEL_UNAVAILABLE`. `bootstrap-knowledge.ps1` идемпотентно загружает корпус (6 PDF, ~3900 фрагментов). После этого UI — `http://localhost:5173`.
 
+### Тестовая админ-панель
+
+`http://localhost:8080/admin` — отдельная страница на `api` (не часть SPA и не часть `web-api-v0`): сводка по вопросам за период из таблиц `api` — ходы и решения (`ANSWER/CLARIFY/HANDOFF_OFFER/…`), статусы, handoff, завершения, feedback, разбивка по дням, частые вопросы и список сообщений. JSON: `GET /admin/api/summary?from=<ISO>&to=<ISO>&limit=200` (по умолчанию последние 24 ч). Ролей нет — включается `ADMIN_PANEL_ENABLED` (по умолчанию `true`), на любом общем хосте задайте `ADMIN_PANEL_TOKEN` (передаётся как `X-Admin-Token` или `?token=`) или выключите.
+
 ## Базовые проверки
 
 Актуальный список и интерпретация результатов — [`docs/quality.md`](docs/quality.md). Основные команды:
